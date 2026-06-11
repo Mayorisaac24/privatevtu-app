@@ -1,0 +1,73 @@
+{
+  "expo": {
+    "name": "PrivateVTU",
+    "slug": "vtu-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "privatevtu",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "statusBar": {
+      "style": "dark",
+      "backgroundColor": "#FFFFFF"
+    },
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#4C1D95"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.privatevtu.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow camera to scan bank account details from photos",
+        "NSPhotoLibraryUsageDescription": "Allow photo library access to scan bank account details",
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIViewControllerBasedStatusBarAppearance": true
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#4C1D95"
+      },
+      "package": "com.privatevtu.app",
+      "permissions": ["android.permission.CAMERA"]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow access to photos to scan account details",
+          "cameraPermission": "Allow camera to scan account details"
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#7C3AED"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "6c380c3b-75de-4a30-bc21-b40f329ca6bd"
+      }
+    }
+  }
+}

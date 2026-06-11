@@ -1,0 +1,850 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Image,
+  ImageSourcePropType,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { router } from 'expo-router';
+import * as Clipboard from 'expo-clipboard';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { api, formatCurrencyVisible, isResponseSuccess, type Transaction } from '../lib/api';
+import { findCachedTransaction } from '../lib/transaction-cache';
+import { BankLogo } from '../components/BankLogo';
+import { formatAccountNumberDisplay, resolveTransferBankForDisplay } from '../lib/transfer-banks';
+import { getProviderLogo } from '../lib/providers';
+import { Colors, Gradients, Radius, Shadow, Spacing, Typography } from '../theme';
+import { Skeleton } from '../components/ui/Skeleton';
+import {
+  enrichTransaction,
+  formatTransactionDateTime,
+  getAmountPresentation,
+  getStatusMeta,
+  getTransactionMeta,
+  getTransactionVisual,
+} from '../lib/transaction-display';
+import { showToast } from '../components/ui/Toast';
+
+const PAGE_BG = '#F4F5FA';
+const BORDER = 'rgba(15, 23, 42, 0.08)';
+const TIMELINE_BRAND = Colors.primary;
+const TIMELINE_BRAND_RING = 'rgba(124, 58, 237, 0.2)';
+const TIMELINE_BRAND_LINE = Colors.primaryLight;
+
+type Props = {
+  id: string;
+};
+
+function readMetaString(metadata: unknown, key: string): string {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return '';
+  const value = (metadata as Record<string, unknown>)[key];
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function formatPaymentMethod(type: string): string {
+  switch (String(type || '').toUpperCase()) {
+    case 'WITHDRAWAL':
+    case 'TRANSFER':
+      return 'Bank transfer';
+    case 'WALLET_FUND':
+      return 'Wallet funding';
+    case 'AIRTIME':
+      return 'Airtime';
+    case 'DATA':
+      return 'Data';
+    case 'ELECTRICITY':
+      return 'Electricity';
+    case 'CABLE':
+      return 'Cable TV';
+    default:
+      return type.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+  }
+}
+
+function getHeroGradient(tone: ReturnType<typeof getStatusMeta>['tone'], isFunding: boolean): string[] {
+  if (isFunding && tone === 'successful') return [...Gradients.success];
+  switch (tone) {
+    case 'successful':
+      return [...Gradients.card];
+    case 'failed':
+      return ['#7F1D1D', '#B91C1C', '#EF4444'];
+    case 'processing':
+      return ['#3730A3', '#5B21B6', '#7C3AED'];
+    default:
+      return ['#5B21B6', '#7C3AED', '#8B5CF6'];
+  }
+}
+
+function DetailRow({
+  label,
+  value,
+  copyValue,
+  onCopy,
+  mono,
+  isLast,
+}: {
+  label: string;
+  value: string;
+  copyValue?: string;
+  onCopy?: (value: string, label: string) => void;
+  mono?: boolean;
+  isLast?: boolean;
+}) {
+  return (
+    <View style={[styles.detailRow, isLast && styles.detailRowLast]}>
+      <Text style={styles.detailLabel}>{label}</Text>
+      <View style={styles.detailValueWrap}>
+        <Text
+          style={[styles.detailValue, mono && styles.detailValueMono]}
+          numberOfLines={3}
+          selectable
+        >
+          {value}
+        </Text>
+        {copyValue && onCopy ? (
+          <Pressable
+            style={({ pressed }) => [styles.copyBtn, pressed && styles.copyBtnPressed]}
+            onPress={() => onCopy(copyValue, label)}
+          >
+            <Ionicons name="copy-outline" size={13} color={Colors.primary} />
+            <Text style={styles.copyText}>Copy</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+function TimelineStep({
+  title,
+  subtitle,
+  active,
+  completed,
+  failed,
+  isLast,
+  accentColor,
+}: {
+  title: string;
+  subtitle: string;
+  active: boolean;
+  completed: boolean;
+  failed?: boolean;
+  isLast?: boolean;
+  accentColor: string;
+}) {
+  const pending = !completed && !active && !failed;
+  const dotColor = failed
+    ? Colors.error
+    : completed || active
+      ? accentColor
+      : Colors.borderMid;
+  const ringColor = failed
+    ? 'rgba(239, 68, 68, 0.18)'
+    : completed || active
+      ? TIMELINE_BRAND_RING
+      : 'transparent';
+
+  const iconName = failed
+    ? 'close'
+    : completed
+      ? 'checkmark'
+      : active
+        ? 'ellipse'
+        : 'ellipse-outline';
+
+  return (
+    <View style={styles.timelineStep}>
+      <View style={styles.timelineRail}>
+        <View style={[styles.timelineDotRing, { backgroundColor: ringColor }]}>
+          <View style={[styles.timelineDot, { backgroundColor: dotColor }]}>
+            <Ionicons name={iconName as any} size={11} color={Colors.white} />
+          </View>
+        </View>
+        {!isLast ? (
+          <View
+            style={[
+              styles.timelineLine,
+              completed || active ? { backgroundColor: completed ? TIMELINE_BRAND_LINE : accentColor } : null,
+            ]}
+          />
+        ) : null}
+      </View>
+      <View style={[styles.timelineBody, isLast && styles.timelineBodyLast]}>
+        <Text style={[styles.timelineTitle, pending && styles.timelineTitleMuted]}>{title}</Text>
+        <Text style={styles.timelineSub}>{subtitle}</Text>
+      </View>
+    </View>
+  );
+}
+
+function TransactionDetailSkeleton({ topInset }: { topInset: number }) {
+  return (
+    <View style={styles.skeletonWrap}>
+      <Skeleton width="100%" height={220 + topInset} borderRadius={0} />
+      <View style={styles.skeletonBody}>
+        <View style={styles.sectionCard}>
+          <Skeleton width="30%" height={14} />
+          {[1, 2, 3].map((i) => (
+            <View key={i} style={styles.skeletonTimelineRow}>
+              <Skeleton width={28} height={28} borderRadius={14} />
+              <View style={{ flex: 1, gap: 6 }}>
+                <Skeleton width="40%" height={12} />
+                <Skeleton width="85%" height={10} />
+              </View>
+            </View>
+          ))}
+        </View>
+        <View style={styles.sectionCard}>
+          <Skeleton width="28%" height={14} />
+          {[1, 2, 3, 4].map((i) => (
+            <View key={i} style={{ gap: 6, marginTop: 14 }}>
+              <Skeleton width="35%" height={10} />
+              <Skeleton width="75%" height={12} />
+            </View>
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function TransactionAvatar({ tx, size = 64, onDark }: { tx: ReturnType<typeof enrichTransaction>; size?: number; onDark?: boolean }) {
+  const visual = getTransactionVisual(tx);
+  const bankCode = readMetaString(tx.metadata, 'bankCode') || tx.logoKey || '';
+  const bankName = readMetaString(tx.metadata, 'bankName');
+  const wrapStyle = [
+    styles.heroAvatar,
+    { width: size, height: size, borderRadius: size / 2 },
+    onDark && styles.heroAvatarOnDark,
+  ];
+
+  if (visual.logoType === 'bank' && bankCode) {
+    const bank = resolveTransferBankForDisplay(bankCode, bankName);
+    return (
+      <View style={wrapStyle}>
+        <BankLogo bank={bank} size={size - 8} />
+      </View>
+    );
+  }
+
+  if (visual.logoType === 'provider' && visual.providerCode) {
+    return (
+      <View style={wrapStyle}>
+        <Image
+          source={getProviderLogo({ code: visual.providerCode, id: visual.providerCode, imageUrl: '' }) as ImageSourcePropType}
+          style={{ width: size - 12, height: size - 12, borderRadius: 10 }}
+          resizeMode="contain"
+        />
+      </View>
+    );
+  }
+
+  return (
+    <View style={[wrapStyle, { backgroundColor: onDark ? 'rgba(255,255,255,0.16)' : visual.bgColor }]}>
+      <Ionicons name={visual.icon as any} size={size * 0.38} color={onDark ? Colors.white : visual.iconColor} />
+    </View>
+  );
+}
+
+function SectionHeader({ icon, title }: { icon: keyof typeof Ionicons.glyphMap; title: string }) {
+  return (
+    <View style={styles.sectionHeader}>
+      <View style={styles.sectionIconWrap}>
+        <Ionicons name={icon} size={14} color={Colors.primary} />
+      </View>
+      <Text style={styles.sectionTitle}>{title}</Text>
+    </View>
+  );
+}
+
+export default function TransactionDetailScreen({ id }: Props) {
+  const insets = useSafeAreaInsets();
+  const [transaction, setTransaction] = useState<Transaction | null>(() => findCachedTransaction(id));
+  const [loadingDetail, setLoadingDetail] = useState(() => !findCachedTransaction(id));
+
+  useEffect(() => {
+    let cancelled = false;
+    const preview = findCachedTransaction(id);
+    setTransaction(preview);
+    setLoadingDetail(!preview);
+
+    (async () => {
+      try {
+        const res = await api.getTransactionDetail(id);
+        if (!cancelled && isResponseSuccess(res) && res.data) {
+          setTransaction(res.data);
+        }
+      } finally {
+        if (!cancelled) setLoadingDetail(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  const tx = useMemo(
+    () => (transaction ? enrichTransaction(transaction) : null),
+    [transaction],
+  );
+
+  const handleCopy = useCallback(async (value: string, label: string) => {
+    await Clipboard.setStringAsync(value);
+    showToast({ type: 'success', text1: 'Copied', text2: `${label} copied` });
+  }, []);
+
+  const handleShare = useCallback(async () => {
+    if (!tx) return;
+    const lines = [
+      tx.displayTitle || tx.type,
+      formatCurrencyVisible(tx.amount, true, getAmountPresentation(tx).prefix),
+      `Status: ${tx.displayStatusLabel || tx.status}`,
+      `Reference: ${tx.reference}`,
+    ];
+    if (tx.transferDetails?.accountNumber) {
+      lines.push(`Account: ${tx.transferDetails.accountNumber}`);
+    }
+    await Share.share({ message: lines.join('\n') });
+  }, [tx]);
+
+  const header = (
+    <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+      <Pressable style={styles.headerBtn} onPress={() => router.back()}>
+        <Ionicons name="chevron-back" size={22} color={Colors.dark} />
+      </Pressable>
+      <Text style={styles.headerTitle}>Transaction</Text>
+      <Pressable
+        style={[styles.shareBtn, !tx && styles.shareBtnDisabled]}
+        onPress={() => void handleShare()}
+        disabled={!tx}
+      >
+        <Ionicons name="share-outline" size={16} color={tx ? Colors.primary : Colors.mutedLight} />
+        <Text style={[styles.shareText, !tx && styles.shareTextDisabled]}>Share</Text>
+      </Pressable>
+    </View>
+  );
+
+  if (loadingDetail && !tx) {
+    return (
+      <View style={styles.root}>
+        {header}
+        <TransactionDetailSkeleton topInset={insets.top} />
+      </View>
+    );
+  }
+
+  if (!tx) {
+    return (
+      <View style={[styles.root, styles.centered]}>
+        {header}
+        <View style={styles.emptyState}>
+          <View style={styles.emptyIcon}>
+            <Ionicons name="receipt-outline" size={28} color={Colors.mutedLight} />
+          </View>
+          <Text style={styles.emptyTitle}>Transaction not found</Text>
+          <Text style={styles.emptySub}>This receipt may have been removed or is no longer available.</Text>
+          <Pressable style={styles.backLink} onPress={() => router.back()}>
+            <Text style={styles.backLinkText}>Go back</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
+  const { prefix } = getAmountPresentation(tx);
+  const statusMeta = getStatusMeta(tx.displayStatus || 'pending');
+  const typeMeta = getTransactionMeta(tx);
+  const transfer = tx.transferDetails;
+  const bankCode = transfer?.bankCode || readMetaString(tx.metadata, 'bankCode') || tx.logoKey || '';
+  const bankName = readMetaString(tx.metadata, 'bankName');
+  const bank = bankCode ? resolveTransferBankForDisplay(bankCode, bankName) : null;
+  const when = formatTransactionDateTime(tx.createdAt);
+  const isTransfer = tx.type === 'WITHDRAWAL' || tx.type === 'TRANSFER';
+  const isFailed = statusMeta.tone === 'failed';
+  const isSuccessful = statusMeta.tone === 'successful';
+  const isProcessing = statusMeta.tone === 'processing' || statusMeta.tone === 'pending';
+  const isFunding = tx.type === 'WALLET_FUND';
+  const accountNumber = transfer?.accountNumber || readMetaString(tx.metadata, 'accountNumber');
+  const recipientName = transfer?.accountName
+    || readMetaString(tx.metadata, 'accountName')
+    || tx.displayTitle
+    || 'Recipient';
+  const heroGradient = getHeroGradient(statusMeta.tone, isFunding);
+  const detailRows: Array<{
+    label: string;
+    value: string;
+    copyValue?: string;
+    mono?: boolean;
+  }> = [];
+
+  if (!isTransfer) {
+    if (tx.phone) detailRows.push({ label: 'Phone', value: tx.phone, copyValue: tx.phone });
+    if (tx.provider) detailRows.push({ label: 'Provider', value: tx.provider });
+  }
+
+  detailRows.push({ label: 'Payment method', value: formatPaymentMethod(tx.type) });
+  detailRows.push({ label: 'Reference', value: tx.reference, copyValue: tx.reference, mono: true });
+  if (tx.providerRef) {
+    detailRows.push({ label: 'Provider reference', value: tx.providerRef, copyValue: tx.providerRef, mono: true });
+  }
+  if (tx.formattedBalanceAfter) {
+    detailRows.push({ label: 'Balance after', value: tx.formattedBalanceAfter });
+  }
+
+  return (
+    <View style={styles.root}>
+      {header}
+
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 28 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <LinearGradient
+          colors={heroGradient as [string, string, ...string[]]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.heroGradient}
+        >
+          <View style={styles.heroBlob1} />
+          <View style={styles.heroBlob2} />
+
+          <TransactionAvatar tx={tx} onDark />
+
+          <Text style={styles.heroAmount}>
+            {formatCurrencyVisible(tx.amount, true, prefix)}
+          </Text>
+          <Text style={styles.heroTitle} numberOfLines={2}>
+            {tx.displayTitle}
+          </Text>
+          <Text style={styles.heroWhen}>{when}</Text>
+
+          <View style={styles.heroTypePill}>
+            <Ionicons name={typeMeta.icon as any} size={12} color="rgba(255,255,255,0.9)" />
+            <Text style={styles.heroTypeText}>{formatPaymentMethod(tx.type)}</Text>
+          </View>
+
+          <View style={styles.heroStatusWrap}>
+            <View style={styles.heroStatusPill}>
+              <View style={[styles.heroStatusDot, { backgroundColor: statusMeta.dot }]} />
+              <Text style={styles.heroStatusText}>{statusMeta.label}</Text>
+            </View>
+          </View>
+        </LinearGradient>
+
+        <View style={styles.bodyStack}>
+          <View style={styles.sectionCard}>
+            <SectionHeader icon="git-network-outline" title="Status" />
+            <TimelineStep
+              title="Initiated"
+              subtitle={`${when} · You started this transaction`}
+              active={isProcessing || isSuccessful || isFailed}
+              completed={isSuccessful || isFailed}
+              accentColor={TIMELINE_BRAND}
+              isLast={false}
+            />
+            <TimelineStep
+              title={isFailed ? 'Failed' : 'Processing'}
+              subtitle={
+                isFailed
+                  ? tx.errorMessage || 'This transaction could not be completed.'
+                  : isSuccessful
+                    ? `${when} · Provider accepted your transaction`
+                    : 'Your transaction is being processed.'
+              }
+              active={isProcessing}
+              completed={isSuccessful}
+              failed={isFailed}
+              accentColor={Colors.primaryGlow}
+              isLast={false}
+            />
+            <TimelineStep
+              title="Completed"
+              subtitle={
+                isSuccessful
+                  ? `${when} · Transaction completed successfully`
+                  : isFailed
+                    ? 'Transaction did not complete'
+                    : 'Waiting for confirmation'
+              }
+              active={isSuccessful}
+              completed={isSuccessful}
+              failed={isFailed}
+              accentColor={TIMELINE_BRAND}
+              isLast
+            />
+          </View>
+
+          <View style={styles.sectionCard}>
+            <SectionHeader icon="document-text-outline" title="Details" />
+
+            {isTransfer ? (
+              <View style={styles.recipientCard}>
+                <View style={styles.recipientLogo}>
+                  {bank ? (
+                    <BankLogo bank={bank} size={44} />
+                  ) : (
+                    <View style={styles.recipientLogoFallback}>
+                      <Ionicons name="person-outline" size={20} color={Colors.primary} />
+                    </View>
+                  )}
+                </View>
+                <View style={styles.recipientInfo}>
+                  <Text style={styles.recipientLabel}>Sent to</Text>
+                  <Text style={styles.recipientName} numberOfLines={2}>
+                    {recipientName}
+                  </Text>
+                  {accountNumber ? (
+                    <Text style={styles.recipientMeta}>
+                      {bank ? `${bank.shortName || bank.name} · ` : ''}
+                      {formatAccountNumberDisplay(accountNumber)}
+                    </Text>
+                  ) : bank ? (
+                    <Text style={styles.recipientMeta}>{bank.shortName || bank.name}</Text>
+                  ) : null}
+                </View>
+                <View style={styles.sentBadge}>
+                  <Ionicons name="paper-plane" size={14} color={Colors.primary} />
+                </View>
+              </View>
+            ) : null}
+
+            {isTransfer && transfer?.narration ? (
+              <>
+                {isTransfer ? <View style={styles.cardDivider} /> : null}
+                <DetailRow label="Description" value={transfer.narration} />
+              </>
+            ) : null}
+
+            {isTransfer && (detailRows.length > 0 || transfer?.narration) ? (
+              <View style={styles.cardDivider} />
+            ) : null}
+
+            {detailRows.map((row, index) => (
+              <DetailRow
+                key={row.label}
+                label={row.label}
+                value={row.value}
+                copyValue={row.copyValue}
+                onCopy={handleCopy}
+                mono={row.mono}
+                isLast={index === detailRows.length - 1}
+              />
+            ))}
+          </View>
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: PAGE_BG },
+  centered: { justifyContent: 'center' },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.page,
+    paddingBottom: 12,
+    backgroundColor: Colors.white,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.border,
+  },
+  headerBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.surfaceAlt,
+  },
+  headerTitle: { ...Typography.h4, color: Colors.dark },
+  shareBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.primaryMuted,
+  },
+  shareBtnDisabled: { backgroundColor: Colors.surfaceAlt },
+  shareText: { ...Typography.captionMed, color: Colors.primary },
+  shareTextDisabled: { color: Colors.mutedLight },
+  content: { paddingBottom: 40 },
+  skeletonWrap: { flex: 1 },
+  skeletonBody: { marginTop: -18, paddingHorizontal: Spacing.page, gap: 14 },
+  skeletonTimelineRow: { flexDirection: 'row', gap: 12, marginTop: 16 },
+  heroGradient: {
+    alignItems: 'center',
+    paddingHorizontal: Spacing.page,
+    paddingTop: 28,
+    paddingBottom: 36,
+    overflow: 'hidden',
+  },
+  heroBlob1: {
+    position: 'absolute',
+    top: -24,
+    right: -20,
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+  },
+  heroBlob2: {
+    position: 'absolute',
+    bottom: 8,
+    left: -18,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  heroAvatar: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    marginBottom: 14,
+  },
+  heroAvatarOnDark: {
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.28)',
+    ...Shadow.sm,
+  },
+  heroAmount: {
+    fontSize: 36,
+    fontWeight: '800',
+    color: Colors.white,
+    letterSpacing: -0.8,
+    marginBottom: 6,
+  },
+  heroTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.95)',
+    textAlign: 'center',
+    lineHeight: 20,
+    maxWidth: '92%',
+  },
+  heroWhen: {
+    ...Typography.caption,
+    color: 'rgba(255,255,255,0.72)',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  heroTypePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: Radius.full,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
+  heroTypeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.9)',
+    letterSpacing: 0.2,
+  },
+  heroStatusWrap: { marginTop: 14 },
+  heroStatusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: Radius.full,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
+  },
+  heroStatusDot: { width: 8, height: 8, borderRadius: 4 },
+  heroStatusText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.white,
+    letterSpacing: 0.2,
+  },
+  bodyStack: {
+    marginTop: -20,
+    paddingHorizontal: Spacing.page,
+    gap: 14,
+  },
+  sectionCard: {
+    backgroundColor: Colors.white,
+    borderRadius: Radius.xl,
+    padding: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: BORDER,
+    ...Shadow.card,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 16,
+  },
+  sectionIconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    backgroundColor: Colors.primaryMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionTitle: { ...Typography.h4, color: Colors.dark },
+  recipientCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: BORDER,
+  },
+  recipientLogo: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: Colors.primaryMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  recipientLogoFallback: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.primaryMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recipientInfo: { flex: 1, gap: 2 },
+  recipientLabel: {
+    ...Typography.label,
+    color: Colors.muted,
+    fontSize: 9,
+  },
+  recipientName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.dark,
+    lineHeight: 18,
+  },
+  recipientMeta: {
+    fontSize: 12,
+    color: Colors.muted,
+    fontWeight: '500',
+    marginTop: 1,
+  },
+  sentBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: Colors.primaryMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardDivider: {
+    height: 1,
+    backgroundColor: Colors.surfaceAlt,
+    marginVertical: 14,
+  },
+  detailRow: {
+    paddingVertical: 11,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.surfaceAlt,
+    gap: 5,
+  },
+  detailRowLast: {
+    borderBottomWidth: 0,
+    paddingBottom: 0,
+  },
+  detailLabel: { ...Typography.label, color: Colors.muted, fontSize: 9 },
+  detailValueWrap: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  detailValue: { flex: 1, ...Typography.bodyMed, color: Colors.dark, lineHeight: 20 },
+  detailValueMono: { ...Typography.mono, fontSize: 12, color: Colors.mid },
+  copyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.primaryMuted,
+  },
+  copyBtnPressed: { opacity: 0.75 },
+  copyText: { ...Typography.captionMed, color: Colors.primary },
+  timelineStep: { flexDirection: 'row', gap: 12, minHeight: 68 },
+  timelineRail: { width: 28, alignItems: 'center' },
+  timelineDotRing: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timelineDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timelineLine: {
+    width: 2,
+    flex: 1,
+    backgroundColor: Colors.borderMid,
+    marginTop: 4,
+    borderRadius: 1,
+  },
+  timelineBody: { flex: 1, paddingBottom: 14 },
+  timelineBodyLast: { paddingBottom: 0 },
+  timelineTitle: { ...Typography.smallMed, color: Colors.dark, fontWeight: '700' },
+  timelineTitleMuted: { color: Colors.mutedLight },
+  timelineSub: { ...Typography.caption, color: Colors.muted, marginTop: 3, lineHeight: 17 },
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 40,
+    gap: 8,
+  },
+  emptyIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: Colors.surfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  emptyTitle: { ...Typography.h4, color: Colors.dark },
+  emptySub: { ...Typography.small, color: Colors.muted, textAlign: 'center', lineHeight: 18 },
+  backLink: {
+    marginTop: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.primaryMuted,
+  },
+  backLinkText: { color: Colors.primary, fontWeight: '700', fontSize: 14 },
+});
