@@ -1,85 +1,135 @@
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator, Keyboard,
+  ScrollView, Keyboard,
 } from 'react-native';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { api, formatCurrency, isResponseSuccess, parseWalletBalanceKobo, type ElectricityProvider } from '../../src/lib/api';
 import { useWalletStore } from '../../src/stores';
-import { Colors, Spacing, Typography, Radius, Shadow } from '../../src/theme';
-import { Toast } from '../../src/components/ui/Toast';
+import { Colors, Typography, Radius } from '../../src/theme';
+import { showToast } from '../../src/components/ui/Toast';
 import { ServiceScreenHeader } from '../../src/components/ServiceScreenHeader';
 import { useHardwareBack } from '../../src/hooks/useHardwareBack';
 import { navigateBack } from '../../src/lib/navigation';
+import { ThemedScreen } from '../../src/components/ui/ThemedScreen';
+import { PurchaseConfirmCard } from '../../src/components/purchase/PurchaseConfirmCard';
+import {
+  ServiceSectionLabel,
+  ServicePurchaseCard,
+  ServiceContinueButton,
+  ServiceEditLink,
+} from '../../src/components/purchase/ServicePurchaseUi';
+import { TransactionLockSheet } from '../../src/components/security/TransactionLockSheet';
+import type { TransactionAuthPayload } from '../../src/hooks/useTransactionLockAuth';
+import { ScreenBody } from '../../src/components/ui/ScreenBody';
+import { DiscoPickerModal } from '../../src/components/DiscoPickerModal';
+import { DiscoLogo } from '../../src/components/DiscoLogo';
+import { getDiscoDisplayName, getDiscoLogo } from '../../src/lib/disco-providers';
+import { useElectricityDiscos } from '../../src/hooks/useElectricityDiscos';
+import {
+  getCachedElectricityDiscos,
+  peekCachedElectricityDiscos,
+  preloadElectricityDiscos,
+} from '../../src/lib/electricity-discos-cache';
 
 const QUICK_AMOUNTS = [1000, 2000, 5000, 10000, 20000];
 
 export default function ElectricityScreen() {
   const { balance, setBalance } = useWalletStore();
-  const [discos, setDiscos] = useState<ElectricityProvider[]>([]);
-  const [selectedDisco, setSelectedDisco] = useState('');
+  const { discos, loading: loadingDiscos } = useElectricityDiscos();
+  const [selectedDiscoProvider, setSelectedDiscoProvider] = useState<ElectricityProvider | null>(null);
+  const [showDiscoPicker, setShowDiscoPicker] = useState(false);
   const [meterNumber, setMeterNumber] = useState('');
   const [meterType, setMeterType] = useState<'prepaid' | 'postpaid'>('prepaid');
   const [amount, setAmount] = useState('');
   const [phone, setPhone] = useState('');
-  const [pin, setPin] = useState('');
   const [step, setStep] = useState<'details' | 'amount' | 'confirm'>('details');
+  const [showLock, setShowLock] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [loadingDiscos, setLoadingDiscos] = useState(true);
   const [verifying, setVerifying] = useState(false);
   const [verification, setVerification] = useState<{ customerName?: string; address?: string } | null>(null);
 
-  useEffect(() => { loadDiscos(); }, []);
+  const selectedDisco = selectedDiscoProvider?.code || '';
+  const selectedDiscoName = selectedDiscoProvider ? getDiscoDisplayName(selectedDiscoProvider) : '';
 
-  const loadDiscos = async () => {
-    try { const res = await api.getElectricityProviders(); if (res.success) setDiscos(res.data ?? []); }
-    finally { setLoadingDiscos(false); }
-  };
+  const openDiscoPicker = useCallback(() => {
+    setShowDiscoPicker(true);
+    if (discos.length === 0) {
+      void getCachedElectricityDiscos();
+    }
+  }, [discos.length]);
+
+  const handleSelectDisco = useCallback((provider: ElectricityProvider) => {
+    setSelectedDiscoProvider(provider);
+    setShowDiscoPicker(false);
+  }, []);
 
   const handleVerify = async () => {
-    if (!selectedDisco) { Toast.show({ type: 'error', text1: 'Select DISCO', text2: 'Please select a DISCO provider' }); return; }
-    if (!meterNumber) { Toast.show({ type: 'error', text1: 'Enter Meter Number', text2: 'Please enter your meter number' }); return; }
+    if (!selectedDisco) { showToast({ type: 'error', text1: 'Select DISCO', text2: 'Please select a DISCO provider' }); return; }
+    if (!meterNumber) { showToast({ type: 'error', text1: 'Enter Meter Number', text2: 'Please enter your meter number' }); return; }
     Keyboard.dismiss(); setVerifying(true);
     try {
       const res = await api.verifyElectricityMeter({ disco: selectedDisco, meterNumber, meterType });
       if (res.success && res.data) {
         setVerification(res.data); setStep('amount');
-        Toast.show({ type: 'success', text1: 'Meter Verified ✓', text2: res.data.customerName || 'Customer verified' });
+        showToast({ type: 'success', text1: 'Meter Verified ✓', text2: res.data.customerName || 'Customer verified' });
       } else {
-        Toast.show({ type: 'error', text1: 'Verification Failed', text2: res.message || 'Check meter number and try again' });
+        showToast({ type: 'error', text1: 'Verification Failed', text2: res.message || 'Check meter number and try again' });
       }
     } catch (err: any) {
-      Toast.show({ type: 'error', text1: 'Verification Failed', text2: err?.data?.message || err?.message || 'Could not verify meter' });
+      showToast({ type: 'error', text1: 'Verification Failed', text2: err?.data?.message || err?.message || 'Could not verify meter' });
     } finally { setVerifying(false); }
   };
 
-  const handlePay = async () => {
-    if (!pin || pin.length !== 4) { Toast.show({ type: 'error', text1: 'Enter PIN', text2: 'Enter your 4-digit transaction PIN' }); return; }
+  const handleContinueToConfirm = () => {
+    if (!amount || parseFloat(amount) < 100) {
+      showToast({ type: 'error', text1: 'Invalid Amount', text2: 'Minimum amount is ₦100' });
+      return;
+    }
+    Keyboard.dismiss();
+    setStep('confirm');
+  };
+
+  const handlePay = async (auth: TransactionAuthPayload) => {
     setLoading(true);
     try {
-      const res = await api.purchaseElectricity({ disco: selectedDisco, meterNumber, meterType, amount: parseFloat(amount), pin, phone: phone || undefined });
+      const res = await api.purchaseElectricity({ disco: selectedDisco, meterNumber, meterType, amount: parseFloat(amount), phone: phone || undefined, ...auth });
       if (res.success) {
         const balRes = await api.getWalletBalance();
         if (isResponseSuccess(balRes)) setBalance(parseWalletBalanceKobo(balRes.data));
         const token = res.data?.token || res.data?.purchasedToken;
-        Toast.show({ type: 'success', text1: 'Payment Successful! ⚡', text2: token ? `Token: ${token}` : `₦${parseFloat(amount).toLocaleString()} electricity purchased` });
-        setTimeout(() => { setMeterNumber(''); setAmount(''); setPin(''); setPhone(''); setVerification(null); setSelectedDisco(''); setStep('details'); }, 2000);
+        showToast({ type: 'success', text1: 'Payment Successful! ⚡', text2: token ? `Token: ${token}` : `₦${parseFloat(amount).toLocaleString()} electricity purchased` });
+        setShowLock(false);
+        setTimeout(() => {
+          setMeterNumber('');
+          setAmount('');
+          setPhone('');
+          setVerification(null);
+          setSelectedDiscoProvider(null);
+          setStep('details');
+        }, 2000);
       } else {
-        Toast.show({ type: 'error', text1: 'Payment Failed', text2: res.message || 'Please try again' });
+        showToast({ type: 'error', text1: 'Payment Failed', text2: res.message || 'Please try again' });
       }
     } catch (err: any) {
-      Toast.show({ type: 'error', text1: 'Payment Failed', text2: err?.data?.message || err?.message || 'Please try again' });
+      showToast({ type: 'error', text1: 'Payment Failed', text2: err?.data?.message || err?.message || 'Please try again' });
     } finally { setLoading(false); }
   };
 
   const stepIndex = step === 'details' ? 0 : step === 'amount' ? 1 : 2;
   const STEPS = ['Meter', 'Amount', 'Confirm'];
-  const selectedDiscoName = discos.find(d => d.code === selectedDisco)?.name || selectedDisco;
 
   const handleBack = useCallback(() => {
+    if (showLock) {
+      setShowLock(false);
+      return;
+    }
+    if (showDiscoPicker) {
+      setShowDiscoPicker(false);
+      return;
+    }
     if (step === 'confirm') {
       setStep('amount');
-      setPin('');
       return;
     }
     if (step === 'amount') {
@@ -89,67 +139,57 @@ export default function ElectricityScreen() {
       return;
     }
     navigateBack();
-  }, [step]);
+  }, [step, showLock, showDiscoPicker]);
 
   useHardwareBack(handleBack);
 
+  useEffect(() => {
+    preloadElectricityDiscos();
+  }, []);
+
   return (
-    <View style={styles.root}>
+    <ThemedScreen>
       <ServiceScreenHeader
         title="Pay Electricity"
         subtitle="Power your home instantly"
         icon="flash-outline"
-        iconColor={Colors.electricity}
-        iconBg={Colors.electricityBg}
         balanceLabel={formatCurrency(balance)}
         onBack={handleBack}
+        stepProgress={{
+          activeIndex: stepIndex,
+          labels: STEPS,
+        }}
       />
 
-      {/* Step bar */}
-      <View style={styles.stepBar}>
-        {STEPS.map((s, i) => {
-          const active = i === stepIndex, done = i < stepIndex;
-          return (
-            <View key={s} style={styles.stepItem}>
-              <View style={[styles.stepDot, active && styles.stepActive, done && styles.stepDone]}>
-                {done ? <Ionicons name="checkmark" size={10} color={Colors.white} /> : <Text style={[styles.stepNum, active && { color: Colors.white }]}>{i + 1}</Text>}
-              </View>
-              <Text style={[styles.stepLabel, active && styles.stepLabelActive]}>{s}</Text>
-              {i < STEPS.length - 1 && <View style={[styles.stepLine, done && styles.stepLineDone]} />}
-            </View>
-          );
-        })}
-      </View>
-
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <ScreenBody>
 
         {step === 'details' && (
           <>
-            {/* DISCO grid */}
-            <View style={styles.card}>
-              <Text style={styles.fieldLabel}>Select DISCO</Text>
-              {loadingDiscos ? (
-                <View style={styles.loadRow}><ActivityIndicator size="small" color={Colors.primary} /><Text style={styles.loadText}>Loading...</Text></View>
-              ) : (
-                <View style={styles.discoGrid}>
-                  {discos.map(d => {
-                    const sel = selectedDisco === d.code;
-                    return (
-                      <TouchableOpacity key={d.id}
-                        style={[styles.discoBtn, sel && styles.discoBtnActive]}
-                        onPress={() => setSelectedDisco(d.code)} activeOpacity={0.75}>
-                        <Ionicons name="flash" size={14} color={sel ? Colors.white : Colors.electricity} />
-                        <Text style={[styles.discoLabel, sel && { color: Colors.white }]} numberOfLines={2}>{d.name}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              )}
-            </View>
+            <ServicePurchaseCard>
+              <ServiceSectionLabel title="Select DISCO" icon="flash-outline" />
+              <TouchableOpacity style={styles.discoSelector} onPress={openDiscoPicker} activeOpacity={0.85}>
+                {selectedDiscoProvider ? (
+                  <View style={styles.discoSelectorInner}>
+                    <DiscoLogo provider={selectedDiscoProvider} size={32} />
+                    <View style={styles.discoSelectorTextWrap}>
+                      <Text style={styles.discoSelectorText}>{selectedDiscoName}</Text>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={styles.discoSelectorInner}>
+                    <View style={styles.discoSelectorIcon}>
+                      <Ionicons name="flash-outline" size={16} color={Colors.primary} />
+                    </View>
+                    <Text style={styles.discoSelectorPlaceholder}>Choose distribution company</Text>
+                  </View>
+                )}
+                <Ionicons name="chevron-down" size={16} color={Colors.mutedLight} />
+              </TouchableOpacity>
+            </ServicePurchaseCard>
 
-            {/* Meter type */}
-            <View style={styles.card}>
-              <Text style={styles.fieldLabel}>Meter Type</Text>
+            <ServicePurchaseCard>
+              <ServiceSectionLabel title="Meter type" icon="speedometer-outline" />
               <View style={styles.typeRow}>
                 {(['prepaid', 'postpaid'] as const).map(t => (
                   <TouchableOpacity key={t} style={[styles.typeBtn, meterType === t && styles.typeBtnActive]} onPress={() => setMeterType(t)}>
@@ -158,34 +198,29 @@ export default function ElectricityScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
-            </View>
+            </ServicePurchaseCard>
 
-            {/* Meter number */}
-            <View style={styles.card}>
-              <Text style={styles.fieldLabel}>Meter Number</Text>
+            <ServicePurchaseCard>
+              <ServiceSectionLabel title="Meter number" icon="barcode-outline" />
               <View style={styles.inputWrap}>
                 <Ionicons name="barcode-outline" size={18} color={Colors.muted} style={{ marginHorizontal: 12 }} />
                 <TextInput style={styles.input} placeholder="Enter meter number"
                   placeholderTextColor={Colors.mutedLight} value={meterNumber}
                   onChangeText={setMeterNumber} keyboardType="number-pad" />
               </View>
-            </View>
+            </ServicePurchaseCard>
 
-            <TouchableOpacity
-              style={[styles.cta, (verifying || !selectedDisco || !meterNumber) && styles.ctaDisabled]}
-              onPress={handleVerify} disabled={verifying || !selectedDisco || !meterNumber} activeOpacity={0.85}>
-              {verifying ? (
-                <><ActivityIndicator color={Colors.white} size="small" /><Text style={styles.ctaText}> Verifying...</Text></>
-              ) : (
-                <><Text style={styles.ctaText}>Verify Meter</Text><Ionicons name="arrow-forward" size={18} color={Colors.white} /></>
-              )}
-            </TouchableOpacity>
+            <ServiceContinueButton
+              label={verifying ? 'Verifying...' : 'Verify Meter'}
+              onPress={handleVerify}
+              disabled={verifying || !selectedDisco || !meterNumber}
+              loading={verifying}
+            />
           </>
         )}
 
         {step === 'amount' && (
           <>
-            {/* Verified banner */}
             <View style={styles.verifiedBanner}>
               <View style={styles.verifiedIcon}><Ionicons name="checkmark-circle" size={22} color={Colors.success} /></View>
               <View style={{ flex: 1 }}>
@@ -198,8 +233,8 @@ export default function ElectricityScreen() {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.card}>
-              <Text style={styles.fieldLabel}>Amount</Text>
+            <ServicePurchaseCard>
+              <ServiceSectionLabel title="Amount" hint="Min ₦100" icon="cash-outline" />
               <View style={styles.amountWrap}>
                 <Text style={styles.nairaSign}>₦</Text>
                 <TextInput style={styles.amountInput} placeholder="0.00"
@@ -213,111 +248,107 @@ export default function ElectricityScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
-            </View>
+            </ServicePurchaseCard>
 
-            <View style={styles.card}>
-              <Text style={styles.fieldLabel}>Phone (Optional — token delivery)</Text>
+            <ServicePurchaseCard>
+              <ServiceSectionLabel title="Phone" hint="Optional" icon="call-outline" />
               <View style={styles.inputWrap}>
                 <Ionicons name="phone-portrait-outline" size={16} color={Colors.muted} style={{ marginHorizontal: 12 }} />
                 <TextInput style={styles.input} placeholder="08012345678 (optional)"
                   placeholderTextColor={Colors.mutedLight} value={phone}
                   onChangeText={setPhone} keyboardType="phone-pad" maxLength={11} />
               </View>
-            </View>
+            </ServicePurchaseCard>
 
-            <TouchableOpacity
-              style={[styles.cta, (!amount || parseFloat(amount) < 100) && styles.ctaDisabled]}
-              onPress={() => { if (!amount || parseFloat(amount) < 100) { Toast.show({ type: 'error', text1: 'Invalid Amount', text2: 'Minimum amount is ₦100' }); return; } Keyboard.dismiss(); setStep('confirm'); }}
-              disabled={!amount || parseFloat(amount) < 100} activeOpacity={0.85}>
-              <Text style={styles.ctaText}>Continue</Text>
-              <Ionicons name="arrow-forward" size={18} color={Colors.white} />
-            </TouchableOpacity>
+            <ServiceContinueButton
+              label="Continue"
+              onPress={handleContinueToConfirm}
+              disabled={!amount || parseFloat(amount) < 100}
+            />
           </>
         )}
 
         {step === 'confirm' && (
           <>
-            <View style={[styles.card, { overflow: 'hidden' }]}>
-              <View style={styles.summaryHeader}>
-                <View style={[styles.summaryIcon, { backgroundColor: Colors.electricityBg }]}>
-                  <Ionicons name="flash-outline" size={24} color={Colors.electricity} />
-                </View>
-                <View>
-                  <Text style={styles.summaryTitle}>Electricity Payment</Text>
-                  <Text style={styles.summaryNet}>{selectedDiscoName}</Text>
-                </View>
-              </View>
-              <View style={styles.summaryRows}>
-                {[
-                  ['DISCO', selectedDiscoName],
-                  ['Meter Type', meterType.charAt(0).toUpperCase() + meterType.slice(1)],
-                  ['Meter Number', meterNumber],
-                  ['Customer', verification?.customerName || '—'],
-                  ...(phone ? [['Phone', phone]] : []),
-                  ['Amount', `₦${parseFloat(amount).toLocaleString()}`],
-                ].map(([k, v], i, arr) => (
-                  <View key={k} style={[styles.summaryRow, i < arr.length - 1 && styles.summaryRowBorder]}>
-                    <Text style={styles.summaryKey}>{k}</Text>
-                    <Text style={[styles.summaryVal, k === 'Amount' && { color: Colors.primary, fontWeight: '800', fontSize: 16 }]}>{v}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
+            <PurchaseConfirmCard
+              eyebrow="You're paying"
+              amount={`₦${parseFloat(amount || '0').toLocaleString()}`}
+              title={`Electricity · ${selectedDiscoName}`}
+              chip={`${meterType} · ${meterNumber}`}
+              logo={selectedDiscoProvider ? getDiscoLogo(selectedDiscoProvider) : undefined}
+              icon="flash-outline"
+              rows={[
+                { label: 'DISCO', value: selectedDiscoName },
+                { label: 'Meter type', value: meterType.charAt(0).toUpperCase() + meterType.slice(1) },
+                { label: 'Meter number', value: meterNumber },
+                { label: 'Customer', value: verification?.customerName || '—' },
+                ...(phone ? [{ label: 'Phone', value: phone }] : []),
+                { label: 'You pay', value: `₦${parseFloat(amount).toLocaleString()}`, highlight: true },
+              ]}
+            />
 
-            <View style={styles.card}>
-              <Text style={styles.fieldLabel}>Transaction PIN</Text>
-              <Text style={styles.pinHint}>Enter your 4-digit PIN to authorize</Text>
-              <View style={styles.inputWrap}>
-                <Ionicons name="lock-closed-outline" size={18} color={Colors.muted} style={{ marginHorizontal: 12 }} />
-                <TextInput style={[styles.input, { flex: 1, letterSpacing: 8, fontSize: 18 }]}
-                  placeholder="• • • •" placeholderTextColor={Colors.borderMid}
-                  value={pin} onChangeText={setPin} keyboardType="number-pad" maxLength={4} secureTextEntry autoFocus />
-              </View>
-            </View>
+            <ServiceContinueButton
+              label={`Pay ₦${parseFloat(amount || '0').toLocaleString()}`}
+              onPress={() => setShowLock(true)}
+              disabled={loading}
+              loading={loading}
+              icon="flash"
+            />
 
-            <TouchableOpacity style={[styles.cta, (loading || pin.length < 4) && styles.ctaDisabled]}
-              onPress={handlePay} disabled={loading || pin.length < 4} activeOpacity={0.85}>
-              {loading ? <ActivityIndicator color={Colors.white} /> : (
-                <><Text style={styles.ctaText}>Pay ₦{parseFloat(amount || '0').toLocaleString()}</Text><Ionicons name="flash" size={18} color={Colors.white} /></>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.backBtn} onPress={() => { setStep('amount'); setPin(''); }}>
-              <Ionicons name="arrow-back" size={14} color={Colors.muted} />
-              <Text style={styles.backText}>Edit details</Text>
-            </TouchableOpacity>
+            <ServiceEditLink onPress={() => setStep('amount')} />
           </>
         )}
+      </ScreenBody>
       </ScrollView>
-    </View>
+
+      <DiscoPickerModal
+        visible={showDiscoPicker}
+        providers={discos.length > 0 ? discos : (peekCachedElectricityDiscos() ?? [])}
+        loading={loadingDiscos && discos.length === 0}
+        selectedCode={selectedDisco}
+        onClose={() => setShowDiscoPicker(false)}
+        onSelect={handleSelectDisco}
+      />
+
+      <TransactionLockSheet
+        visible={showLock}
+        onClose={() => setShowLock(false)}
+        onAuthorized={handlePay}
+        title="Confirm electricity payment"
+        subtitle={`Authorize ₦${parseFloat(amount || '0').toLocaleString()} for meter ${meterNumber}`}
+        amount={`₦${parseFloat(amount || '0').toLocaleString()}`}
+        processing={loading}
+      />
+    </ThemedScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.surface },
-  stepBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, paddingHorizontal: 40, backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  stepItem: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  stepDot: { width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.border, justifyContent: 'center', alignItems: 'center' },
-  stepActive: { backgroundColor: Colors.primary },
-  stepDone: { backgroundColor: Colors.success },
-  stepNum: { ...Typography.captionMed, color: Colors.muted },
-  stepLabel: { ...Typography.caption, color: Colors.muted, marginLeft: 6 },
-  stepLabelActive: { color: Colors.primary, fontWeight: '600' },
-  stepLine: { flex: 1, height: 2, backgroundColor: Colors.border, marginHorizontal: 6 },
-  stepLineDone: { backgroundColor: Colors.success },
-  scroll: { padding: Spacing.page, paddingBottom: 40 },
-  card: { backgroundColor: Colors.white, borderRadius: Radius.xl, padding: 18, marginBottom: 14, ...Shadow.card },
-  fieldLabel: { ...Typography.label, color: Colors.muted, marginBottom: 12 },
-  loadRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
-  loadText: { ...Typography.small, color: Colors.muted },
-  discoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  discoBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingVertical: 9, paddingHorizontal: 12, borderRadius: Radius.md,
-    backgroundColor: Colors.electricityBg, borderWidth: 1.5, borderColor: '#FDE68A',
-    maxWidth: '48%', flex: 1,
+  scroll: { paddingBottom: 40 },
+  discoSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: 'rgba(124, 58, 237, 0.22)',
+    borderRadius: Radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: Colors.primaryMuted,
+    minHeight: 52,
   },
-  discoBtnActive: { backgroundColor: Colors.electricity, borderColor: Colors.electricity },
-  discoLabel: { ...Typography.smallMed, color: Colors.electricity, flex: 1 },
+  discoSelectorInner: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  discoSelectorIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  discoSelectorTextWrap: { flex: 1 },
+  discoSelectorText: { ...Typography.smallMed, color: Colors.dark },
+  discoSelectorPlaceholder: { ...Typography.small, color: Colors.mutedLight, flex: 1 },
   typeRow: { flexDirection: 'row', gap: 10 },
   typeBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
@@ -336,26 +367,21 @@ const styles = StyleSheet.create({
   quickBtnActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   quickText: { ...Typography.captionMed, color: Colors.muted },
   quickTextActive: { color: Colors.white, fontWeight: '700' },
-  verifiedBanner: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: Colors.successLight, borderRadius: Radius.xl, padding: 16, marginBottom: 14 },
+  verifiedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: Colors.successLight,
+    borderRadius: Radius.xl,
+    padding: 14,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: Colors.success + '33',
+  },
   verifiedIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
   verifiedName: { ...Typography.smallMed, color: Colors.successDark, marginBottom: 2 },
   verifiedAddr: { ...Typography.caption, color: Colors.success, marginBottom: 2 },
   verifiedMeter: { ...Typography.caption, color: Colors.success },
   changeBtn: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: Colors.white, borderRadius: Radius.sm },
   changeText: { ...Typography.captionMed, color: Colors.primary },
-  cta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.primary, borderRadius: Radius.md, paddingVertical: 16, ...Shadow.md },
-  ctaDisabled: { opacity: 0.5 },
-  ctaText: { ...Typography.bodyMed, color: Colors.white, fontWeight: '700', fontSize: 16 },
-  backBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: 14 },
-  backText: { ...Typography.small, color: Colors.muted },
-  summaryHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: Colors.surface },
-  summaryIcon: { width: 48, height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-  summaryTitle: { ...Typography.smallMed, color: Colors.dark, fontWeight: '600' },
-  summaryNet: { ...Typography.caption, color: Colors.muted },
-  summaryRows: { gap: 12 },
-  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 12 },
-  summaryRowBorder: { borderBottomWidth: 1, borderBottomColor: Colors.surface },
-  summaryKey: { ...Typography.small, color: Colors.muted },
-  summaryVal: { ...Typography.smallMed, color: Colors.dark },
-  pinHint: { ...Typography.small, color: Colors.muted, marginBottom: 12, marginTop: -6 },
 });

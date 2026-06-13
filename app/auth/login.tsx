@@ -1,19 +1,34 @@
-import {
-  View, Text, TouchableOpacity, StyleSheet, KeyboardAvoidingView,
-  Platform, ScrollView,
-} from 'react-native';
+import { ActivityIndicator, View, TouchableOpacity, StyleSheet } from 'react-native';
 import { useState, useEffect } from 'react';
 import { router } from 'expo-router';
-import * as LocalAuthentication from 'expo-local-authentication';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/lib/api';
 import { useAuthStore } from '../../src/stores';
-import { Input } from '../../src/components/ui/Input';
-import { Button } from '../../src/components/ui/Button';
-import { Toast } from '../../src/components/ui/Toast';
-import { Colors, Spacing, Typography, Radius, Shadow } from '../../src/theme';
-import { prefetchAppData } from '../../src/lib/dashboard-data';
+import { showToast } from '../../src/components/ui/Toast';
+import { Colors, Radius } from '../../src/theme';
 import { registerPushNotifications } from '../../src/lib/push-notifications';
+import { getLoginDeviceId } from '../../src/lib/login-context';
+import {
+  biometricQuickSignIn,
+  getBiometricCapability,
+  getQuickSignInEmail,
+  hasBiometricSignInEnabled,
+} from '../../src/lib/biometric-auth';
+import { canUseBiometricAuth, getSecurityPrefs } from '../../src/lib/security-storage';
+import { AuthShell, AuthCardHeader, AuthSecurityFooter } from '../../src/components/auth/AuthShell';
+import { AuthInput } from '../../src/components/auth/AuthInput';
+import {
+  AuthDivider,
+  AuthFooterLink,
+  AuthGradientButton,
+  AuthSegmentedControl,
+  AuthTextLink,
+} from '../../src/components/auth/AuthControls';
+
+const LOGIN_METHODS = [
+  { key: 'email' as const, label: 'Email', icon: 'mail-outline' as const },
+  { key: 'phone' as const, label: 'Phone', icon: 'call-outline' as const },
+];
 
 export default function LoginScreen() {
   const [method, setMethod] = useState<'email' | 'phone'>('email');
@@ -22,22 +37,30 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [fieldErrors, setFieldErrors] = useState<{ identifier?: string; password?: string }>({});
   const [isLoading, setIsLoading] = useState(false);
-  const [biometricLabel, setBiometricLabel] = useState('');
+  const [bioLoading, setBioLoading] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [quickSignInEmail, setQuickSignInEmail] = useState<string | null>(null);
   const { setUser } = useAuthStore();
 
-  useEffect(() => { checkBiometric(); }, []);
+  useEffect(() => {
+    void (async () => {
+      const capability = await getBiometricCapability();
+      setBiometricAvailable(capability.available);
 
-  const checkBiometric = async () => {
-    const has = await LocalAuthentication.hasHardwareAsync();
-    const enrolled = await LocalAuthentication.isEnrolledAsync();
-    if (!has || !enrolled) return;
-    const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-    setBiometricLabel(
-      types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)
-        ? 'Face ID'
-        : 'Fingerprint'
-    );
-  };
+      const prefs = await getSecurityPrefs();
+      const biometricReady =
+        canUseBiometricAuth(prefs) && (await hasBiometricSignInEnabled());
+
+      if (biometricReady) {
+        const savedEmail = await getQuickSignInEmail();
+        if (savedEmail) {
+          setQuickSignInEmail(savedEmail);
+          setEmail(savedEmail);
+          setMethod('email');
+        }
+      }
+    })();
+  }, []);
 
   const validate = () => {
     const errs: typeof fieldErrors = {};
@@ -52,243 +75,220 @@ export default function LoginScreen() {
     return Object.keys(errs).length === 0;
   };
 
+  const finishSignIn = (signedInUser: { firstName?: string; hasPin?: boolean }) => {
+    void registerPushNotifications().catch(() => {});
+    showToast({
+      type: 'success',
+      text1: 'Welcome back',
+      text2: `Hello, ${signedInUser.firstName || 'there'}`,
+    });
+    router.replace(signedInUser.hasPin === false ? '/dashboard/setup-pin' : '/(tabs)');
+  };
+
   const handleLogin = async () => {
     if (!validate()) return;
     setIsLoading(true);
     try {
+      const deviceId = await getLoginDeviceId();
       const res = await api.login({
         email: method === 'email' ? email.trim() : undefined,
         phone: method === 'phone' ? phone.trim() : undefined,
         password,
+        deviceId,
       });
       if (res.success && res.data) {
         if (res.data.requiresTwoFactor && res.data.userId) {
-          Toast.show({ type: 'info', text1: '2FA Required', text2: 'Enter your authenticator code' });
-          router.push({ pathname: '/auth/verify-2fa', params: { userId: res.data.userId } });
+          const twoFactorMethod = res.data.twoFactorMethod || 'AUTHENTICATOR';
+          const hint = twoFactorMethod === 'AUTHENTICATOR'
+            ? 'Enter your authenticator code'
+            : `Enter the code sent to ${res.data.destination || 'your contact'}`;
+          showToast({ type: 'info', text1: '2FA Required', text2: hint });
+          router.push({
+            pathname: '/auth/verify-2fa',
+            params: {
+              userId: res.data.userId,
+              method: twoFactorMethod,
+              destination: res.data.destination || '',
+            },
+          });
           return;
         }
         if (res.data.user) {
           setUser(res.data.user);
-          void prefetchAppData();
-          void registerPushNotifications().catch(() => {});
-          Toast.show({ type: 'success', text1: 'Welcome back! 👋', text2: `Hello, ${res.data.user.firstName || 'there'}` });
-          // Navigate AFTER a short delay so toast is visible
-          setTimeout(() => {
-            router.replace(res.data!.user?.hasPin === false ? '/dashboard/setup-pin' : '/(tabs)');
-          }, 600);
+          finishSignIn(res.data.user);
         }
       } else {
-        Toast.show({ type: 'error', text1: 'Login Failed', text2: res.message || 'Invalid credentials. Please try again.' });
+        showToast({ type: 'error', text1: 'Login Failed', text2: res.message || 'Invalid credentials. Please try again.' });
       }
     } catch (err: any) {
       const msg = err?.data?.message || err?.message || 'Something went wrong. Try again.';
-      Toast.show({ type: 'error', text1: 'Login Failed', text2: msg });
+      showToast({ type: 'error', text1: 'Login Failed', text2: msg });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleBiometric = async () => {
-    const result = await LocalAuthentication.authenticateAsync({
-      promptMessage: `Authenticate with ${biometricLabel}`,
-      fallbackLabel: 'Use password',
-    });
-    if (result.success) {
-      Toast.show({ type: 'success', text1: 'Authenticated', text2: `Signed in with ${biometricLabel}` });
+  const handleBiometricSignIn = async () => {
+    setBioLoading(true);
+    try {
+      const result = await biometricQuickSignIn();
+      if (!result.ok) {
+        if (result.message !== 'Biometric sign-in cancelled') {
+          showToast({ type: 'error', text1: 'Sign-in failed', text2: result.message });
+        }
+        return;
+      }
+
+      finishSignIn(result.user);
+    } catch (err: any) {
+      const msg = err?.data?.message || err?.message || 'Biometric sign-in failed. Try your password.';
+      showToast({ type: 'error', text1: 'Sign-in failed', text2: msg });
+    } finally {
+      setBioLoading(false);
     }
   };
 
+  const showBiometricSignIn = biometricAvailable && !!quickSignInEmail;
+
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.root}>
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+    <AuthShell scrollable cardFooter={<AuthSecurityFooter />}>
+      <AuthCardHeader
+        eyebrow="Welcome back"
+        title="Sign in"
+        subtitle={
+          showBiometricSignIn
+            ? 'Sign in with your password or biometrics'
+            : 'Use your email or phone number to access your account'
+        }
+      />
 
-        {/* ── HERO ──────────────────────────── */}
-        <View style={styles.hero}>
-          <View style={styles.heroShine} />
-          <View style={styles.logoBox}>
-            <Text style={styles.logoLetter}>P</Text>
-          </View>
-          <Text style={styles.appName}>PrivateVTU</Text>
-          <Text style={styles.tagline}>Your trusted VTU partner</Text>
-        </View>
+      <AuthSegmentedControl
+        label="Continue with"
+        value={method}
+        options={LOGIN_METHODS}
+        onChange={(next) => {
+          setMethod(next);
+          setFieldErrors({});
+        }}
+      />
 
-        {/* ── CARD ──────────────────────────── */}
-        <View style={styles.card}>
-          <Text style={styles.title}>Welcome back</Text>
-          <Text style={styles.subtitle}>Sign in to your account to continue</Text>
+      {method === 'email' ? (
+        <AuthInput
+          key="login-email"
+          label="Email Address"
+          placeholder="you@example.com"
+          value={email}
+          onChangeText={(v) => { setEmail(v); setFieldErrors((e) => ({ ...e, identifier: undefined })); }}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoComplete="email"
+          error={fieldErrors.identifier}
+          leftIcon={<Ionicons name="mail-outline" size={18} color={Colors.primary} />}
+        />
+      ) : (
+        <AuthInput
+          key="login-phone"
+          label="Phone Number"
+          placeholder="08012345678"
+          value={phone}
+          onChangeText={(v) => { setPhone(v); setFieldErrors((e) => ({ ...e, identifier: undefined })); }}
+          keyboardType="phone-pad"
+          maxLength={11}
+          error={fieldErrors.identifier}
+          leftIcon={<Ionicons name="call-outline" size={18} color={Colors.primary} />}
+        />
+      )}
 
-          {/* Method toggle */}
-          <View style={styles.toggle}>
-            {(['email', 'phone'] as const).map((m) => (
-              <TouchableOpacity
-                key={m}
-                style={[styles.toggleBtn, method === m && styles.toggleBtnActive]}
-                onPress={() => { setMethod(m); setFieldErrors({}); }}
-              >
-                <Ionicons
-                  name={m === 'email' ? 'mail-outline' : 'call-outline'}
-                  size={14}
-                  color={method === m ? Colors.primary : Colors.muted}
-                />
-                <Text style={[styles.toggleText, method === m && styles.toggleTextActive]}>
-                  {m === 'email' ? 'Email' : 'Phone'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+      <AuthInput
+        label="Password"
+        placeholder="Enter your password"
+        value={password}
+        onChangeText={(v) => { setPassword(v); setFieldErrors((e) => ({ ...e, password: undefined })); }}
+        secureTextEntry
+        error={fieldErrors.password}
+        leftIcon={<Ionicons name="lock-closed-outline" size={18} color={Colors.primary} />}
+        containerStyle={{ marginBottom: 10 }}
+      />
 
-          {/* Fields — inline field errors only, NO API error here */}
-          {method === 'email' ? (
-            <Input
-              label="Email Address"
-              placeholder="you@example.com"
-              value={email}
-              onChangeText={(v) => { setEmail(v); setFieldErrors(e => ({ ...e, identifier: undefined })); }}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoComplete="email"
-              error={fieldErrors.identifier}
-              leftIcon={<Ionicons name="mail-outline" size={17} color={Colors.muted} />}
-            />
-          ) : (
-            <Input
-              label="Phone Number"
-              placeholder="08012345678"
-              value={phone}
-              onChangeText={(v) => { setPhone(v); setFieldErrors(e => ({ ...e, identifier: undefined })); }}
-              keyboardType="phone-pad"
-              maxLength={11}
-              error={fieldErrors.identifier}
-              leftIcon={<Ionicons name="call-outline" size={17} color={Colors.muted} />}
-            />
-          )}
+      <AuthTextLink
+        label="Forgot password?"
+        align="right"
+        onPress={() => router.push('/auth/forgot-password')}
+      />
 
-          <Input
-            label="Password"
-            placeholder="Enter your password"
-            value={password}
-            onChangeText={(v) => { setPassword(v); setFieldErrors(e => ({ ...e, password: undefined })); }}
-            secureTextEntry
-            error={fieldErrors.password}
-            leftIcon={<Ionicons name="lock-closed-outline" size={17} color={Colors.muted} />}
-            containerStyle={{ marginBottom: 8 }}
-          />
-
-          <TouchableOpacity style={styles.forgotRow} onPress={() => router.push('/auth/forgot-password')}>
-            <Text style={styles.forgotText}>Forgot password?</Text>
-          </TouchableOpacity>
-
-          <Button
+      {showBiometricSignIn ? (
+        <View style={styles.actionRow}>
+          <AuthGradientButton
             title="Sign In"
+            loadingLabel="Signing in..."
             onPress={handleLogin}
             isLoading={isLoading}
-            style={{ marginTop: 8, paddingVertical: 16 }}
+            disabled={bioLoading || isLoading}
+            icon={<Ionicons name="log-in-outline" size={18} color={Colors.white} />}
+            style={styles.actionPrimary}
           />
-
-          {biometricLabel ? (
-            <TouchableOpacity style={styles.biometricBtn} onPress={handleBiometric}>
-              <View style={styles.biometricIcon}>
-                <Ionicons
-                  name={biometricLabel === 'Face ID' ? 'scan-outline' : 'finger-print-outline'}
-                  size={20}
-                  color={Colors.primary}
-                />
-              </View>
-              <Text style={styles.biometricText}>Use {biometricLabel}</Text>
-            </TouchableOpacity>
-          ) : null}
-
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          <TouchableOpacity style={styles.registerRow} onPress={() => router.push('/auth')}>
-            <Text style={styles.registerText}>
-              New to PrivateVTU?{' '}
-              <Text style={styles.registerLink}>Create account</Text>
-            </Text>
+          <TouchableOpacity
+            style={[
+              styles.bioIconBtn,
+              (bioLoading || isLoading) && styles.bioIconBtnDisabled,
+            ]}
+            onPress={() => void handleBiometricSignIn()}
+            disabled={bioLoading || isLoading}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Continue with biometric"
+            accessibilityHint="Sign in using Face ID or fingerprint"
+          >
+            {bioLoading ? (
+              <ActivityIndicator color={Colors.primary} size="small" />
+            ) : (
+              <Ionicons name="finger-print-outline" size={24} color={Colors.primary} />
+            )}
           </TouchableOpacity>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      ) : (
+        <AuthGradientButton
+          title="Sign In"
+          loadingLabel="Signing in..."
+          onPress={handleLogin}
+          isLoading={isLoading}
+          icon={<Ionicons name="log-in-outline" size={18} color={Colors.white} />}
+          style={{ marginTop: 20 }}
+        />
+      )}
+
+      <AuthDivider />
+
+      <AuthFooterLink
+        prefix="New to PrivateVTU?"
+        linkLabel="Create account"
+        onPress={() => router.push('/auth')}
+      />
+    </AuthShell>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.primaryDeep },
-  scroll: { flexGrow: 1 },
-
-  hero: {
-    paddingTop: 72, paddingBottom: 44,
-    alignItems: 'center', overflow: 'hidden',
-  },
-  heroShine: {
-    position: 'absolute', top: -80, right: -60,
-    width: 240, height: 240, borderRadius: 120,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-  },
-  logoBox: {
-    width: 72, height: 72, borderRadius: 22,
-    backgroundColor: Colors.primary,
-    justifyContent: 'center', alignItems: 'center',
-    marginBottom: 16, ...Shadow.lg,
-  },
-  logoLetter: { fontSize: 36, fontWeight: '800', color: Colors.white },
-  appName: { ...Typography.h2, color: Colors.white, marginBottom: 6 },
-  tagline: { ...Typography.small, color: 'rgba(255,255,255,0.6)', letterSpacing: 0.3 },
-
-  card: {
-    flex: 1,
-    backgroundColor: Colors.white,
-    borderTopLeftRadius: 32, borderTopRightRadius: 32,
-    paddingHorizontal: Spacing.page,
-    paddingTop: 32, paddingBottom: 48,
-  },
-  title: { ...Typography.h2, color: Colors.dark, marginBottom: 4 },
-  subtitle: { ...Typography.small, color: Colors.muted, marginBottom: 24 },
-
-  toggle: {
+  actionRow: {
     flexDirection: 'row',
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    padding: 4,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 20,
   },
-  toggleBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'center', gap: 6,
-    paddingVertical: 10, borderRadius: Radius.sm,
+  actionPrimary: {
+    flex: 1,
   },
-  toggleBtnActive: {
+  bioIconBtn: {
+    width: 54,
+    height: 54,
+    borderRadius: Radius.lg,
+    borderWidth: 1.5,
+    borderColor: 'rgba(124, 58, 237, 0.3)',
     backgroundColor: Colors.white,
-    ...Shadow.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  toggleText: { ...Typography.smallMed, color: Colors.muted },
-  toggleTextActive: { color: Colors.primary, fontWeight: '700' },
-
-  forgotRow: { alignSelf: 'flex-end', marginBottom: 4 },
-  forgotText: { ...Typography.smallMed, color: Colors.primary },
-
-  biometricBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 10, paddingVertical: 14, marginTop: 6,
+  bioIconBtnDisabled: {
+    opacity: 0.55,
   },
-  biometricIcon: {
-    width: 36, height: 36, borderRadius: 10,
-    backgroundColor: Colors.primaryMuted,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  biometricText: { ...Typography.bodyMed, color: Colors.primary },
-
-  divider: { flexDirection: 'row', alignItems: 'center', marginVertical: 20 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: Colors.border },
-  dividerText: { ...Typography.caption, color: Colors.muted, paddingHorizontal: 12 },
-
-  registerRow: { alignItems: 'center' },
-  registerText: { ...Typography.small, color: Colors.muted },
-  registerLink: { color: Colors.primary, fontWeight: '700' },
 });

@@ -1,42 +1,109 @@
 import { useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { api } from '../src/lib/api';
-import { prefetchAppData } from '../src/lib/dashboard-data';
-import { setSuppressSessionExpiryUi } from '../src/lib/session';
-import { useAuthStore } from '../src/stores';
+import { api, ApiError } from '../src/lib/api';
+import { AppLogo } from '../src/components/ui/AppLogo';
+import {
+  isNetworkFailureStatus,
+  isSessionExpiredError,
+  isSessionRevoked,
+  setSuppressSessionExpiryUi,
+} from '../src/lib/session';
+import { useAuthStore, waitForAuthStoreHydration } from '../src/stores';
 import { ScreenStatusBar } from '../src/hooks/useStatusBarStyle';
-import { Colors, Typography, Shadow } from '../src/theme';
+import { Colors } from '../src/theme';
+
+function navigateHome(hasPin: boolean | undefined) {
+  router.replace(hasPin === false ? '/dashboard/setup-pin' : '/(tabs)');
+}
 
 export default function SplashScreen() {
-  const { setUser } = useAuthStore();
+  const { setUser, setTokens } = useAuthStore();
 
-  useEffect(() => { init(); }, []);
+  useEffect(() => { void init(); }, []);
 
   const init = async () => {
     setSuppressSessionExpiryUi(true);
     try {
-      await api.initTokens();
-      const token = await SecureStore.getItemAsync('accessToken');
-      const refreshToken = await SecureStore.getItemAsync('refreshToken');
-      if (!token && !refreshToken) {
+      await waitForAuthStoreHydration();
+      const cachedUser = useAuthStore.getState().user;
+
+      const { refreshToken } = await api.initTokens();
+      if (!refreshToken) {
         await useAuthStore.getState().clearTokens();
-        setTimeout(() => router.replace('/auth/login'), 1000);
+        setTimeout(() => router.replace('/auth/login'), 800);
         return;
       }
-      const res = await api.getProfile();
-      if (res.success && res.data) {
-        setUser(res.data);
-        void prefetchAppData();
-        setTimeout(() => {
-          router.replace(res.data!.hasPin === false ? '/dashboard/setup-pin' : '/(tabs)');
-        }, 800);
-      } else {
+
+      const accessToken = await api.getValidToken({ logoutOnAuthFailure: false });
+      if (!accessToken) {
+        const stillHasRefresh = await SecureStore.getItemAsync('refreshToken');
+        if (!stillHasRefresh) {
+          await useAuthStore.getState().clearTokens();
+          setTimeout(() => router.replace('/auth/login'), 800);
+          return;
+        }
+
+        await api.getValidToken({ logoutOnAuthFailure: true });
+        setTimeout(() => router.replace('/auth/login'), 800);
+        return;
+      }
+
+      await setTokens(accessToken, refreshToken);
+
+      try {
+        const res = await api.getProfile();
+        if (res.success && res.data) {
+          setUser(res.data);
+          setTimeout(() => navigateHome(res.data.hasPin), 600);
+          return;
+        }
+
+        if (cachedUser) {
+          setUser(cachedUser);
+          setTimeout(() => navigateHome(cachedUser.hasPin), 600);
+          return;
+        }
+
+        await api.clearTokens();
+        setTimeout(() => router.replace('/auth/login'), 800);
+      } catch (err) {
+        const refreshStillPresent = await SecureStore.getItemAsync('refreshToken');
+        const isNetworkError = err instanceof ApiError && isNetworkFailureStatus(err.statusCode);
+        const isAuthError = err instanceof ApiError && (
+          isSessionExpiredError(err)
+          || isSessionRevoked(err.statusCode, err.data)
+        );
+
+        if (isAuthError) {
+          await api.clearTokens();
+          setTimeout(() => router.replace('/auth/login'), 800);
+          return;
+        }
+
+        if ((isNetworkError || refreshStillPresent) && cachedUser) {
+          setUser(cachedUser);
+          setTimeout(() => navigateHome(cachedUser.hasPin), 600);
+          return;
+        }
+
+        if (refreshStillPresent && cachedUser) {
+          setUser(cachedUser);
+          setTimeout(() => navigateHome(cachedUser.hasPin), 600);
+          return;
+        }
+
         await api.clearTokens();
         setTimeout(() => router.replace('/auth/login'), 800);
       }
     } catch {
+      const cachedUser = useAuthStore.getState().user;
+      const refreshToken = await SecureStore.getItemAsync('refreshToken');
+      if (cachedUser && refreshToken) {
+        setTimeout(() => navigateHome(cachedUser.hasPin), 600);
+        return;
+      }
       await api.clearTokens();
       setTimeout(() => router.replace('/auth/login'), 800);
     } finally {
@@ -46,17 +113,8 @@ export default function SplashScreen() {
 
   return (
     <View style={styles.root}>
-      <ScreenStatusBar style="light" />
-      <View style={styles.logoBox}>
-        <Text style={styles.logoLetter}>P</Text>
-      </View>
-      <Text style={styles.appName}>PrivateVTU</Text>
-      <Text style={styles.tagline}>Fast · Secure · Reliable</Text>
-      <ActivityIndicator
-        color={Colors.primaryLight}
-        size="small"
-        style={{ marginTop: 56 }}
-      />
+      <ScreenStatusBar style="dark" />
+      <AppLogo size={188} />
     </View>
   );
 }
@@ -64,22 +122,8 @@ export default function SplashScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: Colors.primaryDeep,
+    backgroundColor: Colors.white,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  logoBox: {
-    width: 90, height: 90, borderRadius: 28,
-    backgroundColor: Colors.primary,
-    justifyContent: 'center', alignItems: 'center',
-    marginBottom: 20, ...Shadow.lg,
-  },
-  logoLetter: { fontSize: 46, fontWeight: '800', color: Colors.white },
-  appName: { ...Typography.h1, color: Colors.white, marginBottom: 8, letterSpacing: 0.3 },
-  tagline: {
-    ...Typography.small,
-    color: 'rgba(255,255,255,0.55)',
-    letterSpacing: 2.5,
-    textTransform: 'uppercase',
   },
 });

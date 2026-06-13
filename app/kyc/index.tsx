@@ -17,28 +17,33 @@ import {
 } from '../../src/lib/api';
 import { useAuthStore } from '../../src/stores';
 import { useStatusBarStyle } from '../../src/hooks/useStatusBarStyle';
-import { Colors, Radius, Shadow, Spacing } from '../../src/theme';
+import { Colors, Radius, Shadow, Spacing, Gradients } from '../../src/theme';
 import { showToast } from '../../src/components/ui/Toast';
 import { navigateBack } from '../../src/lib/navigation';
+import {
+  getKycStatusData,
+  hasKycStatusCache,
+  peekKycStatusCache,
+  pullToRefreshKycStatus,
+  setKycStatusCache,
+} from '../../src/lib/kyc-status-cache';
 import { DateOfBirthField } from '../../src/components/DateOfBirthField';
-
-const CARD_DARK = '#1A0A3C';
-const BRAND = '#7C3AED';
-const BRAND_LIGHT = '#A78BFA';
-const PAGE_BG = '#F4F5FA';
+import { ThemedScreen } from '../../src/components/ui/ThemedScreen';
+import { GradientButton } from '../../src/components/ui/GradientButton';
+import { useGradients } from '../../src/theme/hooks';
+import { gradientStops } from '../../src/theme/gradient-utils';
+import { GlassCard } from '../../src/components/ui/GlassCard';
 
 type Step = 'status' | 'tier2' | 'phone-verify' | 'phone-otp' | 'tier3';
-
-const BRAND_GRADIENT: [string, string] = ['#8B5CF6', '#7C3AED'];
 
 const TIER_META: Record<string, {
   icon: keyof typeof Ionicons.glyphMap;
   accent: string;
   accentBg: string;
 }> = {
-  TIER_1: { icon: 'phone-portrait-outline', accent: BRAND, accentBg: Colors.primaryMuted },
-  TIER_2: { icon: 'finger-print-outline', accent: BRAND, accentBg: Colors.primaryMuted },
-  TIER_3: { icon: 'shield-checkmark-outline', accent: BRAND, accentBg: Colors.primaryMuted },
+  TIER_1: { icon: 'phone-portrait-outline', accent: Colors.primary, accentBg: Colors.primaryMuted },
+  TIER_2: { icon: 'finger-print-outline', accent: Colors.primary, accentBg: Colors.primaryMuted },
+  TIER_3: { icon: 'shield-checkmark-outline', accent: Colors.primary, accentBg: Colors.primaryMuted },
 };
 
 function tierProgress(currentTier: string): number {
@@ -143,7 +148,7 @@ function RequirementPills({
           <Ionicons
             name={req.completed ? 'checkmark-circle' : 'ellipse-outline'}
             size={singleRow ? 12 : 14}
-            color={req.completed ? BRAND : dimmed ? Colors.mutedLight : BRAND_LIGHT}
+            color={req.completed ? Colors.primary : dimmed ? Colors.mutedLight : Colors.primaryLight}
           />
           <Text
             style={[
@@ -239,13 +244,18 @@ function TierStep({
         isLast={isLast}
       />
 
-      <View style={[
-        styles.tierPanel,
-        isComplete && styles.tierPanelDone,
-        isCurrent && styles.tierPanelActive,
-        isLocked && styles.tierPanelLocked,
-        Shadow.card,
-      ]}>
+      <GlassCard
+        variant={isComplete ? 'tinted' : 'light'}
+        borderRadius={Radius.lg}
+        padding={16}
+        style={[
+          styles.tierPanel,
+          isComplete && styles.tierPanelDone,
+          isCurrent && styles.tierPanelActive,
+          isLocked && styles.tierPanelLocked,
+        ]}
+        contentStyle={styles.tierPanelContent}
+      >
         {isCurrent && (
           <>
             <LinearGradient
@@ -274,7 +284,7 @@ function TierStep({
               </Text>
               {isComplete && (
                 <View style={styles.doneBadge}>
-                  <Ionicons name="checkmark-circle" size={13} color={BRAND} />
+                  <Ionicons name="checkmark-circle" size={13} color={Colors.primary} />
                   <Text style={styles.doneBadgeText}>Verified</Text>
                 </View>
               )}
@@ -316,7 +326,7 @@ function TierStep({
         {isCurrent && actionLabel && onAction ? (
           <TouchableOpacity onPress={onAction} disabled={disabled} activeOpacity={0.88}>
             <LinearGradient
-              colors={BRAND_GRADIENT}
+              colors={gradientStops([Gradients.button[0], Gradients.button[1]])}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={[styles.ctaBtn, disabled && styles.ctaBtnDisabled, Shadow.sm]}
@@ -326,7 +336,7 @@ function TierStep({
             </LinearGradient>
           </TouchableOpacity>
         ) : null}
-      </View>
+      </GlassCard>
     </View>
   );
 }
@@ -358,7 +368,7 @@ function FormField({
       </View>
       <View style={styles.inputShell}>
         <View style={styles.inputIconWrap}>
-          <Ionicons name={icon} size={18} color={BRAND} />
+          <Ionicons name={icon} size={18} color={Colors.primary} />
         </View>
         {children}
       </View>
@@ -430,7 +440,7 @@ function FormShell({
     <View style={styles.formShell}>
       <View style={styles.formHero}>
         <LinearGradient
-          colors={[CARD_DARK, '#2E1065', '#4C1D95']}
+          colors={[Colors.heroDark, '#2E1065', '#4C1D95']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.formHeroGradient}
@@ -440,7 +450,7 @@ function FormShell({
             <Text style={styles.formStepBadgeText}>{stepBadge}</Text>
           </View>
           <View style={styles.formHeroIconRing}>
-            <LinearGradient colors={['#8B5CF6', '#7C3AED']} style={styles.formHeroIcon}>
+            <LinearGradient colors={gradientStops([Gradients.button[0], Gradients.button[1]])} style={styles.formHeroIcon}>
               <Ionicons name={icon} size={22} color={Colors.white} />
             </LinearGradient>
           </View>
@@ -448,14 +458,14 @@ function FormShell({
           <Text style={styles.formSub} numberOfLines={2}>{subtitle}</Text>
           {perks && perks.length > 0 && (
             <View style={styles.formPerkChip}>
-              <Ionicons name="checkmark-circle" size={11} color="#C4B5FD" />
+              <Ionicons name="checkmark-circle" size={11} color={Colors.primaryLight} />
               <Text style={styles.formPerkText} numberOfLines={1}>{perks.join(' · ')}</Text>
             </View>
           )}
         </LinearGradient>
       </View>
 
-      <View style={styles.formBody}>{children}</View>
+      <GlassCard borderRadius={Radius.xl} padding={20} contentStyle={styles.formBody}>{children}</GlassCard>
 
       <View style={styles.formTrust}>
         <Ionicons name="lock-closed" size={12} color={Colors.muted} />
@@ -470,8 +480,8 @@ export default function KycScreen() {
   const insets = useSafeAreaInsets();
   const { updateUser } = useAuthStore();
 
-  const [kycData, setKycData] = useState<KycStatusData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [kycData, setKycData] = useState<KycStatusData | null>(() => peekKycStatusCache());
+  const [loading, setLoading] = useState(() => !hasKycStatusCache());
   const [submitting, setSubmitting] = useState(false);
   const [step, setStep] = useState<Step>('status');
 
@@ -511,26 +521,42 @@ export default function KycScreen() {
     return () => sub.remove();
   }, [step, handleHeaderBack]);
 
-  const fetchStatus = useCallback(async (options?: { silent?: boolean }) => {
-    if (!options?.silent) setLoading(true);
-    try {
-      const res = await api.getKycStatus();
-      if (isResponseSuccess(res) && res.data) {
-        setKycData(res.data);
-        if (res.data.user.address) setAddress(res.data.user.address);
-        if (res.data.user.city) setCity(res.data.user.city);
-        if (res.data.user.state) setState(res.data.user.state);
-        if (res.data.user.country) setCountry(res.data.user.country);
-        if (res.data.user.dateOfBirth) setDateOfBirth(res.data.user.dateOfBirth.slice(0, 10));
-      }
-    } catch {
-      showToast({ type: 'error', text1: 'Could not load KYC status' });
-    } finally {
-      if (!options?.silent) setLoading(false);
-    }
+  const applyKycData = useCallback((data: KycStatusData) => {
+    setKycData(data);
+    setKycStatusCache(data);
+    if (data.user.address) setAddress(data.user.address);
+    if (data.user.city) setCity(data.user.city);
+    if (data.user.state) setState(data.user.state);
+    if (data.user.country) setCountry(data.user.country);
+    if (data.user.dateOfBirth) setDateOfBirth(data.user.dateOfBirth.slice(0, 10));
   }, []);
 
-  useFocusEffect(useCallback(() => { void fetchStatus(); }, [fetchStatus]));
+  const fetchStatus = useCallback(async (options?: { silent?: boolean; force?: boolean }) => {
+    const cached = peekKycStatusCache();
+    if (cached && !options?.force) {
+      applyKycData(cached);
+      setLoading(false);
+    } else if (!options?.silent) {
+      setLoading(true);
+    }
+
+    try {
+      const data = options?.force
+        ? await pullToRefreshKycStatus()
+        : await getKycStatusData({ force: false });
+      if (data) applyKycData(data);
+    } catch {
+      if (!cached) {
+        showToast({ type: 'error', text1: 'Could not load KYC status' });
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [applyKycData]);
+
+  useFocusEffect(useCallback(() => {
+    void fetchStatus({ silent: hasKycStatusCache() });
+  }, [fetchStatus]));
 
   useEffect(() => {
     if (resendCooldown <= 0) return;
@@ -558,7 +584,7 @@ export default function KycScreen() {
       const res = await api.initiateKycTier1();
       if (isResponseSuccess(res)) {
         showToast({ type: 'success', text1: res.message || 'Tier 1 completed' });
-        await fetchStatus({ silent: true });
+        await fetchStatus({ silent: true, force: true });
         syncUserKyc('TIER_1');
       } else {
         showToast({ type: 'error', text1: res.message || 'Could not complete Tier 1' });
@@ -605,7 +631,7 @@ export default function KycScreen() {
         setPhoneOtp('');
         syncUserKyc('TIER_1');
         setStep('status');
-        await fetchStatus({ silent: true });
+        await fetchStatus({ silent: true, force: true });
       } else {
         showToast({ type: 'error', text1: res.message || 'Invalid OTP' });
       }
@@ -654,7 +680,7 @@ export default function KycScreen() {
         showToast({ type: 'success', text1: 'BVN verified successfully' });
         updateUser({ kycStatus: 'VERIFIED' });
         setStep('status');
-        await fetchStatus({ silent: true });
+        await fetchStatus({ silent: true, force: true });
       } else {
         showToast({ type: 'error', text1: res.message || 'BVN verification failed' });
       }
@@ -680,7 +706,7 @@ export default function KycScreen() {
           text2: 'Upload ID documents on the web app to finish Tier 3.',
         });
         setStep('status');
-        await fetchStatus({ silent: true });
+        await fetchStatus({ silent: true, force: true });
       } else {
         showToast({ type: 'error', text1: res.message || 'Could not save address' });
       }
@@ -694,7 +720,7 @@ export default function KycScreen() {
   const renderPrimaryBtn = (label: string, onPress: () => void, disabled?: boolean) => (
     <TouchableOpacity onPress={onPress} disabled={disabled || submitting} activeOpacity={0.88}>
       <LinearGradient
-        colors={BRAND_GRADIENT}
+        colors={gradientStops([Gradients.button[0], Gradients.button[1]])}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={[styles.primaryBtn, (disabled || submitting) && styles.primaryBtnDisabled, Shadow.sm]}
@@ -737,7 +763,7 @@ export default function KycScreen() {
           </FormField>
           <View style={styles.secureNote}>
             <View style={styles.secureNoteIcon}>
-              <Ionicons name="shield-checkmark" size={16} color={BRAND} />
+              <Ionicons name="shield-checkmark" size={16} color={Colors.primary} />
             </View>
             <Text style={styles.secureNoteText}>
               Your BVN is encrypted end-to-end and never shared with third parties.
@@ -759,7 +785,7 @@ export default function KycScreen() {
         >
           <View style={styles.phoneCard}>
             <View style={styles.phoneCardIcon}>
-              <Ionicons name="call-outline" size={22} color={BRAND} />
+              <Ionicons name="call-outline" size={22} color={Colors.primary} />
             </View>
             <Text style={styles.phoneLabel}>Registered number</Text>
             <Text style={styles.phoneValue}>{kycData.user.phone}</Text>
@@ -839,16 +865,16 @@ export default function KycScreen() {
     return (
       <View style={styles.overview}>
         {bvnDone && (
-          <View style={styles.perkBanner}>
+          <GlassCard borderRadius={Radius.lg} padding={14} variant="tinted" contentStyle={styles.perkBanner}>
             <View style={styles.perkIcon}>
-              <Ionicons name="wallet" size={18} color={BRAND} />
+              <Ionicons name="wallet" size={18} color={Colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.perkTitle}>Permanent accounts unlocked</Text>
               <Text style={styles.perkSub}>You can now generate a dedicated virtual account</Text>
             </View>
-            <Ionicons name="checkmark-circle" size={22} color={BRAND} />
-          </View>
+            <Ionicons name="checkmark-circle" size={22} color={Colors.primary} />
+          </GlassCard>
         )}
 
         <Text style={styles.pathLabel}>Your verification path</Text>
@@ -891,9 +917,9 @@ export default function KycScreen() {
   };
 
   return (
-    <View style={styles.root}>
+    <ThemedScreen>
       <LinearGradient
-        colors={[CARD_DARK, '#2E1065', '#4C1D95']}
+        colors={[Colors.heroDark, '#2E1065', '#4C1D95']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.header, { paddingTop: insets.top + 8 }]}
@@ -921,7 +947,7 @@ export default function KycScreen() {
             </View>
             <View style={styles.progressTrack}>
               <LinearGradient
-                colors={[BRAND_LIGHT, BRAND]}
+                colors={gradientStops([Colors.primaryLight, Colors.primary])}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={[styles.progressFill, { width: `${progress}%` }]}
@@ -936,7 +962,7 @@ export default function KycScreen() {
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {loading ? (
           <View style={styles.loadingWrap}>
-            <ActivityIndicator color={BRAND} size="large" />
+            <ActivityIndicator color={Colors.primary} size="large" />
             <Text style={styles.loadingText}>Loading verification status…</Text>
           </View>
         ) : (
@@ -949,17 +975,16 @@ export default function KycScreen() {
           </ScrollView>
         )}
       </KeyboardAvoidingView>
-    </View>
+    </ThemedScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: PAGE_BG },
   flex: { flex: 1 },
   contentCurve: {
     height: 20,
     marginTop: -20,
-    backgroundColor: PAGE_BG,
+    backgroundColor: Colors.pageBg,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
   },
@@ -1022,13 +1047,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: Colors.white,
-    borderRadius: Radius.lg,
-    padding: 14,
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.18)',
-    ...Shadow.card,
   },
   perkIcon: {
     width: 40,
@@ -1063,8 +1082,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 1,
   },
-  railDotDone: { backgroundColor: BRAND, borderColor: BRAND },
-  railDotActive: { backgroundColor: BRAND, borderColor: BRAND },
+  railDotDone: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  railDotActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   railDotLocked: { backgroundColor: '#F1F5F9', borderColor: '#E2E8F0' },
   railDotNum: { fontSize: 11, fontWeight: '800', color: Colors.muted },
   railDotNumActive: { color: Colors.white },
@@ -1076,28 +1095,19 @@ const styles = StyleSheet.create({
     minHeight: 24,
     borderRadius: 2,
   },
-  railLineDone: { backgroundColor: BRAND_LIGHT },
+  railLineDone: { backgroundColor: Colors.primaryLight },
 
   tierPanel: {
     flex: 1,
-    backgroundColor: Colors.white,
-    borderRadius: Radius.lg,
-    padding: 16,
+    overflow: 'hidden',
+  },
+  tierPanelContent: {
     gap: 12,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(15, 23, 42, 0.07)',
   },
-  tierPanelDone: {
-    borderColor: 'rgba(124, 58, 237, 0.2)',
-    backgroundColor: Colors.primaryMuted,
-  },
-  tierPanelActive: {
-    borderColor: 'rgba(124, 58, 237, 0.28)',
-  },
+  tierPanelDone: {},
+  tierPanelActive: {},
   tierPanelLocked: {
-    backgroundColor: '#FAFBFC',
-    borderColor: 'rgba(15, 23, 42, 0.05)',
     opacity: 0.88,
   },
   tierPanelGlow: {
@@ -1110,7 +1120,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     width: 3,
-    backgroundColor: BRAND,
+    backgroundColor: Colors.primary,
   },
   tierPanelHeader: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
   tierPanelIcon: {
@@ -1137,7 +1147,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(124, 58, 237, 0.15)',
   },
-  doneBadgeText: { fontSize: 10, fontWeight: '700', color: BRAND },
+  doneBadgeText: { fontSize: 10, fontWeight: '700', color: Colors.primary },
   nextBadge: {
     backgroundColor: '#FAF5FF',
     paddingHorizontal: 8,
@@ -1146,7 +1156,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(124, 58, 237, 0.18)',
   },
-  nextBadgeText: { fontSize: 10, fontWeight: '700', color: BRAND },
+  nextBadgeText: { fontSize: 10, fontWeight: '700', color: Colors.primary },
 
   reqSection: { gap: 8, alignItems: 'center' },
   reqSectionLabel: {
@@ -1203,7 +1213,7 @@ const styles = StyleSheet.create({
   },
   reqPillText: { fontSize: 11, fontWeight: '600', color: Colors.mid, flexShrink: 1 },
   reqPillTextSingleRow: { fontSize: 10, textAlign: 'center' },
-  reqPillTextDone: { color: BRAND },
+  reqPillTextDone: { color: Colors.primary },
   reqPillTextPending: { color: Colors.primaryDeep },
   reqPillTextDimmed: { color: Colors.mutedLight },
 
@@ -1238,7 +1248,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
-  limitValue: { fontSize: 12, fontWeight: '800', color: CARD_DARK },
+  limitValue: { fontSize: 12, fontWeight: '800', color: Colors.heroDark },
   limitValueDimmed: { color: Colors.mutedLight },
   limitDivider: { width: 1, height: 28, backgroundColor: 'rgba(124, 58, 237, 0.12)' },
   limitDividerDimmed: { backgroundColor: '#E2E8F0' },
@@ -1331,13 +1341,7 @@ const styles = StyleSheet.create({
   },
   formPerkText: { fontSize: 10, fontWeight: '600', color: '#EDE9FE', flexShrink: 1 },
   formBody: {
-    backgroundColor: Colors.white,
-    borderRadius: Radius.xl,
-    padding: 20,
     gap: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(15, 23, 42, 0.06)',
-    ...Shadow.card,
   },
   formTrust: {
     flexDirection: 'row',
@@ -1357,7 +1361,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
     textTransform: 'uppercase',
   },
-  fieldCounter: { fontSize: 11, fontWeight: '700', color: BRAND },
+  fieldCounter: { fontSize: 11, fontWeight: '700', color: Colors.primary },
   inputShell: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1397,12 +1401,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   otpBoxActive: {
-    borderColor: BRAND,
+    borderColor: Colors.primary,
     backgroundColor: '#FAF5FF',
     borderWidth: 2,
   },
   otpBoxFilled: { backgroundColor: '#F5F3FF' },
-  otpDigit: { fontSize: 22, fontWeight: '800', color: CARD_DARK },
+  otpDigit: { fontSize: 22, fontWeight: '800', color: Colors.heroDark },
   otpHiddenInput: {
     position: 'absolute',
     opacity: 0,
@@ -1461,11 +1465,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(124, 58, 237, 0.12)',
   },
-  phoneLabel: { fontSize: 11, color: BRAND, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  phoneValue: { fontSize: 26, fontWeight: '800', color: CARD_DARK, letterSpacing: 0.5 },
+  phoneLabel: { fontSize: 11, color: Colors.primary, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  phoneValue: { fontSize: 26, fontWeight: '800', color: Colors.heroDark, letterSpacing: 0.5 },
   phoneHint: { fontSize: 12, color: Colors.mutedLight, marginTop: 2 },
   resendBtn: { alignSelf: 'center', paddingVertical: 6 },
-  resendText: { fontSize: 14, fontWeight: '600', color: BRAND },
+  resendText: { fontSize: 14, fontWeight: '600', color: Colors.primary },
   resendTextMuted: { color: Colors.mutedLight },
   trustFooter: {
     flexDirection: 'row',

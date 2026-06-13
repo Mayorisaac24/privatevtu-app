@@ -2,10 +2,17 @@
 // Matches exactly the web frontend's client.ts endpoints
 
 import {
+  getApiErrorMessage,
   isAccessTokenExpired,
+  isNetworkFailureStatus,
+  isSessionRevoked,
   notifySessionExpired,
+  resolveSessionLogoutReason,
+  shouldLogoutFromAuthFailure,
   shouldRefreshSession,
+  type TokenRefreshOutcome,
 } from './session';
+import { tryNormalizePhone } from './phone';
 
 // Set in .env — switch local/live by commenting/uncommenting EXPO_PUBLIC_API_BASE_URL
 const API_URL =
@@ -42,6 +49,7 @@ export interface User {
   isPhoneVerified: boolean;
   kycStatus: 'NOT_VERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED';
   twoFactorEnabled: boolean;
+  twoFactorMethod?: 'EMAIL' | 'AUTHENTICATOR' | 'SMS' | null;
   biometricEnabled: boolean;
   hasPin?: boolean;
   roles: Array<string | UserRole>;
@@ -69,6 +77,82 @@ export interface LoginResponse {
   user: User;
   requiresTwoFactor?: boolean;
   userId?: string;
+  twoFactorMethod?: 'EMAIL' | 'AUTHENTICATOR' | 'SMS';
+  destination?: string;
+}
+
+export type TwoFactorMethodType = 'EMAIL' | 'AUTHENTICATOR' | 'SMS';
+
+export interface TwoFactorMethodOption {
+  method: TwoFactorMethodType;
+  label: string;
+  description?: string | null;
+  enabled: boolean;
+  available: boolean;
+  inactiveReason?: string | null;
+}
+
+export interface Enable2FAResponse {
+  method: TwoFactorMethodType;
+  message: string;
+  destination?: string;
+  qrCode?: string;
+  qrCodeUrl?: string;
+  secret?: string;
+  backupCodes?: string[];
+}
+
+export type AppNotificationType = 'info' | 'warning' | 'success' | 'error';
+
+export type AppNotificationChannel = 'IN_APP' | 'PUSH' | 'EMAIL' | 'SMS';
+export type AppNotificationCategory = 'TRANSACTIONAL' | 'MARKETING' | 'SECURITY' | 'SYSTEM';
+
+export interface AppNotification {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  type: AppNotificationType;
+  channel?: AppNotificationChannel;
+  category?: AppNotificationCategory;
+  data: Record<string, unknown> | null;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface NotificationsListResponse {
+  notifications: AppNotification[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+  unreadCount: number;
+}
+
+export type NotificationSettingField =
+  | 'pushNotificationsEnabled'
+  | 'marketingPushNotificationsEnabled'
+  | 'transactionEmailNotificationsEnabled'
+  | 'transactionSmsNotificationsEnabled';
+
+export interface NotificationOption {
+  key: string;
+  title: string;
+  description: string;
+  adminEnabled: boolean;
+  userEnabled: boolean;
+  settingKey: NotificationSettingField;
+}
+
+export interface NotificationSettings {
+  transactionEmailNotificationsEnabled: boolean;
+  pushNotificationsEnabled: boolean;
+  marketingPushNotificationsEnabled: boolean;
+  transactionSmsNotificationsEnabled: boolean;
+  masterEnabled: boolean;
+  options: NotificationOption[];
 }
 
 export interface RegisterData {
@@ -287,6 +371,8 @@ export interface ElectricityProvider {
   name: string;
   code: string;
   meterTypes?: string[];
+  imageUrl?: string | null;
+  updatedAt?: string | null;
 }
 
 export interface CableProvider {
@@ -295,6 +381,7 @@ export interface CableProvider {
   code: string;
   displayName?: string;
   isActive?: boolean;
+  imageUrl?: string | null;
 }
 
 export interface CablePlan {
@@ -422,7 +509,7 @@ export function isSessionExpiredError(err: unknown): boolean {
   return (
     err instanceof ApiError &&
     err.statusCode === 401 &&
-    /session expired|please sign in/i.test(err.message)
+    (/session expired|please sign in|signed in on another device/i.test(err.message))
   );
 }
 
@@ -430,17 +517,39 @@ export function isSessionExpiredError(err: unknown): boolean {
 class ApiClient {
   private baseUrl: string;
   private static isRefreshing = false;
-  private static refreshPromise: Promise<boolean> | null = null;
+  private static refreshPromise: Promise<TokenRefreshOutcome> | null = null;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
   }
 
-  private isAuthEndpoint(endpoint: string): boolean {
+  private canRequestWithoutSession(endpoint: string): boolean {
     return (
       endpoint.includes('/auth/refresh') ||
       endpoint.includes('/auth/logout') ||
-      endpoint.includes('/auth/login')
+      endpoint.includes('/auth/login') ||
+      endpoint.includes('/auth/2fa/login') ||
+      endpoint.includes('/auth/2fa/send-code') ||
+      endpoint.includes('/auth/register/') ||
+      endpoint.includes('/auth/forgot-password') ||
+      endpoint.includes('/auth/reset-password') ||
+      endpoint.includes('/auth/biometric/login')
+    );
+  }
+
+  private isAuthEndpoint(endpoint: string): boolean {
+    return this.canRequestWithoutSession(endpoint);
+  }
+
+  private isPreAuthFlow(endpoint: string): boolean {
+    return (
+      endpoint.includes('/auth/login') ||
+      endpoint.includes('/auth/2fa/login') ||
+      endpoint.includes('/auth/2fa/send-code') ||
+      endpoint.includes('/auth/register/') ||
+      endpoint.includes('/auth/forgot-password') ||
+      endpoint.includes('/auth/reset-password') ||
+      endpoint.includes('/auth/biometric/login')
     );
   }
 
@@ -466,6 +575,37 @@ class ApiClient {
     } catch {}
   }
 
+  async persistLoginSession(data?: LoginResponse | null): Promise<User | null> {
+    if (!data) return null;
+
+    if (data.accessToken && data.refreshToken) {
+      await this.setTokens(data.accessToken, data.refreshToken);
+    }
+
+    const { useAuthStore } = require('../stores/auth-store');
+
+    if (data.user) {
+      useAuthStore.getState().setUser(data.user);
+      return data.user;
+    }
+
+    if (!data.accessToken) {
+      return useAuthStore.getState().user;
+    }
+
+    try {
+      const profile = await this.getProfile();
+      if (isResponseSuccess(profile) && profile.data) {
+        useAuthStore.getState().setUser(profile.data);
+        return profile.data;
+      }
+    } catch {
+      // Profile fetch is a fallback when login payload omits user.
+    }
+
+    return useAuthStore.getState().user;
+  }
+
   async clearTokens() {
     try {
       const SecureStore = require('expo-secure-store');
@@ -476,16 +616,17 @@ class ApiClient {
     } catch {}
   }
 
-  private async expireSession(): Promise<void> {
+  private async expireSession(data?: unknown): Promise<void> {
     const { useAuthStore } = require('../stores/auth-store');
     const wasAuthenticated = useAuthStore.getState().isAuthenticated;
     await this.clearTokens();
     if (wasAuthenticated) {
-      void notifySessionExpired();
+      void notifySessionExpired(resolveSessionLogoutReason(data));
     }
   }
 
-  async getValidToken(): Promise<string | null> {
+  async getValidToken(options: { logoutOnAuthFailure?: boolean } = {}): Promise<string | null> {
+    const logoutOnAuthFailure = options.logoutOnAuthFailure ?? true;
     try {
       const SecureStore = require('expo-secure-store');
       let accessToken = await SecureStore.getItemAsync('accessToken');
@@ -498,24 +639,33 @@ class ApiClient {
       }
 
       if (!refreshToken) {
-        await this.clearTokens();
-        return null;
+        return accessToken;
       }
 
-      const refreshed = await this.refreshTokens();
-      if (!refreshed) {
-        await this.expireSession();
-        return null;
+      const outcome = await this.refreshTokens();
+      if (outcome === 'success') {
+        accessToken = await SecureStore.getItemAsync('accessToken');
+        return accessToken;
+      }
+      if (outcome === 'network_failed') {
+        return accessToken;
       }
 
-      accessToken = await SecureStore.getItemAsync('accessToken');
-      return accessToken;
-    } catch {
+      if (logoutOnAuthFailure) {
+        await this.expireSession({ error: { code: 'SESSION_REVOKED' } });
+      }
       return null;
+    } catch {
+      try {
+        const SecureStore = require('expo-secure-store');
+        return await SecureStore.getItemAsync('accessToken');
+      } catch {
+        return null;
+      }
     }
   }
 
-  private async refreshTokens(): Promise<boolean> {
+  private async refreshTokens(): Promise<TokenRefreshOutcome> {
     if (ApiClient.isRefreshing && ApiClient.refreshPromise) {
       return ApiClient.refreshPromise;
     }
@@ -530,28 +680,45 @@ class ApiClient {
     }
   }
 
-  private async performTokenRefresh(): Promise<boolean> {
+  private async performTokenRefresh(): Promise<TokenRefreshOutcome> {
     try {
       const SecureStore = require('expo-secure-store');
       const refreshToken = await SecureStore.getItemAsync('refreshToken');
-      if (!refreshToken) return false;
+      if (!refreshToken) return 'auth_failed';
 
-      const res = await fetch(`${this.baseUrl}/auth/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken }),
-      });
-      if (!res.ok) return false;
-
-      const data = await res.json();
-      const tokens = data?.data;
-      if (tokens?.accessToken && tokens?.refreshToken) {
-        await this.setTokens(tokens.accessToken, tokens.refreshToken);
-        return true;
+      let res: Response;
+      try {
+        res = await fetch(`${this.baseUrl}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken }),
+        });
+      } catch {
+        return 'network_failed';
       }
-      return false;
+
+      let data: ApiResponse<{ accessToken?: string; refreshToken?: string }> | null = null;
+      try {
+        data = await res.json();
+      } catch {
+        return isNetworkFailureStatus(res.status) ? 'network_failed' : 'auth_failed';
+      }
+
+      if (res.ok && data?.data?.accessToken && data?.data?.refreshToken) {
+        await this.setTokens(data.data.accessToken, data.data.refreshToken);
+        return 'success';
+      }
+
+      if (isSessionRevoked(res.status, data) || res.status === 401 || res.status === 403) {
+        return 'auth_failed';
+      }
+      if (isNetworkFailureStatus(res.status)) return 'network_failed';
+      if (data?.status === 'error' && shouldLogoutFromAuthFailure(res.status, data)) {
+        return 'auth_failed';
+      }
+      return 'network_failed';
     } catch {
-      return false;
+      return 'network_failed';
     }
   }
 
@@ -562,25 +729,38 @@ class ApiClient {
   ): Promise<T> {
     try {
       const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'X-Channel': 'mobile',
+        'X-Channel': 'app',
         ...(options.headers as Record<string, string>),
       };
 
       const accessToken = await this.getValidToken();
       if (accessToken) {
         headers['Authorization'] = `Bearer ${accessToken}`;
-      } else if (!this.isAuthEndpoint(endpoint)) {
+      } else if (!this.canRequestWithoutSession(endpoint)) {
         throw new ApiError('Session expired. Please sign in again.', 401, null);
       }
 
       const { timeoutMs = 30000, ...fetchOptions } = options;
+      const method = (fetchOptions.method || 'GET').toUpperCase();
+      let body = fetchOptions.body;
+
+      if (body === undefined || body === null || body === '') {
+        if (['POST', 'PUT', 'PATCH'].includes(method)) {
+          body = JSON.stringify({});
+        }
+      }
+
+      if (body !== undefined && body !== null && body !== '') {
+        headers['Content-Type'] = headers['Content-Type'] || 'application/json';
+      }
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
       const res = await fetch(`${this.baseUrl}${endpoint}`, {
         ...fetchOptions,
+        method,
+        body,
         headers,
         signal: controller.signal,
       });
@@ -600,24 +780,43 @@ class ApiClient {
       }
 
       if (res.status === 401 && this.isAuthEndpoint(endpoint)) {
-        if (!endpoint.includes('/auth/login')) {
-          await this.expireSession();
+        if (!this.isPreAuthFlow(endpoint)) {
+          await this.expireSession(data);
         }
         throw new ApiError(data?.message || 'Unauthorized', 401, data);
       }
 
       if (res.status === 401 && retry && shouldRefreshSession(res.status, data)) {
-        const refreshed = await this.refreshTokens();
-        if (refreshed) {
+        const outcome = await this.refreshTokens();
+        if (outcome === 'success') {
           return this.request<T>(endpoint, options, false);
         }
-        await this.expireSession();
-        throw new ApiError('Session expired. Please sign in again.', 401, data);
+        if (outcome === 'network_failed') {
+          throw new ApiError(
+            'Unable to reach server. Check your connection and try again.',
+            0,
+            data,
+          );
+        }
+        if (shouldLogoutFromAuthFailure(res.status, data) || isSessionRevoked(res.status, data)) {
+          await this.expireSession(data);
+        }
+        throw new ApiError(
+          getApiErrorMessage(data) || 'Session expired. Please sign in again.',
+          401,
+          data,
+        );
       }
 
       if (res.status === 401 && !retry && shouldRefreshSession(res.status, data)) {
-        await this.expireSession();
-        throw new ApiError('Session expired. Please sign in again.', 401, data);
+        if (shouldLogoutFromAuthFailure(res.status, data) || isSessionRevoked(res.status, data)) {
+          await this.expireSession(data);
+        }
+        throw new ApiError(
+          getApiErrorMessage(data) || 'Session expired. Please sign in again.',
+          401,
+          data,
+        );
       }
 
       if (!res.ok) {
@@ -642,7 +841,10 @@ class ApiClient {
   async initiateRegistration(data: RegisterData): Promise<ApiResponse<{ email: string }>> {
     return this.request('/auth/register/initiate', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        ...data,
+        ...(data.phone ? { phone: tryNormalizePhone(data.phone) } : {}),
+      }),
     });
   }
 
@@ -664,39 +866,54 @@ class ApiClient {
     });
   }
 
-  async login(data: { phone?: string; email?: string; password?: string; pin?: string }): Promise<ApiResponse<LoginResponse>> {
+  async login(data: { phone?: string; email?: string; password?: string; pin?: string; deviceId?: string }): Promise<ApiResponse<LoginResponse>> {
     const res = await this.request<ApiResponse<LoginResponse>>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        ...data,
+        ...(data.phone ? { phone: tryNormalizePhone(data.phone) } : {}),
+      }),
     });
-    if (res.success && res.data && !res.data.requiresTwoFactor) {
-      await this.setTokens(res.data.accessToken, res.data.refreshToken);
+    if (res.success && res.data) {
+      if (res.data.requiresTwoFactor) {
+        await this.clearTokens();
+      } else {
+        await this.setTokens(res.data.accessToken, res.data.refreshToken);
+      }
     }
     return res;
   }
 
-  async verify2FALogin(userId: string, otp: string): Promise<ApiResponse<LoginResponse>> {
+  async verify2FALogin(userId: string, otp: string, deviceId?: string): Promise<ApiResponse<LoginResponse>> {
     const res = await this.request<ApiResponse<LoginResponse>>('/auth/2fa/login', {
       method: 'POST',
-      body: JSON.stringify({ userId, otp }),
+      body: JSON.stringify({ userId, otp, ...(deviceId ? { deviceId } : {}) }),
     });
-    if (res.success && res.data) {
+    if (isResponseSuccess(res) && res.data?.accessToken && res.data?.refreshToken) {
       await this.setTokens(res.data.accessToken, res.data.refreshToken);
     }
     return res;
   }
 
   async forgotPassword(identifier: string): Promise<ApiResponse<{ email?: string }>> {
+    const normalizedIdentifier = identifier.includes('@')
+      ? identifier.trim().toLowerCase()
+      : tryNormalizePhone(identifier);
     return this.request('/auth/forgot-password', {
       method: 'POST',
-      body: JSON.stringify({ identifier }),
+      body: JSON.stringify({ identifier: normalizedIdentifier }),
     });
   }
 
   async resetPassword(otp: string, newPassword: string, phone?: string, email?: string): Promise<ApiResponse> {
     return this.request('/auth/reset-password', {
       method: 'POST',
-      body: JSON.stringify({ otp, newPassword, phone, email }),
+      body: JSON.stringify({
+        otp,
+        newPassword,
+        email,
+        ...(phone ? { phone: tryNormalizePhone(phone) } : {}),
+      }),
     });
   }
 
@@ -719,23 +936,54 @@ class ApiClient {
     return this.request('/users/me');
   }
 
-  async getNotificationSettings(): Promise<ApiResponse<{
-    transactionEmailNotificationsEnabled: boolean;
-    pushNotificationsEnabled: boolean;
-  }>> {
+  async getNotificationSettings(): Promise<ApiResponse<NotificationSettings>> {
     return this.request('/users/me/notification-settings');
   }
 
   async updateNotificationSettings(data: {
+    masterEnabled?: boolean;
     transactionEmailNotificationsEnabled?: boolean;
     pushNotificationsEnabled?: boolean;
-  }): Promise<ApiResponse<{
-    transactionEmailNotificationsEnabled: boolean;
-    pushNotificationsEnabled: boolean;
-  }>> {
+    marketingPushNotificationsEnabled?: boolean;
+    transactionSmsNotificationsEnabled?: boolean;
+  }): Promise<ApiResponse<NotificationSettings>> {
     return this.request('/users/me/notification-settings', {
       method: 'PATCH',
       body: JSON.stringify(data),
+    });
+  }
+
+  async getNotifications(params?: {
+    page?: number;
+    pageSize?: number;
+    unreadOnly?: boolean;
+    excludeLoginDeviceId?: string;
+  }): Promise<ApiResponse<NotificationsListResponse>> {
+    const query = new URLSearchParams();
+    if (params?.page) query.set('page', String(params.page));
+    if (params?.pageSize) query.set('pageSize', String(params.pageSize));
+    if (params?.unreadOnly) query.set('unreadOnly', 'true');
+    if (params?.excludeLoginDeviceId) query.set('excludeLoginDeviceId', params.excludeLoginDeviceId);
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return this.request(`/users/me/notifications${suffix}`);
+  }
+
+  async getNotificationUnreadCount(excludeLoginDeviceId?: string): Promise<ApiResponse<{ unreadCount: number }>> {
+    const suffix = excludeLoginDeviceId
+      ? `?excludeLoginDeviceId=${encodeURIComponent(excludeLoginDeviceId)}`
+      : '';
+    return this.request(`/users/me/notifications/unread-count${suffix}`);
+  }
+
+  async markNotificationRead(notificationId: string): Promise<ApiResponse<AppNotification>> {
+    return this.request(`/users/me/notifications/${notificationId}/read`, {
+      method: 'PATCH',
+    });
+  }
+
+  async markAllNotificationsRead(): Promise<ApiResponse<{ updatedCount: number }>> {
+    return this.request('/users/me/notifications/read-all', {
+      method: 'PATCH',
     });
   }
 
@@ -773,29 +1021,184 @@ class ApiClient {
     });
   }
 
-  async changePassword(currentPassword: string, newPassword: string): Promise<ApiResponse> {
-    return this.request('/auth/change-password', {
+  async requestPinReset(): Promise<ApiResponse<{ message?: string }>> {
+    return this.request('/auth/reset-pin/request', { method: 'POST', body: JSON.stringify({}) });
+  }
+
+  async resetPin(otp: string, newPin: string, confirmPin: string): Promise<ApiResponse> {
+    return this.request('/auth/reset-pin', {
       method: 'POST',
-      body: JSON.stringify({ currentPassword, newPassword }),
+      body: JSON.stringify({ otp, newPin, confirmPin }),
     });
   }
 
-  async enable2FA(): Promise<ApiResponse<{ secret: string; qrCode: string }>> {
-    return this.request('/auth/2fa/enable', { method: 'POST' });
+  async verifyPin(pin: string): Promise<ApiResponse<{ verified: boolean }>> {
+    return this.request('/auth/verify-pin', {
+      method: 'POST',
+      body: JSON.stringify({ pin }),
+    });
   }
 
-  async verify2FA(otp: string): Promise<ApiResponse> {
-    return this.request('/auth/2fa/verify', { method: 'POST', body: JSON.stringify({ otp }) });
+  async enableBiometric(deviceId: string): Promise<ApiResponse<{ biometricToken: string }>> {
+    return this.request('/auth/biometric/enable', {
+      method: 'POST',
+      body: JSON.stringify({ deviceId }),
+    });
+  }
+
+  async disableBiometric(): Promise<ApiResponse> {
+    return this.request('/auth/biometric/disable', { method: 'POST', body: JSON.stringify({}) });
+  }
+
+  async biometricLogin(data: {
+    userId: string;
+    deviceId: string;
+    biometricToken: string;
+  }): Promise<ApiResponse<LoginResponse>> {
+    const res = await this.request<ApiResponse<LoginResponse>>('/auth/biometric/login', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    if (isResponseSuccess(res) && res.data) {
+      await this.persistLoginSession(res.data);
+    }
+    return res;
+  }
+
+  async changePassword(
+    currentPassword: string,
+    newPassword: string,
+    confirmPassword?: string,
+  ): Promise<ApiResponse> {
+    return this.request('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({
+        currentPassword,
+        newPassword,
+        confirmPassword: confirmPassword ?? newPassword,
+      }),
+    });
+  }
+
+  async get2FAMethods(): Promise<ApiResponse<{ methods: TwoFactorMethodOption[] }>> {
+    return this.request('/auth/2fa/methods');
+  }
+
+  async enable2FA(method: TwoFactorMethodType): Promise<ApiResponse<Enable2FAResponse>> {
+    return this.request('/auth/2fa/enable', {
+      method: 'POST',
+      body: JSON.stringify({ method }),
+    });
+  }
+
+  async verify2FA(otp: string, method: TwoFactorMethodType): Promise<ApiResponse> {
+    return this.request('/auth/2fa/verify', {
+      method: 'POST',
+      body: JSON.stringify({ otp, method }),
+    });
   }
 
   async disable2FA(otp: string): Promise<ApiResponse> {
-    return this.request('/auth/2fa/disable', { method: 'POST', body: JSON.stringify({ otp }) });
+    return this.request('/auth/2fa/disable', {
+      method: 'POST',
+      body: JSON.stringify({ otp }),
+    });
+  }
+
+  async send2FACode(
+    action: 'enable' | 'disable' | 'login',
+    options?: { method?: TwoFactorMethodType; userId?: string },
+  ): Promise<ApiResponse<{ message: string; destination?: string; method?: TwoFactorMethodType }>> {
+    return this.request('/auth/2fa/send-code', {
+      method: 'POST',
+      body: JSON.stringify({ action, ...options }),
+    });
+  }
+
+  async uploadAvatar(image: string, oldPublicId?: string): Promise<ApiResponse<{ url: string; publicId: string }>> {
+    return this.request('/upload/avatar', {
+      method: 'POST',
+      body: JSON.stringify({ image, oldPublicId }),
+    });
+  }
+
+  async getContentPage(slug: string): Promise<ApiResponse<{ slug: string; title: string; body: string }>> {
+    return this.request(`/content/pages/${slug}`);
+  }
+
+  async getActiveAds(params: { screen?: string; channel?: 'mobile' | 'web' }): Promise<ApiResponse<{
+    ads: Array<{
+      id: string;
+      title: string;
+      subtitle?: string | null;
+      imageUrl?: string | null;
+      linkUrl?: string | null;
+      ctaLabel?: string | null;
+      adType?: string;
+      placement: 'BANNER' | 'CARD' | 'MODAL' | 'TOP_BANNER';
+      targetScreen: string;
+      channel: string;
+      actionType?: 'NONE' | 'URL' | 'SCREEN';
+      actionRoute?: string | null;
+      frequency?: 'UNLIMITED' | 'ONCE' | 'ONCE_PER_DAY' | 'ONCE_PER_SESSION';
+      maxImpressions?: number | null;
+    }>;
+  }>> {
+    const query = new URLSearchParams();
+    if (params.screen) query.set('screen', params.screen);
+    query.set('channel', params.channel || 'mobile');
+    return this.request(`/content/ads?${query.toString()}`);
+  }
+
+  async trackAdImpression(adId: string): Promise<void> {
+    try {
+      await this.request(`/content/ads/${adId}/impression`, { method: 'POST' });
+    } catch {
+      // Analytics are best-effort.
+    }
+  }
+
+  async trackAdClick(adId: string): Promise<void> {
+    try {
+      await this.request(`/content/ads/${adId}/click`, { method: 'POST' });
+    } catch {
+      // Analytics are best-effort.
+    }
+  }
+
+  async getActiveBroadcasts(params?: { screen?: string }): Promise<ApiResponse<{
+    broadcasts: Array<{
+      id: string;
+      title: string;
+      body: string;
+      imageUrl?: string | null;
+      displayType: 'IN_APP_MODAL' | 'PUSH' | 'ON_PAGE_BANNER' | 'ON_PAGE_NOTIFICATION';
+      targetScreens: string[];
+      actionRoute?: string | null;
+      actionLabel?: string | null;
+      category: string;
+      audience: string;
+      sentAt?: string | null;
+    }>;
+  }>> {
+    const query = new URLSearchParams();
+    if (params?.screen) query.set('screen', params.screen);
+    return this.request(`/content/broadcasts?${query.toString()}`);
   }
 
   // ============ WALLET ============
 
   async getWalletBalance(): Promise<ApiResponse<{ balance: string; formattedBalance?: string }>> {
     return this.request('/wallet');
+  }
+
+  async getWalletMonthSummary(): Promise<ApiResponse<{
+    moneyIn: string;
+    moneyOut: string;
+    inCount: number;
+    outCount: number;
+  }>> {
+    return this.request('/wallet/ledger/summary');
   }
 
   async getWalletLedger(page = 1, pageSize = 20): Promise<ApiResponse<{
@@ -806,13 +1209,14 @@ class ApiClient {
   }
 
   /** Paginate ledger until all entries for the current calendar month are loaded. */
-  async fetchCurrentMonthLedger(): Promise<LedgerEntry[]> {
+  async fetchCurrentMonthLedger(options?: { maxPages?: number }): Promise<LedgerEntry[]> {
     const monthStart = getCurrentMonthStart();
     const collected: LedgerEntry[] = [];
     let page = 1;
     const pageSize = 50;
+    const maxPages = options?.maxPages ?? 5;
 
-    while (page <= 50) {
+    while (page <= maxPages) {
       const res = await this.getWalletLedger(page, pageSize);
       if (!isResponseSuccess(res)) break;
 
@@ -980,6 +1384,14 @@ class ApiClient {
     return this.request('/vtu/airtime/providers');
   }
 
+  async getNumberPrefixes(): Promise<ApiResponse<Array<{
+    prefix: string;
+    networkCode: string;
+    networkName: string;
+  }>>> {
+    return this.request('/vtu/number-prefixes');
+  }
+
   async validateNetwork(phone: string): Promise<ApiResponse<{
     network: string;
     networkName: string;
@@ -996,7 +1408,9 @@ class ApiClient {
     network: string;
     phone: string;
     amount: number; // in Naira, will convert to kobo
-    pin: string;
+    pin?: string;
+    biometricToken?: string;
+    deviceId?: string;
     bypassValidation?: boolean;
   }): Promise<ApiResponse<{
     transactionId: string;
@@ -1013,6 +1427,8 @@ class ApiClient {
         phone: data.phone,
         amount: Math.round(data.amount * 100),
         pin: data.pin,
+        biometricToken: data.biometricToken,
+        deviceId: data.deviceId,
         bypassValidation: data.bypassValidation,
       }),
     });
@@ -1037,7 +1453,9 @@ class ApiClient {
     provider: string;
     phone: string;
     bundleId: string;
-    pin: string;
+    pin?: string;
+    biometricToken?: string;
+    deviceId?: string;
     bypassValidation?: boolean;
   }): Promise<ApiResponse<{
     transactionId: string;
@@ -1055,6 +1473,8 @@ class ApiClient {
         phone: data.phone,
         network: data.provider,
         pin: data.pin,
+        biometricToken: data.biometricToken,
+        deviceId: data.deviceId,
         bypassValidation: data.bypassValidation,
       }),
     });
@@ -1088,7 +1508,9 @@ class ApiClient {
     meterNumber: string;
     meterType: 'prepaid' | 'postpaid';
     amount: number; // in Naira
-    pin: string;
+    pin?: string;
+    biometricToken?: string;
+    deviceId?: string;
     phone?: string;
   }): Promise<ApiResponse<{
     transactionId: string;
@@ -1137,7 +1559,9 @@ class ApiClient {
     provider: string;
     smartCardNumber: string;
     planId: string;
-    pin: string;
+    pin?: string;
+    biometricToken?: string;
+    deviceId?: string;
   }): Promise<ApiResponse<{
     transactionId: string;
     status: string;
@@ -1154,6 +1578,8 @@ class ApiClient {
         smartcardNumber: data.smartCardNumber,
         planId: data.planId,
         pin: data.pin,
+        biometricToken: data.biometricToken,
+        deviceId: data.deviceId,
       }),
     });
   }
@@ -1162,6 +1588,10 @@ class ApiClient {
 
   async getServiceAvailability(): Promise<ApiResponse<ServiceAvailabilityMap>> {
     return this.request('/services/availability');
+  }
+
+  async getCatalogRevision(): Promise<ApiResponse<{ revision: number; updatedAt: string }>> {
+    return this.request('/services/catalog-revision');
   }
 
   // ============ BANK TRANSFERS ============
@@ -1204,7 +1634,9 @@ class ApiClient {
     accountName: string;
     amount: number; // in Naira (will NOT convert, backend expects Naira for transfers)
     narration?: string;
-    pin: string;
+    pin?: string;
+    biometricToken?: string;
+    deviceId?: string;
   }): Promise<ApiResponse<{
     reference: string;
     status: string;
@@ -1228,13 +1660,22 @@ class ApiClient {
     return this.request(`/transfers/status/${encodeURIComponent(reference)}${query}`);
   }
 
-  async getRecentTransferRecipients(limit = 8): Promise<ApiResponse<Array<{
+  async getRecentTransferRecipients(limit = 20): Promise<ApiResponse<Array<{
     accountNumber: string;
     accountName: string;
     bankCode: string;
     lastTransferAt: string;
   }>>> {
     return this.request(`/transfers/recent-recipients?limit=${limit}`);
+  }
+
+  async removeRecentTransferRecipients(
+    recipients: Array<{ bankCode: string; accountNumber: string }>,
+  ): Promise<ApiResponse<{ removed: number }>> {
+    return this.request('/transfers/recent-recipients', {
+      method: 'DELETE',
+      body: JSON.stringify({ recipients }),
+    });
   }
 
   async getTransferHistory(page = 1, pageSize = 20): Promise<ApiResponse> {

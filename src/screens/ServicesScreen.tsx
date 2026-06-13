@@ -1,5 +1,5 @@
 import {
-  View, Text, TouchableOpacity, StyleSheet, ScrollView,
+  View, Text, TouchableOpacity, StyleSheet, ScrollView, useWindowDimensions,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useTabContext } from '../stores/tab-context';
@@ -9,11 +9,109 @@ import { Colors, Spacing, Typography, Radius, Shadow } from '../theme';
 import { useServiceAvailability } from '../hooks/useServiceAvailability';
 import { SERVICE_CATALOG_GROUPS, type ServiceCatalogItem } from '../lib/service-catalog-ui';
 import { showToast } from '../components/ui/Toast';
+import { ThemedScreen } from '../components/ui/ThemedScreen';
+import { GlassCard } from '../components/ui/GlassCard';
+import { GlassSurface } from '../components/ui/GlassSurface';
+import { AdBanner } from '../components/ads/AdBanner';
+import { BroadcastBanner } from '../components/broadcast/BroadcastBanner';
+import { ScreenBody } from '../components/ui/ScreenBody';
+import { useLayout } from '../lib/platform-ui';
+
+const GRID_COLS = 3;
+const GRID_GAP = 10;
+const GROUP_PAD = 14;
+
+function ServiceGridTile({
+  item,
+  available,
+  width,
+  onPress,
+}: {
+  item: ServiceCatalogItem;
+  available: boolean;
+  width: number;
+  onPress: () => void;
+}) {
+  const badgeLabel = item.route ? 'Unavailable' : 'Soon';
+
+  return (
+    <TouchableOpacity
+      style={[styles.tileWrap, { width }, !available && styles.tileWrapDisabled]}
+      onPress={onPress}
+      activeOpacity={available ? 0.72 : 1}
+    >
+      <GlassSurface variant="solid" borderRadius={14} style={styles.tile} contentStyle={styles.tileInner}>
+        <View style={[styles.tileIcon, { backgroundColor: item.bg }, !available && styles.tileIconDisabled]}>
+          <Ionicons
+            name={item.icon as keyof typeof Ionicons.glyphMap}
+            size={26}
+            color={available ? item.color : Colors.mutedLight}
+          />
+        </View>
+        <Text style={[styles.tileLabel, !available && styles.tileLabelDisabled]} numberOfLines={2}>
+          {item.label}
+        </Text>
+        {!available ? (
+          <View style={styles.tileBadge}>
+            <Text style={styles.tileBadgeText}>{badgeLabel}</Text>
+          </View>
+        ) : null}
+      </GlassSurface>
+    </TouchableOpacity>
+  );
+}
+
+function ServiceGroupPanel({
+  title,
+  items,
+  tileWidth,
+  isItemAvailable,
+  onPressItem,
+  muted = false,
+}: {
+  title: string;
+  items: ServiceCatalogItem[];
+  tileWidth: number;
+  isItemAvailable: (item: ServiceCatalogItem) => boolean;
+  onPressItem: (item: ServiceCatalogItem) => void;
+  muted?: boolean;
+}) {
+  return (
+    <GlassCard
+      variant="solid"
+      borderRadius={20}
+      padding={GROUP_PAD}
+      style={[styles.groupCard, muted && styles.groupCardMuted]}
+    >
+      <View style={styles.groupHead}>
+        <Text style={styles.groupTitle}>{title}</Text>
+        <View style={styles.groupLine} />
+      </View>
+
+      <View style={styles.grid}>
+        {items.map((item) => (
+          <ServiceGridTile
+            key={item.label}
+            item={item}
+            available={isItemAvailable(item)}
+            width={tileWidth}
+            onPress={() => onPressItem(item)}
+          />
+        ))}
+      </View>
+    </GlassCard>
+  );
+}
 
 export default function ServicesScreen() {
   const insets = useSafeAreaInsets();
+  const { pagePadding, contentWidth } = useLayout();
   const { setTab } = useTabContext();
   const { isUsable } = useServiceAvailability();
+
+  const tileWidth = (
+    contentWidth - pagePadding * 2 - GROUP_PAD * 2 - GRID_GAP * (GRID_COLS - 1)
+  ) / GRID_COLS;
 
   const isItemAvailable = (item: ServiceCatalogItem) => {
     if (!item.route) return false;
@@ -39,87 +137,172 @@ export default function ServicesScreen() {
   };
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-        <Text style={styles.headerTitle}>All Services</Text>
-        <Text style={styles.headerSub}>Everything you need, in one place</Text>
-      </View>
+    <ThemedScreen>
 
-      {SERVICE_CATALOG_GROUPS.map((group) => (
-        <View key={group.title} style={styles.group}>
-          <Text style={styles.groupTitle}>{group.title}</Text>
-          <View style={styles.grid}>
-            {group.items.map((item) => {
-              const available = isItemAvailable(item);
-              return (
-                <TouchableOpacity
-                  key={item.label}
-                  style={[styles.serviceCard, !available && styles.serviceCardDisabled]}
-                  onPress={() => handlePress(item)}
-                  activeOpacity={available ? 0.75 : 1}
-                >
-                  <View style={[styles.serviceIcon, { backgroundColor: item.bg }]}>
-                    <Ionicons name={item.icon as keyof typeof Ionicons.glyphMap} size={24} color={available ? item.color : Colors.mutedLight} />
-                  </View>
-                  <Text style={[styles.serviceLabel, !available && styles.serviceLabelDisabled]}>
-                    {item.label}
-                  </Text>
-                  {!available && (
-                    <View style={styles.soonBadge}>
-                      <Text style={styles.soonText}>{item.route ? 'Unavailable' : 'Soon'}</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
+      <GlassSurface
+        variant="solid"
+        borderRadius={24}
+        style={styles.headerShell}
+        contentStyle={{ ...styles.header, paddingTop: insets.top + 12, paddingHorizontal: pagePadding }}
+      >
+        <View style={styles.headerRow}>
+          <View style={styles.headerIcon}>
+            <Ionicons name="grid-outline" size={20} color={Colors.primary} />
+          </View>
+          <View style={styles.headerText}>
+            <Text style={styles.headerTitle}>All Services</Text>
+            <Text style={styles.headerSub}>Everything you need, in one place</Text>
           </View>
         </View>
-      ))}
-    </ScrollView>
+      </GlassSurface>
+
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 32 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <ScreenBody>
+        <BroadcastBanner screen="SERVICES" />
+        <AdBanner screen="SERVICES" placement="CARD" />
+        {SERVICE_CATALOG_GROUPS.map((group) => (
+          <ServiceGroupPanel
+            key={group.title}
+            title={group.title}
+            items={group.items}
+            tileWidth={tileWidth}
+            isItemAvailable={isItemAvailable}
+            onPressItem={handlePress}
+            muted={group.title === 'Coming Soon'}
+          />
+        ))}
+        </ScreenBody>
+      </ScrollView>
+    </ThemedScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.surface },
+  root: { flex: 1 },
+  headerShell: {
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    ...Shadow.sm,
+  },
   header: {
-    paddingHorizontal: Spacing.page, paddingBottom: 20,
-    backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: Colors.border,
+    paddingHorizontal: Spacing.page,
+    paddingBottom: 18,
   },
-  headerTitle: { ...Typography.h2, color: Colors.dark, marginBottom: 4 },
-  headerSub: { ...Typography.small, color: Colors.muted },
-  group: { paddingHorizontal: Spacing.page, paddingTop: 20 },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: Colors.primaryMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(124, 58, 237, 0.12)',
+  },
+  headerText: {
+    flex: 1,
+    gap: 3,
+  },
+  headerTitle: {
+    ...Typography.h2,
+    color: Colors.dark,
+    letterSpacing: -0.3,
+  },
+  headerSub: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: Colors.mid,
+    lineHeight: 20,
+  },
+  scroll: { flex: 1 },
+  scrollContent: {
+    paddingTop: 16,
+    gap: 14,
+  },
+  groupCard: {
+    ...Shadow.md,
+  },
+  groupCardMuted: {
+    opacity: 0.92,
+  },
+  groupHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 14,
+  },
   groupTitle: {
-    ...Typography.label, color: Colors.muted, marginBottom: 12,
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.muted,
+    letterSpacing: 0.35,
+    textTransform: 'uppercase',
   },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  serviceCard: {
-    width: '22%',
-    flexGrow: 1,
-    backgroundColor: Colors.white,
-    borderRadius: Radius.lg,
-    paddingVertical: 16,
+  groupLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(124, 58, 237, 0.1)',
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: GRID_GAP,
+  },
+  tileWrap: {
+    position: 'relative',
+  },
+  tileWrapDisabled: {
+    opacity: 0.65,
+  },
+  tile: {
+    width: '100%',
+  },
+  tileInner: {
+    paddingVertical: 12,
     paddingHorizontal: 8,
     alignItems: 'center',
     gap: 8,
-    ...Shadow.xs,
     position: 'relative',
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
-  serviceCardDisabled: { opacity: 0.6 },
-  serviceIcon: { width: 50, height: 50, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-  serviceLabel: { ...Typography.caption, color: Colors.dark, fontWeight: '600', textAlign: 'center' },
-  serviceLabelDisabled: { color: Colors.muted },
-  soonBadge: {
-    position: 'absolute', top: 6, right: 6,
-    backgroundColor: Colors.primaryMuted, borderRadius: Radius.full,
-    paddingHorizontal: 5, paddingVertical: 2,
+  tileIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 13,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  soonText: {
+  tileIconDisabled: {
+    opacity: 0.7,
+  },
+  tileLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.mid,
+    textAlign: 'center',
+  },
+  tileLabelDisabled: {
+    color: Colors.muted,
+  },
+  tileBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: 'rgba(15, 23, 42, 0.08)',
+    borderRadius: Radius.full,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  tileBadgeText: {
     fontSize: 7,
     fontWeight: '700',
-    color: Colors.primary,
-    letterSpacing: 0,
-    textTransform: 'none',
+    color: Colors.muted,
   },
 });

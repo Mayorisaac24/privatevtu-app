@@ -1,8 +1,14 @@
 import { Colors } from '../theme';
 import { SERVICE_CODES, type ServiceCode } from './service-availability';
 
+export const SERVICE_ICON = {
+  color: Colors.primary,
+  bg: Colors.primaryMuted,
+} as const;
+
 export type ServiceCatalogItem = {
   label: string;
+  subtitle?: string;
   icon: string;
   color: string;
   bg: string;
@@ -11,34 +17,98 @@ export type ServiceCatalogItem = {
   alwaysAvailable?: boolean;
 };
 
+function catalogItem(
+  item: Omit<ServiceCatalogItem, 'color' | 'bg'> & { color?: string; bg?: string },
+): ServiceCatalogItem {
+  return {
+    ...item,
+    color: item.color ?? SERVICE_ICON.color,
+    bg: item.bg ?? SERVICE_ICON.bg,
+  };
+}
+
 export const SERVICE_CATALOG_GROUPS: Array<{ title: string; items: ServiceCatalogItem[] }> = [
   {
     title: 'Essentials',
     items: [
-      { label: 'Airtime', icon: 'phone-portrait-outline', color: Colors.primary, bg: Colors.primaryMuted, route: '/services/airtime', serviceCode: SERVICE_CODES.airtime },
-      { label: 'Data Bundle', icon: 'wifi-outline', color: Colors.primary, bg: Colors.primaryMuted, route: '/services/data', serviceCode: SERVICE_CODES.data },
-      { label: 'Electricity', icon: 'flash-outline', color: Colors.primary, bg: Colors.primaryMuted, route: '/services/electricity', serviceCode: SERVICE_CODES.electricity },
-      { label: 'Cable TV', icon: 'tv-outline', color: Colors.primary, bg: Colors.primaryMuted, route: '/services/cable', serviceCode: SERVICE_CODES.cable },
-      { label: 'Education', icon: 'school-outline', color: Colors.primary, bg: Colors.primaryMuted, route: '/services/education', serviceCode: SERVICE_CODES.education },
+      catalogItem({
+        label: 'Airtime',
+        subtitle: 'Top up MTN, Airtel, Glo & 9mobile',
+        icon: 'phone-portrait-outline',
+        route: '/services/airtime',
+        serviceCode: SERVICE_CODES.airtime,
+      }),
+      catalogItem({
+        label: 'Data Bundle',
+        subtitle: 'Daily, weekly & monthly plans',
+        icon: 'wifi-outline',
+        route: '/services/data',
+        serviceCode: SERVICE_CODES.data,
+      }),
+      catalogItem({
+        label: 'Electricity',
+        subtitle: 'Prepaid & postpaid disco bills',
+        icon: 'flash-outline',
+        route: '/services/electricity',
+        serviceCode: SERVICE_CODES.electricity,
+      }),
+      catalogItem({
+        label: 'Cable TV',
+        subtitle: 'DSTV, GOtv, Startimes & more',
+        icon: 'tv-outline',
+        route: '/services/cable',
+        serviceCode: SERVICE_CODES.cable,
+      }),
+      catalogItem({
+        label: 'Education',
+        subtitle: 'WAEC, JAMB & exam pins',
+        icon: 'school-outline',
+        route: '/services/education',
+        serviceCode: SERVICE_CODES.education,
+      }),
     ],
   },
   {
     title: 'Finance',
     items: [
-      { label: 'Fund Wallet', icon: 'add-circle-outline', color: Colors.primary, bg: Colors.primaryMuted, route: '/wallet/fund', serviceCode: SERVICE_CODES.walletFund },
-      { label: 'Transfer', icon: 'swap-horizontal-outline', color: Colors.primary, bg: Colors.primaryMuted, route: '/wallet/transfer', serviceCode: SERVICE_CODES.localTransfer },
-      { label: 'Transactions', icon: 'receipt-outline', color: Colors.primary, bg: Colors.primaryMuted, route: 'TAB:history', alwaysAvailable: true },
-      { label: 'Wallet', icon: 'wallet-outline', color: Colors.primary, bg: Colors.primaryMuted, route: 'TAB:wallet', alwaysAvailable: true },
+      catalogItem({
+        label: 'Fund Wallet',
+        subtitle: 'Add money via bank transfer',
+        icon: 'add-circle-outline',
+        route: '/wallet/fund',
+        serviceCode: SERVICE_CODES.walletFund,
+      }),
+      catalogItem({
+        label: 'Transfer',
+        subtitle: 'Send to any Nigerian bank',
+        icon: 'swap-horizontal-outline',
+        route: '/wallet/transfer',
+        serviceCode: SERVICE_CODES.localTransfer,
+      }),
+      catalogItem({
+        label: 'Transactions',
+        subtitle: 'View purchases & wallet history',
+        icon: 'receipt-outline',
+        route: 'TAB:history',
+        alwaysAvailable: true,
+      }),
+      catalogItem({
+        label: 'Wallet',
+        subtitle: 'Balance, funding & activity',
+        icon: 'wallet-outline',
+        route: 'TAB:wallet',
+        alwaysAvailable: true,
+      }),
     ],
   },
   {
     title: 'Coming Soon',
     items: [
-      { label: 'Betting', icon: 'trophy-outline', color: Colors.primary, bg: Colors.primaryMuted, route: null },
-      { label: 'Gift Cards', icon: 'gift-outline', color: Colors.primary, bg: Colors.primaryMuted, route: null },
-      { label: 'Insurance', icon: 'shield-checkmark-outline', color: Colors.primary, bg: Colors.primaryMuted, route: null },
-      { label: 'Savings', icon: 'trending-up-outline', color: Colors.primary, bg: Colors.primaryMuted, route: null },
-      { label: 'Virtual Card', icon: 'card-outline', color: Colors.primary, bg: Colors.primaryMuted, route: null },
+      { label: 'Betting', icon: 'trophy-outline', color: Colors.muted, bg: Colors.surfaceAlt, route: null },
+      { label: 'Gift Cards', icon: 'gift-outline', color: Colors.muted, bg: Colors.surfaceAlt, route: null },
+      { label: 'Insurance', icon: 'shield-checkmark-outline', color: Colors.muted, bg: Colors.surfaceAlt, route: null },
+      { label: 'Savings', icon: 'trending-up-outline', color: Colors.muted, bg: Colors.surfaceAlt, route: null },
+      { label: 'Virtual Card', icon: 'card-outline', color: Colors.muted, bg: Colors.surfaceAlt, route: null },
     ],
   },
 ];
@@ -51,10 +121,10 @@ export const HOME_QUICK_ACTIONS: Array<{
   route: string;
   serviceCode?: ServiceCode;
 }> = [
-  { title: 'Airtime', icon: 'phone-portrait-outline', color: Colors.primary, bg: Colors.primaryMuted, route: '/services/airtime', serviceCode: SERVICE_CODES.airtime },
-  { title: 'Data', icon: 'wifi-outline', color: Colors.primary, bg: Colors.primaryMuted, route: '/services/data', serviceCode: SERVICE_CODES.data },
-  { title: 'Electric', icon: 'flash-outline', color: Colors.primary, bg: Colors.primaryMuted, route: '/services/electricity', serviceCode: SERVICE_CODES.electricity },
-  { title: 'Cable TV', icon: 'tv-outline', color: Colors.primary, bg: Colors.primaryMuted, route: '/services/cable', serviceCode: SERVICE_CODES.cable },
-  { title: 'Education', icon: 'school-outline', color: Colors.primary, bg: Colors.primaryMuted, route: '/services/education', serviceCode: SERVICE_CODES.education },
-  { title: 'More', icon: 'grid-outline', color: Colors.primary, bg: Colors.primaryMuted, route: 'TAB:services' },
+  { title: 'Airtime', icon: 'phone-portrait-outline', ...SERVICE_ICON, route: '/services/airtime', serviceCode: SERVICE_CODES.airtime },
+  { title: 'Data', icon: 'wifi-outline', ...SERVICE_ICON, route: '/services/data', serviceCode: SERVICE_CODES.data },
+  { title: 'Electric', icon: 'flash-outline', ...SERVICE_ICON, route: '/services/electricity', serviceCode: SERVICE_CODES.electricity },
+  { title: 'Cable TV', icon: 'tv-outline', ...SERVICE_ICON, route: '/services/cable', serviceCode: SERVICE_CODES.cable },
+  { title: 'Education', icon: 'school-outline', ...SERVICE_ICON, route: '/services/education', serviceCode: SERVICE_CODES.education },
+  { title: 'More', icon: 'grid-outline', ...SERVICE_ICON, route: 'TAB:services' },
 ];

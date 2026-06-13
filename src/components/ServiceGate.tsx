@@ -6,6 +6,8 @@ import { useServiceAvailability } from '../hooks/useServiceAvailability';
 import { useServiceAvailabilityStore } from '../stores/service-availability-store';
 import { type ServiceCode } from '../lib/service-availability';
 import { Colors, Radius, Spacing } from '../theme';
+import { ThemedScreen } from './ui/ThemedScreen';
+import { GlassCard } from './ui/GlassCard';
 
 type ServiceGateProps = {
   serviceCode: ServiceCode;
@@ -23,18 +25,22 @@ export function ServiceGate({ serviceCode, title, children }: ServiceGateProps) 
 
   if (!isUsable(serviceCode)) {
     return (
-      <View style={styles.centered}>
-        <View style={styles.iconWrap}>
-          <Ionicons name="ban-outline" size={28} color="#D97706" />
+      <ThemedScreen>
+        <View style={styles.centered}>
+          <GlassCard contentStyle={styles.cardContent}>
+            <View style={styles.iconWrap}>
+              <Ionicons name="ban-outline" size={28} color={Colors.warning} />
+            </View>
+            <Text style={styles.title}>{title} unavailable</Text>
+            <Text style={styles.subtitle}>
+              This service is currently disabled. Please check back later or contact support.
+            </Text>
+            <TouchableOpacity style={styles.backBtn} onPress={() => navigateBack()} activeOpacity={0.85}>
+              <Text style={styles.backBtnText}>Go back</Text>
+            </TouchableOpacity>
+          </GlassCard>
         </View>
-        <Text style={styles.title}>{title} unavailable</Text>
-        <Text style={styles.subtitle}>
-          This service is currently disabled. Please check back later or contact support.
-        </Text>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigateBack()} activeOpacity={0.85}>
-          <Text style={styles.backBtnText}>Go back</Text>
-        </TouchableOpacity>
-      </View>
+      </ThemedScreen>
     );
   }
 
@@ -47,14 +53,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: Spacing.page,
-    backgroundColor: '#F4F5FA',
+  },
+  cardContent: {
+    alignItems: 'center',
     gap: 10,
+    paddingVertical: 28,
+    paddingHorizontal: 22,
   },
   iconWrap: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#FFFBEB',
+    backgroundColor: Colors.warningLight,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,

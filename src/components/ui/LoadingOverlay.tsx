@@ -3,15 +3,18 @@ import {
   Animated,
   Easing,
   Modal,
+  Platform,
   StyleSheet,
   Text,
   View,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Colors, Gradients, Radius, Shadow } from '../../theme';
+import { Colors, Gradients, Radius } from '../../theme';
+import { GlassSurface } from './GlassSurface';
 
 type LoadingOverlayProps = {
   visible: boolean;
@@ -137,6 +140,14 @@ export function LoadingOverlay({
       onRequestClose={() => {}}
     >
       <View style={[styles.backdrop, style]}>
+        <BlurView
+          intensity={40}
+          tint="dark"
+          style={StyleSheet.absoluteFill}
+          experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined}
+        />
+        <View style={styles.backdropTint} />
+
         <Animated.View
           style={[
             styles.glow,
@@ -147,7 +158,13 @@ export function LoadingOverlay({
           ]}
         />
 
-        <View style={styles.card}>
+        <GlassSurface
+          variant="light"
+          borderRadius={Radius.xl}
+          intensity={72}
+          style={styles.card}
+          contentStyle={styles.cardContent}
+        >
           <View style={styles.iconStage}>
             <Animated.View style={[styles.orbitRing, { transform: [{ rotate: ringRotate }] }]}>
               <View style={styles.orbitDot} />
@@ -171,7 +188,7 @@ export function LoadingOverlay({
             <BounceDot delay={120} />
             <BounceDot delay={240} />
           </View>
-        </View>
+        </GlassSurface>
       </View>
     </Modal>
   );
@@ -182,8 +199,11 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.42)',
     paddingHorizontal: 28,
+  },
+  backdropTint: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 23, 42, 0.32)',
   },
   glow: {
     position: 'absolute',
@@ -195,15 +215,12 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 320,
-    backgroundColor: Colors.white,
-    borderRadius: Radius.xl,
+  },
+  cardContent: {
     paddingHorizontal: 24,
     paddingTop: 28,
     paddingBottom: 24,
     alignItems: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(124, 58, 237, 0.12)',
-    ...Shadow.lg,
   },
   iconStage: {
     width: 88,
@@ -236,7 +253,6 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    ...Shadow.sm,
   },
   message: {
     fontSize: 17,

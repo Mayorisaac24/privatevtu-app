@@ -6,7 +6,7 @@ export default function AuthLayout() {
   return (
     <>
       <FocusStatusBar style="light" />
-      <Stack screenOptions={stackScreenOptions}>
+      <Stack screenOptions={{ ...stackScreenOptions, gestureEnabled: false, fullScreenGestureEnabled: false }}>
       <Stack.Screen name="login" />
       <Stack.Screen name="index" />
       <Stack.Screen name="verify-otp" />

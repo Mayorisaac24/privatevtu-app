@@ -5,6 +5,10 @@ import type { User } from '../lib/api';
 import { resetDashboardCache } from '../lib/dashboard-data';
 import { resetTransferConfigCache } from '../lib/transfer-config-cache';
 import { resetWalletFundingCache } from '../lib/wallet-funding-cache';
+import { resetKycStatusCache } from '../lib/kyc-status-cache';
+import { resetTransferRecipientsCache, resetVerifiedAccountsCache } from '../lib/transfer-recipients-cache';
+import { resetServiceCatalogCache } from '../lib/service-catalog-cache';
+import { resetCatalogRevisionSync } from '../lib/catalog-revision-sync';
 import { useServiceAvailabilityStore } from './service-availability-store';
 import { useWalletStore } from './wallet-store';
 
@@ -52,7 +56,7 @@ export const useAuthStore = create<AuthState>()(
       setTokens: async (accessToken, refreshToken) => {
         await secureStorage.setItem('accessToken', accessToken);
         await secureStorage.setItem('refreshToken', refreshToken);
-        set({ accessToken, error: null });
+        set({ accessToken, isAuthenticated: true, error: null });
       },
       clearTokens: async () => {
         await secureStorage.removeItem('accessToken');
@@ -62,6 +66,11 @@ export const useAuthStore = create<AuthState>()(
         resetDashboardCache();
         resetTransferConfigCache();
         resetWalletFundingCache();
+        resetKycStatusCache();
+        resetTransferRecipientsCache();
+        resetVerifiedAccountsCache();
+        resetServiceCatalogCache();
+        resetCatalogRevisionSync();
         set({ accessToken: null, user: null, isAuthenticated: false, error: null });
       },
       logout: async () => {
@@ -84,3 +93,17 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 );
+
+export function waitForAuthStoreHydration(timeoutMs = 2000): Promise<void> {
+  if (useAuthStore.persist.hasHydrated()) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    const timeout = setTimeout(resolve, timeoutMs);
+    useAuthStore.persist.onFinishHydration(() => {
+      clearTimeout(timeout);
+      resolve();
+    });
+  });
+}

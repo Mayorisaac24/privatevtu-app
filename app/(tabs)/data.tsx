@@ -4,14 +4,37 @@ import {
 } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { api, formatCurrency, isResponseSuccess, parseWalletBalanceKobo, type AirtimeProvider, type DataPlan } from '../../src/lib/api';
+import { api, formatCurrency, isResponseSuccess, parseWalletBalanceKobo, type DataPlan } from '../../src/lib/api';
 import { useWalletStore } from '../../src/stores';
-import { Colors, Spacing, Typography, Radius, Shadow } from '../../src/theme';
-import { Toast } from '../../src/components/ui/Toast';
+import { Colors, Typography, Radius } from '../../src/theme';
+import { showToast } from '../../src/components/ui/Toast';
 import { NetworkProviderGrid } from '../../src/components/NetworkProviderGrid';
+import { PhoneNumberInput } from '../../src/components/PhoneNumberInput';
 import { ServiceScreenHeader } from '../../src/components/ServiceScreenHeader';
 import { useHardwareBack } from '../../src/hooks/useHardwareBack';
 import { navigateBack } from '../../src/lib/navigation';
+import { ThemedScreen } from '../../src/components/ui/ThemedScreen';
+import { PurchaseConfirmCard } from '../../src/components/purchase/PurchaseConfirmCard';
+import {
+  ServiceSectionLabel,
+  ServicePurchaseCard,
+  ServiceContinueButton,
+  ServiceDetectedBadge,
+  ServiceSecureNote,
+  ServiceCardDivider,
+  ServiceEditLink,
+} from '../../src/components/purchase/ServicePurchaseUi';
+import { TransactionLockSheet } from '../../src/components/security/TransactionLockSheet';
+import type { TransactionAuthPayload } from '../../src/hooks/useTransactionLockAuth';
+import { getProviderLogo } from '../../src/lib/providers';
+import { useNetworkAutoDetect } from '../../src/hooks/useNetworkAutoDetect';
+import { useCachedDataCatalog, useCachedServiceProviders } from '../../src/hooks/useServiceCatalog';
+import { formatPhoneDisplay } from '../../src/lib/phone';
+import { ScreenBody } from '../../src/components/ui/ScreenBody';
+import {
+  filterDataPlansByType,
+  shouldShowDataTypeFilters,
+} from '../../src/lib/data-plans';
 
 function PlanCard({ plan, selected, onSelect }: { plan: DataPlan; selected: boolean; onSelect: () => void }) {
   return (
@@ -21,7 +44,11 @@ function PlanCard({ plan, selected, onSelect }: { plan: DataPlan; selected: bool
     >
       <View style={styles.planTop}>
         <Text style={[styles.planName, selected && { color: Colors.primary }]}>{plan.name}</Text>
-        {selected && <Ionicons name="checkmark-circle" size={18} color={Colors.primary} />}
+        {selected ? (
+          <View style={styles.planCheck}>
+            <Ionicons name="checkmark" size={12} color={Colors.white} />
+          </View>
+        ) : null}
       </View>
       {plan.validity ? (
         <View style={styles.planValidity}>
@@ -38,251 +65,302 @@ function PlanCard({ plan, selected, onSelect }: { plan: DataPlan; selected: bool
 
 export default function DataScreen() {
   const { balance, setBalance } = useWalletStore();
-  const [providers, setProviders] = useState<AirtimeProvider[]>([]);
-  const [plans, setPlans] = useState<DataPlan[]>([]);
+  const { providers, loading: loadingProviders } = useCachedServiceProviders('data');
   const [selectedNetwork, setSelectedNetwork] = useState('');
+  const { categories, plans, loadingPlans } = useCachedDataCatalog(selectedNetwork);
   const [selectedPlan, setSelectedPlan] = useState<DataPlan | null>(null);
   const [phone, setPhone] = useState('');
-  const [pin, setPin] = useState('');
   const [step, setStep] = useState<'details' | 'confirm'>('details');
+  const [showLock, setShowLock] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [loadingProviders, setLoadingProviders] = useState(true);
-  const [loadingPlans, setLoadingPlans] = useState(false);
   const [search, setSearch] = useState('');
+  const [selectedDataType, setSelectedDataType] = useState('all');
+  const {
+    onPhoneChange,
+    detectedNet,
+    detecting,
+    normalizedPhone,
+    isPhoneComplete,
+  } = useNetworkAutoDetect({
+    phone,
+    setPhone,
+    selectedNetwork,
+    setSelectedNetwork,
+    providers,
+  });
 
-  useEffect(() => { loadProviders(); }, []);
-  useEffect(() => { if (selectedNetwork) loadPlans(selectedNetwork); }, [selectedNetwork]);
-
-  const loadProviders = async () => {
-    try { const res = await api.getDataProviders(); if (res.success) setProviders(res.data ?? []); }
-    finally { setLoadingProviders(false); }
-  };
-
-  const loadPlans = async (net: string) => {
-    setLoadingPlans(true); setPlans([]); setSelectedPlan(null); setSearch('');
-    try { const res = await api.getDataPlans(net); if (res.success) setPlans(res.data ?? []); }
-    finally { setLoadingPlans(false); }
-  };
+  useEffect(() => {
+    if (!selectedNetwork) return;
+    setSelectedPlan(null);
+    setSelectedDataType('all');
+    setSearch('');
+  }, [selectedNetwork]);
 
   const handleContinue = () => {
-    if (!selectedNetwork) { Toast.show({ type: 'error', text1: 'Select Network', text2: 'Please select a network provider' }); return; }
-    if (!selectedPlan) { Toast.show({ type: 'error', text1: 'Select Plan', text2: 'Please select a data plan' }); return; }
-    if (!phone || phone.length < 11) { Toast.show({ type: 'error', text1: 'Invalid Phone', text2: 'Enter a valid 11-digit phone number' }); return; }
+    if (!selectedNetwork) { showToast({ type: 'error', text1: 'Select Network', text2: 'Please select a network provider' }); return; }
+    if (!selectedPlan) { showToast({ type: 'error', text1: 'Select Plan', text2: 'Please select a data plan' }); return; }
+    if (!isPhoneComplete) { showToast({ type: 'error', text1: 'Invalid Phone', text2: 'Enter a valid Nigerian phone number' }); return; }
     Keyboard.dismiss(); setStep('confirm');
   };
 
-  const handlePurchase = async () => {
-    if (!pin || pin.length !== 4) { Toast.show({ type: 'error', text1: 'Enter PIN', text2: 'Enter your 4-digit transaction PIN' }); return; }
+  const handlePurchase = async (auth: TransactionAuthPayload) => {
     setLoading(true);
     try {
-      const res = await api.purchaseData({ provider: selectedNetwork, phone, bundleId: selectedPlan!.id, pin });
+      const res = await api.purchaseData({ provider: selectedNetwork, phone: normalizedPhone, bundleId: selectedPlan!.id, ...auth });
       if (res.success) {
         const balRes = await api.getWalletBalance();
         if (isResponseSuccess(balRes)) setBalance(parseWalletBalanceKobo(balRes.data));
-        Toast.show({ type: 'success', text1: 'Data Activated! 📶', text2: `${selectedPlan!.name} sent to ${phone}` });
-        setTimeout(() => { setPhone(''); setPin(''); setStep('details'); setSelectedPlan(null); setSelectedNetwork(''); }, 1500);
+        showToast({ type: 'success', text1: 'Data Activated! 📶', text2: `${selectedPlan!.name} sent to ${normalizedPhone}` });
+        setShowLock(false);
+        setTimeout(() => { setPhone(''); setStep('details'); setSelectedPlan(null); setSelectedNetwork(''); }, 1500);
       } else {
-        Toast.show({ type: 'error', text1: 'Purchase Failed', text2: res.message || 'Please try again' });
+        showToast({ type: 'error', text1: 'Purchase Failed', text2: res.message || 'Please try again' });
       }
     } catch (err: any) {
-      Toast.show({ type: 'error', text1: 'Purchase Failed', text2: err?.data?.message || err?.message || 'Please try again' });
+      showToast({ type: 'error', text1: 'Purchase Failed', text2: err?.data?.message || err?.message || 'Please try again' });
     } finally { setLoading(false); }
   };
 
-  const filteredPlans = plans.filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()));
-  const selectedProv = providers.find(p => p.code === selectedNetwork);
+  const showDataTypeFilters = shouldShowDataTypeFilters(plans);
+  const typeFilteredPlans = filterDataPlansByType(plans, selectedDataType, showDataTypeFilters);
+  const filteredPlans = typeFilteredPlans.filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()));
+
+  useEffect(() => {
+    if (!showDataTypeFilters && selectedDataType !== 'all') {
+      setSelectedDataType('all');
+    }
+  }, [showDataTypeFilters, selectedDataType]);
+
+  const selectedProv = providers.find(p => String(p.code || '').toLowerCase() === selectedNetwork.toLowerCase());
 
   const handleBack = useCallback(() => {
+    if (showLock) {
+      setShowLock(false);
+      return;
+    }
     if (step === 'confirm') {
       setStep('details');
-      setPin('');
       return;
     }
     navigateBack();
-  }, [step]);
+  }, [step, showLock]);
 
   useHardwareBack(handleBack);
 
   return (
-    <View style={styles.root}>
+    <ThemedScreen>
       <ServiceScreenHeader
         title="Buy Data"
         subtitle="Browse without limits"
         icon="wifi-outline"
-        iconColor={Colors.data}
-        iconBg={Colors.dataBg}
         balanceLabel={formatCurrency(balance)}
         onBack={handleBack}
+        stepProgress={{
+          activeIndex: step === 'confirm' ? 1 : 0,
+          labels: ['Details', 'Confirm'],
+        }}
       />
 
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <ScreenBody>
         {step === 'details' && (
           <>
-            {/* Network */}
-            <View style={styles.card}>
-              <Text style={styles.fieldLabel}>Network</Text>
+            <ServicePurchaseCard>
+              <ServiceSectionLabel title="Network" icon="cellular-outline" />
               <NetworkProviderGrid
                 providers={providers}
                 selectedCode={selectedNetwork}
                 onSelect={setSelectedNetwork}
                 loading={loadingProviders}
               />
-            </View>
 
-            {/* Phone */}
-            <View style={styles.card}>
-              <Text style={styles.fieldLabel}>Phone Number</Text>
-              <View style={styles.inputWrap}>
-                <Text style={styles.prefix}>🇳🇬 +234</Text>
-                <View style={styles.inputDivider} />
-                <TextInput style={styles.input} placeholder="08012345678"
-                  placeholderTextColor={Colors.mutedLight} value={phone}
-                  onChangeText={setPhone} keyboardType="phone-pad" maxLength={11} />
-                {phone.length === 11 && <Ionicons name="checkmark-circle" size={18} color={Colors.success} style={{ marginRight: 8 }} />}
-              </View>
-            </View>
+              <ServiceCardDivider />
 
-            {/* Plans */}
+              <ServiceSectionLabel title="Phone number" icon="call-outline" />
+              <PhoneNumberInput
+                value={phone}
+                onChangeText={onPhoneChange}
+                detecting={detecting}
+                isComplete={isPhoneComplete}
+              />
+              {detectedNet ? <ServiceDetectedBadge label={detectedNet} /> : null}
+            </ServicePurchaseCard>
+
+            {selectedNetwork && showDataTypeFilters && categories.length > 0 && (
+              <ServicePurchaseCard>
+                <ServiceSectionLabel title="Data type" icon="layers-outline" />
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.typePills}
+                >
+                  <TouchableOpacity
+                    style={[styles.typePill, selectedDataType === 'all' && styles.typePillActive]}
+                    onPress={() => { setSelectedDataType('all'); setSelectedPlan(null); }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.typePillText, selectedDataType === 'all' && styles.typePillTextActive]}>
+                      All types
+                    </Text>
+                  </TouchableOpacity>
+                  {[...categories]
+                    .sort((a, b) => a.sortOrder - b.sortOrder)
+                    .map((category) => (
+                      <TouchableOpacity
+                        key={category.id}
+                        style={[styles.typePill, selectedDataType === category.name && styles.typePillActive]}
+                        onPress={() => { setSelectedDataType(category.name); setSelectedPlan(null); }}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={[styles.typePillText, selectedDataType === category.name && styles.typePillTextActive]}>
+                          {category.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                </ScrollView>
+              </ServicePurchaseCard>
+            )}
+
             {selectedNetwork && (
-              <View style={styles.card}>
-                <Text style={styles.fieldLabel}>Select Plan</Text>
+              <ServicePurchaseCard>
+                <ServiceSectionLabel title="Select plan" icon="albums-outline" />
                 {loadingPlans ? (
-                  <View style={styles.loadRow}><ActivityIndicator size="small" color={Colors.primary} /><Text style={styles.loadText}>Loading plans...</Text></View>
+                  <View style={styles.loadRow}>
+                    <ActivityIndicator size="small" color={Colors.primary} />
+                    <Text style={styles.loadText}>Loading plans...</Text>
+                  </View>
                 ) : (
                   <>
                     <View style={styles.searchWrap}>
                       <Ionicons name="search-outline" size={15} color={Colors.muted} />
-                      <TextInput style={styles.searchInput} placeholder="Search plans..."
-                        placeholderTextColor={Colors.mutedLight} value={search} onChangeText={setSearch} />
+                      <TextInput
+                        style={styles.searchInput}
+                        placeholder="Search plans..."
+                        placeholderTextColor={Colors.mutedLight}
+                        value={search}
+                        onChangeText={setSearch}
+                      />
                     </View>
                     {filteredPlans.length === 0 ? (
                       <Text style={styles.noPlans}>No plans available</Text>
                     ) : (
                       <View style={styles.planGrid}>
                         {filteredPlans.slice(0, 20).map(p => (
-                          <PlanCard key={p.id} plan={p} selected={selectedPlan?.id === p.id} onSelect={() => setSelectedPlan(p)} />
+                          <PlanCard
+                            key={p.id}
+                            plan={p}
+                            selected={selectedPlan?.id === p.id}
+                            onSelect={() => setSelectedPlan(p)}
+                          />
                         ))}
                       </View>
                     )}
                   </>
                 )}
-              </View>
+              </ServicePurchaseCard>
             )}
 
-            <TouchableOpacity style={styles.cta} onPress={handleContinue} activeOpacity={0.85}>
-              <Text style={styles.ctaText}>Continue</Text>
-              <Ionicons name="arrow-forward" size={18} color={Colors.white} />
-            </TouchableOpacity>
+            <ServiceContinueButton label="Continue" onPress={handleContinue} />
           </>
         )}
 
         {step === 'confirm' && (
           <>
-            <View style={[styles.card, { overflow: 'hidden' }]}>
-              <View style={styles.summaryHeader}>
-                <View style={[styles.summaryIcon, { backgroundColor: Colors.dataBg }]}>
-                  <Ionicons name="wifi-outline" size={24} color={Colors.data} />
-                </View>
-                <View>
-                  <Text style={styles.summaryTitle}>Data Purchase</Text>
-                  <Text style={styles.summaryNet}>{selectedProv?.name || selectedNetwork}</Text>
-                </View>
-              </View>
-              <View style={styles.summaryRows}>
-                {[
-                  ['Phone Number', phone],
-                  ['Network', selectedProv?.name || selectedNetwork],
-                  ['Plan', selectedPlan?.name],
-                  ['Validity', selectedPlan?.validity || '—'],
-                  ['Amount', formatCurrency(selectedPlan?.price ?? 0)],
-                ].map(([k, v], i, arr) => (
-                  <View key={k} style={[styles.summaryRow, i < arr.length - 1 && styles.summaryRowBorder]}>
-                    <Text style={styles.summaryKey}>{k}</Text>
-                    <Text style={[styles.summaryVal, k === 'Amount' && { color: Colors.primary, fontWeight: '800', fontSize: 16 }]}>{v}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
+            <PurchaseConfirmCard
+              accent="data"
+              eyebrow="You're buying"
+              amount={formatCurrency(selectedPlan?.price ?? 0)}
+              title={selectedPlan?.name || 'Data bundle'}
+              chip={`${selectedProv?.name || selectedNetwork} · ${formatPhoneDisplay(phone)}`}
+              logo={selectedProv ? getProviderLogo(selectedProv) : undefined}
+              icon="wifi-outline"
+              rows={[
+                { label: 'Phone number', value: formatPhoneDisplay(phone) },
+                { label: 'Network', value: selectedProv?.name || selectedNetwork },
+                { label: 'Plan', value: selectedPlan?.name || '—' },
+                { label: 'Validity', value: selectedPlan?.validity || '—' },
+                { label: 'You pay', value: formatCurrency(selectedPlan?.price ?? 0), highlight: true },
+              ]}
+            />
 
-            <View style={styles.card}>
-              <Text style={styles.fieldLabel}>Transaction PIN</Text>
-              <Text style={styles.pinHint}>Enter your 4-digit PIN to authorize</Text>
-              <View style={styles.inputWrap}>
-                <Ionicons name="lock-closed-outline" size={18} color={Colors.muted} style={{ marginHorizontal: 12 }} />
-                <TextInput style={[styles.input, { flex: 1, letterSpacing: 8, fontSize: 18 }]}
-                  placeholder="• • • •" placeholderTextColor={Colors.borderMid}
-                  value={pin} onChangeText={setPin}
-                  keyboardType="number-pad" maxLength={4} secureTextEntry autoFocus />
-              </View>
-            </View>
+            <ServiceSecureNote text="Secured payment · Instant activation" />
 
-            <TouchableOpacity style={[styles.cta, (loading || pin.length < 4) && styles.ctaDisabled]}
-              onPress={handlePurchase} disabled={loading || pin.length < 4} activeOpacity={0.85}>
-              {loading ? <ActivityIndicator color={Colors.white} /> : (
-                <><Text style={styles.ctaText}>Confirm Purchase</Text><Ionicons name="checkmark" size={18} color={Colors.white} /></>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.backBtn} onPress={() => { setStep('details'); setPin(''); }}>
-              <Ionicons name="arrow-back" size={14} color={Colors.muted} />
-              <Text style={styles.backText}>Edit details</Text>
-            </TouchableOpacity>
+            <ServiceContinueButton
+              label="Confirm Purchase"
+              onPress={() => setShowLock(true)}
+              disabled={loading}
+              loading={loading}
+            />
+
+            <ServiceEditLink onPress={() => setStep('details')} />
           </>
         )}
+        </ScreenBody>
       </ScrollView>
-    </View>
+
+      <TransactionLockSheet
+        visible={showLock}
+        onClose={() => setShowLock(false)}
+        onAuthorized={handlePurchase}
+        title="Confirm data purchase"
+        subtitle={`Authorize ${formatCurrency(selectedPlan?.price ?? 0)} for ${selectedPlan?.name || 'data bundle'}`}
+        amount={formatCurrency(selectedPlan?.price ?? 0)}
+        processing={loading}
+      />
+    </ThemedScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.surface },
-  scroll: { padding: Spacing.page, paddingBottom: 40 },
-  card: { backgroundColor: Colors.white, borderRadius: Radius.xl, padding: 18, marginBottom: 14, ...Shadow.card },
-  fieldLabel: { ...Typography.label, color: Colors.muted, marginBottom: 12 },
+  scroll: { paddingBottom: 40 },
   loadRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
   loadText: { ...Typography.small, color: Colors.muted },
-  inputWrap: {
-    flexDirection: 'row', alignItems: 'center',
-    borderWidth: 1.5, borderColor: Colors.border,
-    borderRadius: Radius.md, backgroundColor: Colors.surface, height: 52,
-  },
-  prefix: { ...Typography.small, color: Colors.dark, paddingHorizontal: 12 },
-  inputDivider: { width: 1, height: 28, backgroundColor: Colors.border, marginRight: 12 },
-  input: { flex: 1, fontSize: 15, color: Colors.dark, paddingVertical: 0 },
   searchWrap: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: Colors.surface, borderRadius: Radius.sm,
-    paddingHorizontal: 12, height: 40, marginBottom: 12,
+    backgroundColor: Colors.surface, borderRadius: Radius.md,
+    paddingHorizontal: 12, height: 44, marginBottom: 12,
     borderWidth: 1, borderColor: Colors.border,
   },
   searchInput: { flex: 1, fontSize: 14, color: Colors.dark },
   noPlans: { ...Typography.small, color: Colors.muted, textAlign: 'center', paddingVertical: 16 },
   planGrid: { gap: 8 },
   planCard: {
-    backgroundColor: Colors.surface, borderRadius: Radius.md, padding: 14,
-    borderWidth: 1.5, borderColor: 'transparent',
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
   },
-  planCardActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryMuted },
+  planCardActive: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryMuted,
+  },
   planTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
   planName: { ...Typography.smallMed, color: Colors.dark, flex: 1 },
+  planCheck: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   planValidity: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 },
   planValidityText: { ...Typography.caption, color: Colors.muted },
   planPrice: { ...Typography.bodyMed, color: Colors.dark, fontWeight: '700' },
-  cta: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: Colors.primary, borderRadius: Radius.md, paddingVertical: 16, ...Shadow.md,
+  typePills: { gap: 8, paddingVertical: 2 },
+  typePill: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: Radius.full,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
   },
-  ctaDisabled: { opacity: 0.5 },
-  ctaText: { ...Typography.bodyMed, color: Colors.white, fontWeight: '700', fontSize: 16 },
-  backBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: 14 },
-  backText: { ...Typography.small, color: Colors.muted },
-  summaryHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: Colors.surface },
-  summaryIcon: { width: 48, height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-  summaryTitle: { ...Typography.smallMed, color: Colors.dark, fontWeight: '600' },
-  summaryNet: { ...Typography.caption, color: Colors.muted },
-  summaryRows: { gap: 12 },
-  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 12 },
-  summaryRowBorder: { borderBottomWidth: 1, borderBottomColor: Colors.surface },
-  summaryKey: { ...Typography.small, color: Colors.muted },
-  summaryVal: { ...Typography.smallMed, color: Colors.dark },
-  pinHint: { ...Typography.small, color: Colors.muted, marginBottom: 12, marginTop: -6 },
+  typePillActive: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryMuted,
+  },
+  typePillText: { ...Typography.small, color: Colors.muted, fontWeight: '600' },
+  typePillTextActive: { color: Colors.primary },
 });

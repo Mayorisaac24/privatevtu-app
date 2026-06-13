@@ -9,3 +9,7 @@ export function navigateBack(fallback: BackFallback = '/(tabs)'): void {
   }
   router.replace(fallback);
 }
+
+export function openNotifications(): void {
+  router.push('/notifications');
+}

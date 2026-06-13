@@ -7,15 +7,17 @@ import {
   Pressable,
   StyleSheet,
   ScrollView,
+  Platform,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Radius } from '../theme';
+import { GradientButton } from './ui/GradientButton';
+import { GlassCard } from './ui/GlassCard';
+import { GlassSurface } from './ui/GlassSurface';
 
-const BRAND = '#7C3AED';
-const BRAND_LIGHT = '#A78BFA';
-const CARD_DARK = '#1A0A3C';
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const MIN_YEAR = 1940;
@@ -143,7 +145,7 @@ function MonthStep({
             <Text style={[styles.listRowText, month === index && styles.listRowTextActive]}>
               {name}
             </Text>
-            {month === index && <Ionicons name="checkmark" size={18} color={BRAND} />}
+            {month === index && <Ionicons name="checkmark" size={18} color={Colors.primary} />}
           </TouchableOpacity>
         ))}
       </View>
@@ -226,7 +228,7 @@ function BirthDatePicker({
   };
 
   return (
-    <View style={styles.pickerCard}>
+    <GlassCard borderRadius={18} padding={0} style={styles.pickerCard} contentStyle={styles.pickerCardContent}>
       <StepHeader step={step} />
 
       <ScrollView style={styles.stepScroll} showsVerticalScrollIndicator={false}>
@@ -241,7 +243,7 @@ function BirthDatePicker({
           <Text style={styles.backLinkText}>Go back</Text>
         </TouchableOpacity>
       )}
-    </View>
+    </GlassCard>
   );
 }
 
@@ -284,7 +286,7 @@ export function DateOfBirthField({
         <Text style={[styles.triggerText, !displayValue && styles.triggerPlaceholder]}>
           {displayValue || placeholder}
         </Text>
-        <Ionicons name="chevron-down" size={18} color={BRAND} />
+        <Ionicons name="chevron-down" size={18} color={Colors.primary} />
       </TouchableOpacity>
 
       <Modal
@@ -293,40 +295,55 @@ export function DateOfBirthField({
         animationType="slide"
         onRequestClose={() => setShowPicker(false)}
       >
-        <Pressable style={styles.backdrop} onPress={() => setShowPicker(false)} />
-        <View style={[styles.sheet, { paddingBottom: insets.bottom + 12 }]}>
-          <LinearGradient
-            colors={[CARD_DARK, '#2E1065']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.sheetHeader}
-          >
-            <Text style={styles.sheetTitle}>Date of birth</Text>
-            <Text style={styles.sheetSub}>Must match your BVN records</Text>
-            <View style={styles.previewPill}>
-              <Ionicons name="calendar" size={14} color={BRAND_LIGHT} />
-              <Text style={styles.previewText}>{formatFriendlyDate(draft)}</Text>
-            </View>
-          </LinearGradient>
+        <View style={styles.modalRoot}>
+          <Pressable style={styles.backdropPress} onPress={() => setShowPicker(false)}>
+            <BlurView
+              intensity={36}
+              tint="dark"
+              style={StyleSheet.absoluteFill}
+              experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined}
+            />
+            <View style={styles.backdropTint} pointerEvents="none" />
+          </Pressable>
 
-          {showPicker && (
-            <BirthDatePicker key={pickerKey} value={draft} onChange={setDraft} />
-          )}
-
-          <View style={styles.sheetActions}>
-            <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowPicker(false)}>
-              <Text style={styles.cancelText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={confirmDate} activeOpacity={0.88} style={styles.confirmWrap}>
+          <View style={[styles.sheetWrap, { paddingBottom: insets.bottom + 12 }]}>
+            <GlassSurface
+              variant="light"
+              borderRadius={Radius.xl}
+              intensity={64}
+              style={styles.sheet}
+              contentStyle={styles.sheetInner}
+            >
               <LinearGradient
-                colors={['#8B5CF6', '#7C3AED']}
+                colors={[Colors.heroDark, '#2E1065']}
                 start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.confirmBtn}
+                end={{ x: 1, y: 1 }}
+                style={styles.sheetHeader}
               >
-                <Text style={styles.confirmText}>Confirm date</Text>
+                <Text style={styles.sheetTitle}>Date of birth</Text>
+                <Text style={styles.sheetSub}>Must match your BVN records</Text>
+                <View style={styles.previewPill}>
+                  <Ionicons name="calendar" size={14} color={Colors.primaryLight} />
+                  <Text style={styles.previewText}>{formatFriendlyDate(draft)}</Text>
+                </View>
               </LinearGradient>
-            </TouchableOpacity>
+
+              {showPicker && (
+                <BirthDatePicker key={pickerKey} value={draft} onChange={setDraft} />
+              )}
+
+              <View style={styles.sheetActions}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowPicker(false)}>
+                  <Text style={styles.cancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <GradientButton
+                  title="Confirm date"
+                  onPress={confirmDate}
+                  gradientStyle={styles.confirmBtn}
+                  style={styles.confirmWrap}
+                />
+              </View>
+            </GlassSurface>
           </View>
         </View>
       </Modal>
@@ -352,16 +369,27 @@ const styles = StyleSheet.create({
     color: Colors.mutedLight,
     fontWeight: '400',
   },
-  backdrop: {
+  modalRoot: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  backdropPress: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  backdropTint: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 23, 42, 0.28)',
+  },
+  sheetWrap: {
+    maxHeight: '90%',
   },
   sheet: {
-    backgroundColor: Colors.white,
-    borderTopLeftRadius: Radius.xl,
-    borderTopRightRadius: Radius.xl,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     overflow: 'hidden',
-    maxHeight: '90%',
+  },
+  sheetInner: {
+    padding: 0,
   },
   sheetHeader: {
     paddingHorizontal: 20,
@@ -400,14 +428,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 12,
     marginBottom: 8,
-    borderRadius: 18,
-    backgroundColor: Colors.white,
     overflow: 'hidden',
-    shadowColor: '#7C3AED',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 3,
+  },
+  pickerCardContent: {
+    padding: 0,
   },
   stepHeader: {
     paddingHorizontal: 18,
@@ -418,7 +442,7 @@ const styles = StyleSheet.create({
   stepCount: {
     fontSize: 11,
     fontWeight: '600',
-    color: BRAND_LIGHT,
+    color: Colors.primaryLight,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: 6,
@@ -461,7 +485,7 @@ const styles = StyleSheet.create({
     color: Colors.muted,
   },
   chipTextActive: {
-    color: BRAND,
+    color: Colors.primary,
     fontWeight: '600',
   },
   grid: {
@@ -488,7 +512,7 @@ const styles = StyleSheet.create({
     color: Colors.mid,
   },
   gridBtnTextActive: {
-    color: BRAND,
+    color: Colors.primary,
     fontWeight: '600',
   },
   list: {
@@ -512,7 +536,7 @@ const styles = StyleSheet.create({
     color: Colors.mid,
   },
   listRowTextActive: {
-    color: BRAND,
+    color: Colors.primary,
     fontWeight: '600',
   },
   dayGrid: {
@@ -539,7 +563,7 @@ const styles = StyleSheet.create({
     color: Colors.mid,
   },
   dayBtnTextActive: {
-    color: BRAND,
+    color: Colors.primary,
     fontWeight: '600',
   },
   backLink: {

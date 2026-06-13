@@ -1,4 +1,5 @@
 import type { FundingBank } from './api';
+import { resolveTransferBankLogoUrl } from './transfer-bank-logos';
 
 export function normalizeBankCode(code: string | number): string {
   const raw = String(code ?? '').trim();
@@ -18,7 +19,8 @@ export function filterDynamicBanks(banks: FundingBank[]): FundingBank[] {
 
 export function enrichBankLogo(bank: FundingBank): FundingBank {
   const code = normalizeBankCode(bank.code);
-  const logoUrl = bank.logoUrl?.trim() || null;
+  const stored = bank.logoUrl?.trim() || null;
+  const logoUrl = resolveTransferBankLogoUrl(bank.code, null) || stored;
   return {
     ...bank,
     code,

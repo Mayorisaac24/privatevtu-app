@@ -6,14 +6,26 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { api, isResponseSuccess } from '../lib/api';
 import { dedupeTransactionsForDisplay, enrichTransaction, matchesHistoryTab } from '../lib/transaction-display';
+import { getHomeDashboardStats, hasHistoryStatsReady, refreshHistoryData, refreshHomeDashboardStats } from '../lib/dashboard-data';
 import { useWalletStore } from '../stores';
-import { Colors, Spacing, Typography, Radius } from '../theme';
-import { SkeletonCard } from '../components/ui/Skeleton';
+import { Colors, Spacing, Typography, Radius, Shadow } from '../theme';
+import { Skeleton, SkeletonCard } from '../components/ui/Skeleton';
 import { TransactionListItem } from '../components/TransactionListItem';
+import { MonthActivityPanel } from '../components/MonthActivityPanel';
+import { ThemedScreen } from '../components/ui/ThemedScreen';
+import { GlassCard } from '../components/ui/GlassCard';
+import { GlassSurface } from '../components/ui/GlassSurface';
+import { useLayout, mergeInputStyle } from '../lib/platform-ui';
 
 type HistoryTab = 'all' | 'services' | 'wallet';
+
+
+const FILTER_TABS: Array<{ key: HistoryTab; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
+  { key: 'all', label: 'All', icon: 'layers-outline' },
+  { key: 'services', label: 'Services', icon: 'flash-outline' },
+  { key: 'wallet', label: 'Wallet', icon: 'wallet-outline' },
+];
 
 function groupByDate(entries: Array<{ createdAt: string }>) {
   const groups: Record<string, typeof entries> = {};
@@ -32,29 +44,55 @@ function groupByDate(entries: Array<{ createdAt: string }>) {
   return Object.entries(groups);
 }
 
+type DayGroup = {
+  type: 'group';
+  key: string;
+  date: string;
+  items: ReturnType<typeof enrichTransaction>[];
+};
+
+function OverviewSkeleton() {
+  return (
+    <GlassCard borderRadius={20} contentStyle={styles.overviewSkeleton}>
+      <Skeleton width="45%" height={14} borderRadius={6} style={{ marginBottom: 18 }} />
+      <View style={styles.overviewSkeletonRow}>
+        <Skeleton width="28%" height={22} borderRadius={6} />
+        <Skeleton width="28%" height={22} borderRadius={6} />
+        <Skeleton width="28%" height={22} borderRadius={6} />
+      </View>
+      <Skeleton width="100%" height={5} borderRadius={3} style={{ marginTop: 16, marginBottom: 10 }} />
+      <Skeleton width="70%" height={11} borderRadius={4} />
+    </GlassCard>
+  );
+}
+
 export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
-  const { transactions, balanceVisible, historyHydrated, setTransactions, setHistoryHydrated, bumpDashboardVersion } = useWalletStore();
+  const { pagePadding } = useLayout();
+  const {
+    transactions,
+    balanceVisible,
+    historyHydrated,
+    dashboardVersion,
+  } = useWalletStore();
   const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<HistoryTab>('all');
   const [loading, setLoading] = useState(false);
-  const showInitialLoading = !historyHydrated;
+  const showInitialLoading = !historyHydrated && transactions.length === 0;
 
   const loadHistory = useCallback(async () => {
-    const alreadyHydrated = useWalletStore.getState().historyHydrated;
-    if (!alreadyHydrated) setLoading(true);
+    const { historyHydrated: hydrated } = useWalletStore.getState();
+    if (!hydrated) setLoading(true);
     try {
-      const res = await api.getTransactions(1, 100);
-      if (isResponseSuccess(res)) {
-        setTransactions(res.data?.transactions ?? []);
-        setHistoryHydrated(true);
-        bumpDashboardVersion();
-      }
+      await Promise.all([
+        refreshHistoryData({ priority: !hydrated }),
+        refreshHomeDashboardStats({ force: !hydrated }),
+      ]);
     } finally {
       setLoading(false);
     }
-  }, [bumpDashboardVersion, setHistoryHydrated, setTransactions]);
+  }, []);
 
   useEffect(() => {
     void loadHistory();
@@ -62,9 +100,15 @@ export default function HistoryScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await loadHistory();
+    await Promise.all([
+      refreshHistoryData({ force: true }),
+      refreshHomeDashboardStats({ force: true }),
+    ]);
     setRefreshing(false);
-  }, [loadHistory]);
+  }, []);
+
+  const monthLabel = new Date().toLocaleDateString('en-NG', { month: 'long' });
+  const dashboardStats = useMemo(() => getHomeDashboardStats(), [dashboardVersion]);
 
   const enriched = useMemo(
     () => dedupeTransactionsForDisplay(transactions).map((tx) => enrichTransaction(tx)),
@@ -94,149 +138,397 @@ export default function HistoryScreen() {
     );
   }, [activeTab, enriched, search]);
 
-  const grouped = groupByDate(filtered);
-  const flatData: Array<{ type: 'header' | 'item'; id?: string; date?: string; tx?: typeof filtered[number] }> = [];
-  for (const [date, items] of grouped) {
-    flatData.push({ type: 'header', date });
-    items.forEach((tx) => flatData.push({ type: 'item', id: tx.id, tx }));
-  }
+  const dayGroups = useMemo<DayGroup[]>(() => {
+    return groupByDate(filtered).map(([date, items]) => ({
+      type: 'group' as const,
+      key: date,
+      date,
+      items,
+    }));
+  }, [filtered]);
+
+  const listHeader = !hasHistoryStatsReady() ? (
+    <OverviewSkeleton />
+  ) : (
+    <MonthActivityPanel
+      monthLabel={monthLabel}
+      stats={dashboardStats}
+      loading={false}
+      balanceVisible={balanceVisible}
+      embedded
+    />
+  );
 
   return (
-    <View style={styles.root}>
-      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-        <Text style={styles.headerTitle}>Transactions</Text>
+    <ThemedScreen>
+      <GlassSurface
+        variant="light"
+        borderRadius={24}
+        style={styles.headerShell}
+        contentStyle={{ ...styles.header, paddingTop: insets.top + 12, paddingHorizontal: pagePadding }}
+      >
+        <View style={styles.headerTop}>
+          <Text style={styles.headerTitle}>Transactions</Text>
+          <TouchableOpacity
+            style={styles.refreshBtn}
+            onPress={onRefresh}
+            activeOpacity={0.75}
+            disabled={refreshing}
+          >
+            <Ionicons
+              name="refresh-outline"
+              size={18}
+              color={refreshing ? Colors.mutedLight : Colors.primary}
+            />
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.searchRow}>
-          <Ionicons name="search-outline" size={16} color={Colors.muted} />
+          <View style={styles.searchIconWrap}>
+            <Ionicons name="search-outline" size={17} color={Colors.primary} />
+          </View>
           <TextInput
             style={styles.searchInput}
-            placeholder="Search transactions..."
+            placeholder="Search by name, reference, provider..."
             placeholderTextColor={Colors.mutedLight}
             value={search}
             onChangeText={setSearch}
           />
           {search ? (
-            <TouchableOpacity onPress={() => setSearch('')}>
-              <Ionicons name="close-circle" size={16} color={Colors.muted} />
+            <TouchableOpacity style={styles.searchClear} onPress={() => setSearch('')}>
+              <Ionicons name="close-circle" size={18} color={Colors.muted} />
             </TouchableOpacity>
           ) : null}
         </View>
 
-        <View style={styles.filterRow}>
-          {([
-            ['all', 'All'],
-            ['services', 'Services'],
-            ['wallet', 'Wallet'],
-          ] as const).map(([tab, label]) => (
-            <TouchableOpacity
-              key={tab}
-              style={[styles.filterChip, activeTab === tab && styles.filterChipActive]}
-              onPress={() => setActiveTab(tab)}
-            >
-              <Text style={[styles.filterText, activeTab === tab && styles.filterTextActive]}>
-                {label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        <View style={styles.segmented}>
+          {FILTER_TABS.map(({ key, label, icon }) => {
+            const active = activeTab === key;
+            return (
+              <TouchableOpacity
+                key={key}
+                style={styles.segment}
+                onPress={() => setActiveTab(key)}
+                activeOpacity={0.82}
+              >
+                {active ? (
+                  <GlassSurface variant="light" borderRadius={11} style={styles.segmentActiveGlass} contentStyle={styles.segmentActiveInner}>
+                    <Ionicons
+                      name={icon}
+                      size={14}
+                      color={Colors.primary}
+                    />
+                    <Text style={[styles.segmentText, styles.segmentTextActive]}>
+                      {label}
+                    </Text>
+                  </GlassSurface>
+                ) : (
+                  <>
+                    <Ionicons
+                      name={icon}
+                      size={14}
+                      color={Colors.muted}
+                    />
+                    <Text style={styles.segmentText}>
+                      {label}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            );
+          })}
         </View>
-      </View>
+      </GlassSurface>
 
       {showInitialLoading ? (
-        <View style={{ padding: Spacing.page, gap: 10 }}>
-          {[1, 2, 3, 4, 5].map((i) => <SkeletonCard key={i} />)}
+        <View style={styles.loadingWrap}>
+          {hasHistoryStatsReady() ? (
+            <MonthActivityPanel
+              monthLabel={monthLabel}
+              stats={dashboardStats}
+              loading={false}
+              balanceVisible={balanceVisible}
+              embedded
+            />
+          ) : (
+            <OverviewSkeleton />
+          )}
+          {[1, 2, 3].map((i) => (
+            <View key={i} style={styles.dayGroup}>
+              <Skeleton width={72} height={10} borderRadius={4} style={{ marginBottom: 10, marginLeft: 2 }} />
+              <SkeletonCard />
+            </View>
+          ))}
         </View>
       ) : (
         <FlatList
-          data={flatData}
-          keyExtractor={(item, index) => item.id || `header-${item.date}-${index}`}
-          contentContainerStyle={{ padding: Spacing.page, paddingBottom: 40 }}
+          data={dayGroups}
+          keyExtractor={(item) => item.key}
+          contentContainerStyle={[
+            styles.listContent,
+            { paddingHorizontal: pagePadding },
+            dayGroups.length === 0 && styles.listContentEmpty,
+          ]}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primaryLight} />
+            <RefreshControl
+              refreshing={refreshing || (loading && !historyHydrated)}
+              onRefresh={onRefresh}
+              tintColor={Colors.primary}
+            />
           }
+          ListHeaderComponent={listHeader}
           ListEmptyComponent={
             loading || !historyHydrated ? null : (
               <View style={styles.empty}>
-                <View style={styles.emptyIcon}>
-                  <Ionicons name="receipt-outline" size={32} color={Colors.muted} />
+                <View style={styles.emptyIconRing}>
+                  <GlassSurface variant="light" borderRadius={20} style={styles.emptyIcon} contentStyle={styles.emptyIconInner}>
+                    <Ionicons name="receipt-outline" size={30} color={Colors.primary} />
+                  </GlassSurface>
                 </View>
                 <Text style={styles.emptyTitle}>No transactions found</Text>
                 <Text style={styles.emptySub}>
-                  {search ? 'Try a different search term' : 'Your transactions will appear here'}
+                  {search
+                    ? 'Try a different search term or clear filters'
+                    : activeTab === 'all'
+                      ? 'Your purchases and wallet activity will show up here'
+                      : `No ${activeTab} transactions yet`}
                 </Text>
+                {search || activeTab !== 'all' ? (
+                  <TouchableOpacity
+                    onPress={() => {
+                      setSearch('');
+                      setActiveTab('all');
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <GlassCard borderRadius={Radius.full} padding={0} contentStyle={styles.emptyAction}>
+                      <Text style={styles.emptyActionText}>Clear filters</Text>
+                    </GlassCard>
+                  </TouchableOpacity>
+                ) : null}
               </View>
             )
           }
-          renderItem={({ item }) => {
-            if (item.type === 'header') {
-              return <Text style={styles.dateHeader}>{item.date}</Text>;
-            }
-            if (!item.tx) return null;
-            return (
-              <TransactionListItem
-                transaction={item.tx}
-                balanceVisible={balanceVisible}
-                onPress={() => router.push(`/transactions/${item.tx!.id}`)}
-              />
-            );
-          }}
+          renderItem={({ item }) => (
+            <View style={styles.dayGroup}>
+              <View style={styles.dateRow}>
+                <Text style={styles.dateHeader}>{item.date}</Text>
+                <View style={styles.dateLine} />
+                <GlassSurface variant="light" borderRadius={11} style={styles.dateCount} contentStyle={styles.dateCountInner}>
+                  <Text style={styles.dateCountText}>{item.items.length}</Text>
+                </GlassSurface>
+              </View>
+              <GlassCard borderRadius={18} padding={0}>
+                {item.items.map((tx, idx) => (
+                  <TransactionListItem
+                    key={tx.id}
+                    transaction={tx}
+                    balanceVisible={balanceVisible}
+                    variant="embedded"
+                    isLast={idx === item.items.length - 1}
+                    onPress={() => router.push(`/transactions/${tx.id}`)}
+                  />
+                ))}
+              </GlassCard>
+            </View>
+          )}
         />
       )}
-    </View>
+    </ThemedScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.surface },
-  header: {
-    backgroundColor: Colors.white,
-    paddingHorizontal: Spacing.page,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    gap: 12,
+  root: { flex: 1 },
+  headerShell: {
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    ...Shadow.sm,
   },
-  headerTitle: { ...Typography.h2, color: Colors.dark },
-  searchRow: {
+  header: {
+    paddingHorizontal: Spacing.page,
+    paddingBottom: 16,
+    gap: 14,
+  },
+  headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    paddingHorizontal: 12,
-    height: 42,
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
-  searchInput: { flex: 1, fontSize: 14, color: Colors.dark },
-  filterRow: { flexDirection: 'row', gap: 8 },
-  filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
+  headerTitle: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: '700',
+    color: Colors.dark,
+    letterSpacing: -0.3,
   },
-  filterChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  filterText: { ...Typography.captionMed, color: Colors.muted },
-  filterTextActive: { color: Colors.white },
-  dateHeader: {
-    ...Typography.label,
+  refreshBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: Colors.primaryMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.pageBg,
+    borderRadius: 16,
+    paddingHorizontal: 4,
+    height: 48,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.borderSubtle,
+  },
+  searchIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchInput: mergeInputStyle({
+    flex: 1,
+    fontSize: 14,
+    color: Colors.dark,
+    fontWeight: '500',
+  }),
+  searchClear: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmented: {
+    flexDirection: 'row',
+    backgroundColor: Colors.pageBg,
+    borderRadius: 14,
+    padding: 4,
+    gap: 4,
+  },
+  segment: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentActiveGlass: {
+    alignSelf: 'stretch',
+  },
+  segmentActiveInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 10,
+  },
+  segmentText: {
+    fontSize: 12,
+    fontWeight: '600',
     color: Colors.muted,
-    marginTop: 16,
-    marginBottom: 8,
+  },
+  segmentTextActive: {
+    color: Colors.dark,
+  },
+  loadingWrap: {
+    padding: Spacing.page,
+    gap: 18,
+  },
+  listContent: {
+    paddingTop: 18,
+    paddingBottom: 40,
+  },
+  listContentEmpty: {
+    flexGrow: 1,
+  },
+  overviewSkeleton: {},
+  overviewSkeletonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  dayGroup: {
+    gap: 10,
+    marginBottom: 18,
+  },
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     paddingHorizontal: 2,
   },
-  empty: { alignItems: 'center', paddingVertical: 60, gap: 8 },
-  emptyIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 20,
-    backgroundColor: Colors.white,
-    justifyContent: 'center',
-    alignItems: 'center',
+  dateHeader: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.muted,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
   },
-  emptyTitle: { ...Typography.bodyMed, color: Colors.muted },
-  emptySub: { ...Typography.small, color: Colors.borderMid, textAlign: 'center' },
+  dateLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: Colors.borderSubtle,
+  },
+  dateCount: {
+    minWidth: 22,
+  },
+  dateCountInner: {
+    minWidth: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  dateCountText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: Colors.muted,
+  },
+  empty: {
+    alignItems: 'center',
+    paddingVertical: 48,
+    paddingHorizontal: 24,
+    gap: 10,
+  },
+  emptyIconRing: {
+    width: 88,
+    height: 88,
+    borderRadius: 28,
+    backgroundColor: Colors.primaryMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  emptyIcon: {
+    width: 64,
+    height: 64,
+  },
+  emptyIconInner: {
+    width: 64,
+    height: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.dark,
+    letterSpacing: -0.2,
+  },
+  emptySub: {
+    ...Typography.small,
+    color: Colors.muted,
+    textAlign: 'center',
+    lineHeight: 20,
+    maxWidth: 260,
+  },
+  emptyAction: {
+    marginTop: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  emptyActionText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.primary,
+  },
 });

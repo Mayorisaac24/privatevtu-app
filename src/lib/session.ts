@@ -1,4 +1,8 @@
-type SessionExpiredHandler = () => void | Promise<void>;
+export type TokenRefreshOutcome = 'success' | 'auth_failed' | 'network_failed';
+
+type SessionExpiredHandler = (reason: SessionLogoutReason) => void | Promise<void>;
+
+export type SessionLogoutReason = 'revoked' | 'expired' | 'unknown';
 
 type ApiErrorBody = {
   message?: string;
@@ -18,11 +22,49 @@ export function registerSessionExpiredHandler(handler: SessionExpiredHandler): v
   sessionExpiredHandler = handler;
 }
 
-export async function notifySessionExpired(): Promise<void> {
+export function getApiErrorCode(data: unknown): string {
+  const body = data as ApiErrorBody | null;
+  if (!body?.error) return '';
+  if (typeof body.error === 'string') return body.error;
+  return String(body.error.code || '');
+}
+
+export function getApiErrorMessage(data: unknown): string {
+  const body = data as ApiErrorBody | null;
+  return String(body?.message || '');
+}
+
+export function isSessionRevoked(status: number, data: unknown): boolean {
+  if (status !== 401 && status !== 403) return false;
+  const code = getApiErrorCode(data);
+  const message = getApiErrorMessage(data);
+  if (code === 'SESSION_REVOKED') return true;
+  if (/signed in on another device/i.test(message)) return true;
+  if (/invalid refresh token/i.test(message)) return true;
+  return false;
+}
+
+export function isBusinessAuthError(status: number, data: unknown): boolean {
+  if (status !== 401) return false;
+  const code = getApiErrorCode(data);
+  const message = getApiErrorMessage(data);
+  if (code === 'INVALID_PIN' || /invalid\s*pin/i.test(message)) return true;
+  if (
+    code === 'TWO_FA_ERROR'
+    || code === 'VALIDATION_ERROR'
+    || /invalid.*2fa/i.test(message)
+    || /invalid.*code/i.test(message)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+export async function notifySessionExpired(reason: SessionLogoutReason = 'unknown'): Promise<void> {
   if (handlingSessionExpiry || suppressSessionExpiryUi) return;
   handlingSessionExpiry = true;
   try {
-    await sessionExpiredHandler?.();
+    await sessionExpiredHandler?.(reason);
   } finally {
     handlingSessionExpiry = false;
   }
@@ -31,18 +73,20 @@ export async function notifySessionExpired(): Promise<void> {
 /** True when a 401 should trigger refresh/logout (not business errors like invalid PIN). */
 export function shouldRefreshSession(status: number, data: unknown): boolean {
   if (status !== 401) return false;
+  return !isBusinessAuthError(status, data);
+}
 
-  const body = data as ApiErrorBody | null;
-  const message = String(body?.message || '');
-  const errorCode = typeof body?.error === 'object' && body?.error
-    ? String(body.error.code || '')
-    : '';
-
-  if (errorCode === 'INVALID_PIN' || /invalid\s*pin/i.test(message)) {
-    return false;
-  }
-
+export function shouldLogoutFromAuthFailure(status: number, data: unknown): boolean {
+  if (status !== 401 && status !== 403) return false;
+  if (isBusinessAuthError(status, data)) return false;
   return true;
+}
+
+export function resolveSessionLogoutReason(data: unknown): SessionLogoutReason {
+  if (isSessionRevoked(401, data)) return 'revoked';
+  const message = getApiErrorMessage(data);
+  if (/session expired|please sign in/i.test(message)) return 'expired';
+  return 'unknown';
 }
 
 export function decodeJwtExpiry(token: string): number | null {
@@ -57,8 +101,12 @@ export function decodeJwtExpiry(token: string): number | null {
   }
 }
 
-export function isAccessTokenExpired(token: string, skewSeconds = 30): boolean {
+export function isAccessTokenExpired(token: string, skewSeconds = 60): boolean {
   const exp = decodeJwtExpiry(token);
   if (!exp) return false;
   return Date.now() >= (exp - skewSeconds) * 1000;
+}
+
+export function isNetworkFailureStatus(status: number): boolean {
+  return status === 0 || status === 408 || status >= 500;
 }

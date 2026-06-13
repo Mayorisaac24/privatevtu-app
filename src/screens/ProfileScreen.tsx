@@ -7,29 +7,29 @@ import {
   Alert,
   Switch,
 } from 'react-native';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { api } from '../lib/api';
 import { useAuthStore } from '../stores';
+import { api } from '../lib/api';
 import { Colors, Spacing, Typography, Radius, Shadow } from '../theme';
-import { Toast } from '../components/ui/Toast';
-
-const PAGE_BG = '#F4F5FA';
-const CARD_DARK = '#1A0A3C';
-const BRAND = '#7C3AED';
-const BORDER = 'rgba(15, 23, 42, 0.08)';
+import { useColors, useGradients } from '../theme/hooks';
+import { ThemedScreen } from '../components/ui/ThemedScreen';
+import { GlassCard } from '../components/ui/GlassCard';
+import { GlassSurface } from '../components/ui/GlassSurface';
+import { UserAvatar } from '../components/ui/UserAvatar';
+import { ScreenBody } from '../components/ui/ScreenBody';
+import { useLayout } from '../lib/platform-ui';
+import { preloadTwoFactorMethods } from '../lib/two-factor-methods-cache';
+import { preloadBiometricSettings } from '../lib/biometric-settings-cache';
+import { getNotificationSettingsCached, hydrateNotificationSettingsCache } from '../lib/notification-settings-cache';
+import { getKycStatusData, peekKycStatusCache, preloadKycStatusData } from '../lib/kyc-status-cache';
+import { getProfileKycDisplay } from '../lib/kyc-display';
+import type { KycStatusData } from '../lib/api';
 
 const BRAND_ICON = { bg: Colors.primaryMuted, iconColor: Colors.primary };
-
-const KYC_MAP = {
-  VERIFIED: { label: 'Verified', color: Colors.primaryLight, icon: 'shield-checkmark' as const },
-  PENDING: { label: 'Pending', color: '#FCD34D', icon: 'time-outline' as const },
-  NOT_VERIFIED: { label: 'Not Verified', color: '#FCA5A5', icon: 'shield-outline' as const },
-  REJECTED: { label: 'Rejected', color: '#FCA5A5', icon: 'close-circle-outline' as const },
-} as const;
 
 type MenuItem = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -50,9 +50,22 @@ type MenuGroup = {
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
+  const { pagePadding } = useLayout();
   const { user, logout } = useAuthStore();
-  const [notifications, setNotifications] = useState(true);
-  const [biometric, setBiometric] = useState(false);
+  const colors = useColors();
+  const gradients = useGradients();
+  const [kycData, setKycData] = useState<KycStatusData | null>(() => peekKycStatusCache());
+
+  useEffect(() => {
+    preloadTwoFactorMethods();
+    preloadBiometricSettings();
+    preloadKycStatusData();
+    void hydrateNotificationSettingsCache();
+    void getNotificationSettingsCached().catch(() => undefined);
+    void getKycStatusData().then((data) => {
+      if (data) setKycData(data);
+    });
+  }, []);
 
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -73,12 +86,10 @@ export default function ProfileScreen() {
     ]);
   };
 
-  const initials = user?.firstName
-    ? `${user.firstName[0]}${user.lastName?.[0] || ''}`.toUpperCase()
-    : 'PV';
   const fullName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'User';
   const kycStatus = user?.kycStatus ?? 'NOT_VERIFIED';
-  const kyc = KYC_MAP[kycStatus as keyof typeof KYC_MAP] ?? KYC_MAP.NOT_VERIFIED;
+  const kycDisplay = getProfileKycDisplay(kycStatus, kycData?.currentTier);
+  const { badge: kycBadge, prompt: kycPrompt, menuSubtitle: kycMenuSubtitle, showMenuBadge } = kycDisplay;
 
   const GROUPS: MenuGroup[] = [
     {
@@ -87,37 +98,35 @@ export default function ProfileScreen() {
         {
           icon: 'person-outline',
           label: 'Personal Info',
-          subtitle: 'Name, email & phone',
-          action: () => Toast.show({ type: 'info', text1: 'Coming Soon', text2: 'Profile editing coming soon' }),
+          subtitle: 'View your profile details',
+          action: () => router.push('/profile/personal-info'),
         },
         {
           icon: 'id-card-outline',
           label: 'KYC Verification',
-          subtitle: kycStatus === 'VERIFIED' ? 'Identity verified' : 'Complete verification to unlock limits',
+          subtitle: kycMenuSubtitle,
           action: () => router.push('/kyc'),
-          badge: kycStatus !== 'VERIFIED',
+          badge: showMenuBadge,
         },
         {
           icon: 'lock-closed-outline',
           label: 'Change PIN',
           subtitle: 'Update your transaction PIN',
-          action: () => Toast.show({ type: 'info', text1: 'Coming Soon', text2: 'Change PIN coming soon' }),
+          action: () => router.push('/profile/change-pin'),
         },
         {
           icon: 'key-outline',
           label: 'Change Password',
           subtitle: 'Keep your account secure',
-          action: () => Toast.show({ type: 'info', text1: 'Coming Soon', text2: 'Change password coming soon' }),
+          action: () => router.push('/profile/change-password'),
         },
         {
           icon: 'shield-checkmark-outline',
           label: '2-Factor Auth',
-          subtitle: user?.twoFactorEnabled ? 'Enabled' : 'Add an extra layer of security',
-          action: () => Toast.show({
-            type: 'info',
-            text1: user?.twoFactorEnabled ? '2FA Enabled' : '2FA Disabled',
-            text2: 'Manage your 2FA settings',
-          }),
+          subtitle: user?.twoFactorEnabled
+            ? `Enabled · ${user.twoFactorMethod === 'EMAIL' ? 'Email' : user.twoFactorMethod === 'SMS' ? 'SMS' : 'Authenticator'}`
+            : 'Add an extra layer of security',
+          action: () => router.push('/profile/two-factor'),
         },
       ],
     },
@@ -125,20 +134,24 @@ export default function ProfileScreen() {
       title: 'Preferences',
       items: [
         {
+          icon: 'color-palette-outline',
+          label: 'Appearance',
+          subtitle: 'Themes, dark mode & display colors',
+          action: () => router.push('/profile/appearance' as never),
+        },
+        {
           icon: 'notifications-outline',
-          label: 'Push Notifications',
-          subtitle: 'Alerts for transactions & promos',
-          toggle: true,
-          toggleVal: notifications,
-          toggleFn: setNotifications,
+          label: 'Notifications',
+          subtitle: 'Push, email & account alerts',
+          action: () => router.push('/profile/notifications'),
         },
         {
           icon: 'finger-print-outline',
-          label: 'Biometric Login',
-          subtitle: 'Face ID or fingerprint unlock',
-          toggle: true,
-          toggleVal: biometric,
-          toggleFn: setBiometric,
+          label: 'Biometric',
+          subtitle: user?.biometricEnabled
+            ? 'Authentication and transaction options'
+            : 'Set up Face ID or fingerprint',
+          action: () => router.push('/profile/biometric'),
         },
       ],
     },
@@ -149,7 +162,7 @@ export default function ProfileScreen() {
           icon: 'help-circle-outline',
           label: 'Help & FAQ',
           subtitle: 'Answers to common questions',
-          action: () => Alert.alert('Help', 'Visit privatevtu.vercel.app for FAQs'),
+          action: () => router.push('/profile/help'),
         },
         {
           icon: 'chatbubble-outline',
@@ -167,7 +180,7 @@ export default function ProfileScreen() {
           icon: 'document-text-outline',
           label: 'Privacy Policy',
           subtitle: 'How we protect your data',
-          action: () => Alert.alert('Privacy', 'Visit privatevtu.com/privacy'),
+          action: () => router.push('/profile/privacy'),
         },
       ],
     },
@@ -186,19 +199,27 @@ export default function ProfileScreen() {
   ];
 
   return (
-    <ScrollView
-      style={styles.root}
-      contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+    <ThemedScreen>
+
+      <GlassSurface
+        variant="light"
+        borderRadius={24}
+        style={styles.headerShell}
+        contentStyle={{ ...styles.header, paddingTop: insets.top + 12, paddingHorizontal: pagePadding }}
+      >
         <Text style={styles.headerTitle}>Profile</Text>
         <Text style={styles.headerSub}>Your account & preferences</Text>
-      </View>
+      </GlassSurface>
 
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}
+        showsVerticalScrollIndicator={false}
+      >
+      <ScreenBody>
       <View style={styles.heroCard}>
         <LinearGradient
-          colors={[CARD_DARK, '#2E1065', '#4C1D95']}
+          colors={[...gradients.hero]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.heroGradient}
@@ -207,11 +228,13 @@ export default function ProfileScreen() {
           <View style={styles.blob2} />
           <View style={styles.cardShine} />
 
-          <View style={styles.avatarRing}>
-            <LinearGradient colors={['#8B5CF6', BRAND]} style={styles.avatar}>
-              <Text style={styles.avatarText}>{initials}</Text>
-            </LinearGradient>
-          </View>
+          <UserAvatar
+            uri={user?.avatar}
+            firstName={user?.firstName}
+            lastName={user?.lastName}
+            size="lg"
+            variant="hero"
+          />
 
           <Text style={styles.heroName}>{fullName}</Text>
           {user?.email ? <Text style={styles.heroMeta}>{user.email}</Text> : null}
@@ -219,23 +242,25 @@ export default function ProfileScreen() {
 
           <View style={styles.badgeRow}>
             <View style={styles.glassBadge}>
-              <Ionicons name={kyc.icon} size={12} color={kyc.color} />
-              <Text style={[styles.glassBadgeText, { color: kyc.color }]}>KYC {kyc.label}</Text>
+              <Ionicons name={kycBadge.icon} size={12} color={kycBadge.color} />
+              <Text style={[styles.glassBadgeText, { color: kycBadge.color }]}>{kycBadge.label}</Text>
             </View>
           </View>
         </LinearGradient>
       </View>
 
-      {kycStatus !== 'VERIFIED' ? (
-        <TouchableOpacity style={styles.kycPrompt} onPress={() => router.push('/kyc')} activeOpacity={0.85}>
-          <View style={styles.kycPromptIcon}>
-            <Ionicons name="shield-outline" size={18} color={BRAND} />
-          </View>
-          <View style={styles.kycPromptBody}>
-            <Text style={styles.kycPromptTitle}>Complete KYC verification</Text>
-            <Text style={styles.kycPromptSub}>Unlock higher limits and permanent accounts</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={BRAND} />
+      {kycPrompt ? (
+        <TouchableOpacity onPress={() => router.push('/kyc')} activeOpacity={0.85}>
+          <GlassCard borderRadius={Radius.lg} contentStyle={styles.kycPrompt}>
+            <View style={styles.kycPromptIcon}>
+              <Ionicons name="shield-outline" size={18} color={colors.primary} />
+            </View>
+            <View style={styles.kycPromptBody}>
+              <Text style={styles.kycPromptTitle}>{kycPrompt.title}</Text>
+              <Text style={styles.kycPromptSub}>{kycPrompt.subtitle}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.primary} />
+          </GlassCard>
         </TouchableOpacity>
       ) : null}
 
@@ -243,7 +268,11 @@ export default function ProfileScreen() {
         {GROUPS.map((group, gi) => (
           <View key={gi}>
             {group.title ? <Text style={styles.groupTitle}>{group.title}</Text> : null}
-            <View style={[styles.groupCard, group.items.some((i) => i.danger) && styles.groupCardDanger]}>
+            <GlassCard
+              borderRadius={Radius.xl}
+              padding={0}
+              style={[styles.groupCardSpacing, group.items.some((i) => i.danger) && styles.groupCardDanger]}
+            >
               {group.items.map((item, ii) => (
                 <TouchableOpacity
                   key={item.label}
@@ -297,7 +326,7 @@ export default function ProfileScreen() {
                   )}
                 </TouchableOpacity>
               ))}
-            </View>
+            </GlassCard>
           </View>
         ))}
       </View>
@@ -306,24 +335,38 @@ export default function ProfileScreen() {
         <Ionicons name="lock-closed" size={12} color={Colors.muted} />
         <Text style={styles.footerText}>PrivateVTU v1.0.0 · Secured & NDPR compliant</Text>
       </View>
-    </ScrollView>
+      </ScreenBody>
+      </ScrollView>
+    </ThemedScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: PAGE_BG },
-  content: { paddingHorizontal: Spacing.page },
+  root: { flex: 1 },
+  scroll: { flex: 1 },
+  content: {
+    paddingTop: 18,
+  },
+  headerShell: {
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    ...Shadow.sm,
+  },
   header: {
     paddingBottom: 18,
-    marginHorizontal: -Spacing.page,
-    paddingHorizontal: Spacing.page,
-    backgroundColor: Colors.white,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-    marginBottom: 20,
+    gap: 4,
   },
-  headerTitle: { ...Typography.h2, color: Colors.dark, marginBottom: 4 },
-  headerSub: { ...Typography.small, color: Colors.muted },
+  headerTitle: {
+    ...Typography.h2,
+    color: Colors.dark,
+    letterSpacing: -0.3,
+  },
+  headerSub: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: Colors.mid,
+    lineHeight: 20,
+  },
 
   heroCard: {
     marginBottom: 16,
@@ -412,13 +455,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: Colors.white,
-    borderRadius: Radius.lg,
     padding: 14,
     marginBottom: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.16)',
-    ...Shadow.xs,
   },
   kycPromptIcon: {
     width: 40,
@@ -434,19 +472,16 @@ const styles = StyleSheet.create({
 
   settingsWrap: { gap: 4 },
   groupTitle: {
-    ...Typography.label,
-    color: Colors.muted,
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.mid,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
     marginTop: 12,
     marginBottom: 8,
     marginLeft: 2,
   },
-  groupCard: {
-    backgroundColor: Colors.white,
-    borderRadius: Radius.xl,
-    overflow: 'hidden',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: BORDER,
-    ...Shadow.card,
+  groupCardSpacing: {
     marginBottom: 8,
   },
   groupCardDanger: {

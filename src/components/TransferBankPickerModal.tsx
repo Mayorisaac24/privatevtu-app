@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   Modal, View, Text, TouchableOpacity, StyleSheet, Pressable,
-  ActivityIndicator, TextInput, FlatList,
+  ActivityIndicator, TextInput, FlatList, Platform, Dimensions, useWindowDimensions,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Bank } from '../lib/api';
@@ -16,7 +17,10 @@ import { getBankDisplayName } from '../lib/funding-banks';
 import { BankLogo } from './BankLogo';
 import { Colors, Radius, Shadow } from '../theme';
 
-const BRAND = '#7C3AED';
+const SHEET_HEIGHT = Math.round(Dimensions.get('window').height * 0.88);
+const POP_COLS = 4;
+const SHEET_H_PAD = 20;
+const POP_GAP = 10;
 
 type EnrichedBankRow = {
   bank: Bank;
@@ -42,7 +46,12 @@ export function TransferBankPickerModal({
   onSelect,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
   const [search, setSearch] = useState('');
+
+  const popularChipWidth = (
+    screenWidth - SHEET_H_PAD * 2 - POP_GAP * (POP_COLS - 1)
+  ) / POP_COLS;
 
   useEffect(() => {
     if (!visible) setSearch('');
@@ -82,26 +91,75 @@ export function TransferBankPickerModal({
   const renderBankRow = useCallback(({ item }: { item: EnrichedBankRow }) => {
     const active = selectedCode === item.bank.code || selectedCode === item.enriched.code;
     return (
-      <TouchableOpacity
-        style={[styles.bankRow, active && styles.bankRowActive]}
+      <Pressable
+        style={({ pressed }) => [
+          styles.bankRow,
+          active && styles.bankRowActive,
+          pressed && styles.bankRowPressed,
+        ]}
         onPress={() => handleSelect(item.bank)}
-        activeOpacity={0.82}
       >
         <BankLogo bank={item.enriched} size={44} />
         <View style={styles.bankText}>
           <Text style={styles.bankName}>{item.displayName}</Text>
         </View>
         {active ? (
-          <Ionicons name="checkmark-circle" size={20} color={BRAND} />
+          <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />
         ) : (
           <Ionicons name="chevron-forward" size={18} color={Colors.mutedLight} />
         )}
-      </TouchableOpacity>
+      </Pressable>
     );
   }, [handleSelect, selectedCode]);
 
-  const listHeader = useMemo(() => (
-    <>
+  const scrollListHeader = useMemo(() => (
+    <View>
+      {!search && popularRows.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Popular</Text>
+          <View style={styles.popularRow}>
+            {popularRows.map((row) => {
+              const active = selectedCode === row.bank.code;
+              return (
+                <TouchableOpacity
+                  key={`pop-${row.bank.code}`}
+                  style={[
+                    styles.popularChip,
+                    { width: popularChipWidth },
+                    active && styles.popularChipActive,
+                  ]}
+                  onPress={() => handleSelect(row.bank)}
+                >
+                  <BankLogo bank={row.enriched} size={32} />
+                  <Text style={[styles.popularText, active && styles.popularTextActive]} numberOfLines={2}>
+                    {row.displayName}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      )}
+
+      <Text style={styles.sectionLabel}>
+        {search ? `Results (${filtered.length})` : 'All banks'}
+      </Text>
+    </View>
+  ), [filtered.length, handleSelect, popularChipWidth, popularRows, search, selectedCode]);
+
+  const fixedHeader = (
+    <View style={styles.fixedHeader}>
+      <View style={styles.handle} />
+      <View style={styles.header}>
+        <View style={styles.headerText}>
+          <Text style={styles.title}>Select bank</Text>
+          <Text style={styles.subtitle}>Choose the recipient&apos;s bank</Text>
+        </View>
+        <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
+          <Ionicons name="close" size={20} color={Colors.mid} />
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.searchWrap}>
         <Ionicons name="search-outline" size={18} color={Colors.muted} />
         <TextInput
@@ -119,87 +177,59 @@ export function TransferBankPickerModal({
           </TouchableOpacity>
         )}
       </View>
-
-      {loading ? (
-        <View style={styles.loadingWrap}>
-          <ActivityIndicator color={BRAND} size="large" />
-          <Text style={styles.loadingText}>Loading banks…</Text>
-        </View>
-      ) : (
-        <>
-          {!search && popularRows.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Popular</Text>
-              <View style={styles.popularRow}>
-                {popularRows.map((row) => {
-                  const active = selectedCode === row.bank.code;
-                  return (
-                    <TouchableOpacity
-                      key={`pop-${row.bank.code}`}
-                      style={[styles.popularChip, active && styles.popularChipActive]}
-                      onPress={() => handleSelect(row.bank)}
-                    >
-                      <BankLogo bank={row.enriched} size={32} />
-                      <Text style={[styles.popularText, active && styles.popularTextActive]} numberOfLines={2}>
-                        {row.displayName}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-          )}
-
-          <Text style={styles.sectionLabel}>
-            {search ? `Results (${filtered.length})` : 'All banks'}
-          </Text>
-        </>
-      )}
-    </>
-  ), [filtered.length, handleSelect, loading, popularRows, search, selectedCode]);
+    </View>
+  );
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable
-          style={[styles.sheet, { paddingBottom: insets.bottom + 16 }]}
-          onPress={(e) => e.stopPropagation()}
-        >
-          <View style={styles.handle} />
-          <View style={styles.header}>
-            <View>
-              <Text style={styles.title}>Select bank</Text>
-              <Text style={styles.subtitle}>Choose the recipient&apos;s bank</Text>
-            </View>
-            <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-              <Ionicons name="close" size={20} color={Colors.mid} />
-            </TouchableOpacity>
-          </View>
-
-          {!loading && (
-            <FlatList
-              data={filtered}
-              keyExtractor={(item) => `${item.bank.code}-${item.bank.name}`}
-              renderItem={renderBankRow}
-              ListHeaderComponent={listHeader}
-              ListEmptyComponent={(
-                <View style={styles.empty}>
-                  <Ionicons name="business-outline" size={28} color={Colors.mutedLight} />
-                  <Text style={styles.emptyText}>No banks match your search</Text>
-                </View>
-              )}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              initialNumToRender={18}
-              maxToRenderPerBatch={24}
-              windowSize={8}
-              contentContainerStyle={styles.listContent}
-            />
-          )}
-
-          {loading && listHeader}
+      <View style={styles.overlay}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose}>
+          <BlurView
+            intensity={18}
+            tint="dark"
+            style={StyleSheet.absoluteFill}
+            experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined}
+          />
+          <View style={styles.overlayTint} pointerEvents="none" />
         </Pressable>
-      </Pressable>
+
+        <View
+          style={[styles.sheetWrap, { height: SHEET_HEIGHT, paddingBottom: insets.bottom }]}
+        >
+          <View style={styles.sheet}>
+            {fixedHeader}
+            {loading ? (
+              <View style={styles.loadingWrap}>
+                <ActivityIndicator color={Colors.primary} size="large" />
+                <Text style={styles.loadingText}>Loading banks…</Text>
+              </View>
+            ) : (
+              <FlatList
+                style={styles.bankListFlex}
+                data={filtered}
+                keyExtractor={(item) => `${item.bank.code}-${item.bank.name}`}
+                renderItem={renderBankRow}
+                ListHeaderComponent={scrollListHeader}
+                ItemSeparatorComponent={() => <View style={styles.bankRowSeparator} />}
+                ListEmptyComponent={(
+                  <View style={styles.empty}>
+                    <Ionicons name="business-outline" size={28} color={Colors.mutedLight} />
+                    <Text style={styles.emptyText}>No banks match your search</Text>
+                  </View>
+                )}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                nestedScrollEnabled
+                initialNumToRender={18}
+                maxToRenderPerBatch={24}
+                windowSize={8}
+                contentContainerStyle={styles.listContent}
+              />
+            )}
+          </View>
+        </View>
+      </View>
     </Modal>
   );
 }
@@ -207,17 +237,31 @@ export function TransferBankPickerModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.5)',
     justifyContent: 'flex-end',
   },
+  overlayTint: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 23, 42, 0.42)',
+  },
+  sheetWrap: {
+    width: '100%',
+  },
   sheet: {
-    backgroundColor: Colors.white,
+    flex: 1,
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    maxHeight: '88%',
+    paddingHorizontal: SHEET_H_PAD,
+    paddingBottom: 8,
     ...Shadow.lg,
+  },
+  fixedHeader: {
+    paddingTop: 10,
+    backgroundColor: '#FFFFFF',
+    zIndex: 1,
+  },
+  bankListFlex: {
+    flex: 1,
   },
   handle: {
     width: 40,
@@ -233,8 +277,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 14,
   },
+  headerText: {
+    flex: 1,
+    paddingRight: 12,
+  },
   title: { fontSize: 20, fontWeight: '700', color: Colors.dark, letterSpacing: -0.3 },
-  subtitle: { fontSize: 13, color: Colors.muted, marginTop: 3 },
+  subtitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: Colors.mid,
+    marginTop: 4,
+    lineHeight: 20,
+  },
   closeBtn: {
     width: 36,
     height: 36,
@@ -256,22 +310,27 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   searchInput: { flex: 1, fontSize: 15, color: Colors.dark, paddingVertical: 0 },
-  loadingWrap: { paddingVertical: 48, alignItems: 'center', gap: 10 },
+  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
   loadingText: { fontSize: 13, color: Colors.muted },
   section: { marginBottom: 18 },
   sectionLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
-    color: Colors.muted,
-    letterSpacing: 0.6,
+    color: Colors.mid,
+    letterSpacing: 0.5,
     textTransform: 'uppercase',
     marginBottom: 10,
   },
-  popularRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 18 },
+  popularRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: POP_GAP,
+    justifyContent: 'center',
+    marginBottom: 18,
+  },
   popularChip: {
-    width: 88,
     paddingVertical: 12,
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     borderRadius: Radius.lg,
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
@@ -290,8 +349,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 13,
   },
-  popularTextActive: { color: BRAND },
-  listContent: { paddingBottom: 12, gap: 8 },
+  popularTextActive: { color: Colors.primary },
+  listContent: { paddingBottom: 12, flexGrow: 1 },
+  bankRowSeparator: { height: 8 },
   bankRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -301,11 +361,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAFBFC',
     borderWidth: 1,
     borderColor: 'rgba(15, 23, 42, 0.05)',
-    marginBottom: 8,
   },
   bankRowActive: {
     backgroundColor: '#FAF5FF',
     borderColor: 'rgba(124, 58, 237, 0.25)',
+  },
+  bankRowPressed: {
+    opacity: 0.88,
   },
   bankText: { flex: 1 },
   bankName: { fontSize: 15, fontWeight: '600', color: Colors.dark },

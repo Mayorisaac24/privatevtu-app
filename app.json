@@ -15,7 +15,7 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#4C1D95"
+      "backgroundColor": "#FFFFFF"
     },
     "ios": {
       "supportsTablet": true,
@@ -23,6 +23,7 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Allow camera to scan bank account details from photos",
         "NSPhotoLibraryUsageDescription": "Allow photo library access to scan bank account details",
+        "NSContactsUsageDescription": "Allow access to contacts to fill in phone numbers for airtime and data purchases",
         "ITSAppUsesNonExemptEncryption": false,
         "UIViewControllerBasedStatusBarAppearance": true
       }
@@ -30,10 +31,12 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#4C1D95"
+        "backgroundColor": "#FFFFFF"
       },
       "package": "com.privatevtu.app",
-      "permissions": ["android.permission.CAMERA"]
+      "permissions": ["android.permission.CAMERA", "android.permission.READ_CONTACTS"],
+      "usesCleartextTraffic": true,
+      "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
       "bundler": "metro",
@@ -47,6 +50,12 @@
         {
           "photosPermission": "Allow access to photos to scan account details",
           "cameraPermission": "Allow camera to scan account details"
+        }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow $(PRODUCT_NAME) to access your contacts to fill in phone numbers."
         }
       ],
       "expo-secure-store",

@@ -32,15 +32,17 @@ export interface StatusMeta {
   tone: 'pending' | 'processing' | 'successful' | 'failed';
 }
 
+const BRAND_TX_ICON = { bgColor: Colors.primaryMuted, iconColor: Colors.primary };
+
 const TYPE_META: Record<string, Omit<TxDisplayMeta, 'isCredit'>> = {
-  AIRTIME: { icon: 'phone-portrait-outline', label: 'Airtime', bgColor: Colors.airtimeBg, iconColor: Colors.airtime },
-  DATA: { icon: 'wifi-outline', label: 'Data', bgColor: Colors.dataBg, iconColor: Colors.data },
-  ELECTRICITY: { icon: 'flash-outline', label: 'Electricity', bgColor: Colors.electricityBg, iconColor: Colors.electricity },
-  CABLE: { icon: 'tv-outline', label: 'Cable TV', bgColor: Colors.cableBg, iconColor: Colors.cable },
-  TRANSFER: { icon: 'paper-plane-outline', label: 'Transfer', bgColor: Colors.transferBg, iconColor: Colors.transfer },
-  WITHDRAWAL: { icon: 'paper-plane-outline', label: 'Bank Transfer', bgColor: Colors.transferBg, iconColor: Colors.transfer },
-  WALLET_FUND: { icon: 'wallet-outline', label: 'Wallet Funding', bgColor: Colors.successLight, iconColor: Colors.success },
-  EDUCATION: { icon: 'school-outline', label: 'Education', bgColor: Colors.educationBg, iconColor: Colors.education },
+  AIRTIME: { icon: 'phone-portrait-outline', label: 'Airtime', ...BRAND_TX_ICON },
+  DATA: { icon: 'wifi-outline', label: 'Data', ...BRAND_TX_ICON },
+  ELECTRICITY: { icon: 'flash-outline', label: 'Electricity', ...BRAND_TX_ICON },
+  CABLE: { icon: 'tv-outline', label: 'Cable TV', ...BRAND_TX_ICON },
+  TRANSFER: { icon: 'paper-plane-outline', label: 'Transfer', ...BRAND_TX_ICON },
+  WITHDRAWAL: { icon: 'paper-plane-outline', label: 'Bank Transfer', ...BRAND_TX_ICON },
+  WALLET_FUND: { icon: 'wallet-outline', label: 'Wallet Funding', ...BRAND_TX_ICON },
+  EDUCATION: { icon: 'school-outline', label: 'Education', ...BRAND_TX_ICON },
 };
 
 function normalizeStatus(status?: string): DisplayStatus {
@@ -275,6 +277,75 @@ export interface MonthlyInsights {
   moneyOut: bigint;
   inCount: number;
   outCount: number;
+}
+
+export interface HomeDashboardStats {
+  monthTransactionCount: number;
+  monthSuccessfulCount: number;
+  monthServiceSpendKobo: bigint;
+  topServiceType: string | null;
+}
+
+export function getServiceTypeLabel(type: string | null): string {
+  if (!type) return 'services';
+  const meta = TYPE_META[type.toUpperCase()];
+  return meta?.label?.toLowerCase() ?? type.replace(/_/g, ' ').toLowerCase();
+}
+
+const SUCCESS_STATUSES = new Set(['SUCCESS', 'SUCCESSFUL', 'COMPLETED']);
+
+const SERVICE_SPEND_TYPES = new Set([
+  'AIRTIME',
+  'DATA',
+  'CABLE',
+  'ELECTRICITY',
+  'EDUCATION',
+  'BETTING',
+  'INSURANCE',
+]);
+
+export function computeHomeDashboardStats(
+  transactions: Array<{ type: string; status: string; amount: string; createdAt: string }>,
+): HomeDashboardStats {
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  let monthTransactionCount = 0;
+  let monthSuccessfulCount = 0;
+  let monthServiceSpendKobo = 0n;
+  const serviceTypeCounts = new Map<string, number>();
+
+  for (const tx of transactions) {
+    const created = new Date(tx.createdAt);
+    if (created < monthStart) continue;
+
+    monthTransactionCount += 1;
+    const status = String(tx.status || '').toUpperCase();
+    const isSuccess = SUCCESS_STATUSES.has(status);
+    if (isSuccess) monthSuccessfulCount += 1;
+
+    const type = String(tx.type || '').toUpperCase();
+    if (isSuccess && SERVICE_SPEND_TYPES.has(type)) {
+      monthServiceSpendKobo += BigInt(tx.amount || '0');
+      serviceTypeCounts.set(type, (serviceTypeCounts.get(type) ?? 0) + 1);
+    }
+  }
+
+  let topServiceType: string | null = null;
+  let topCount = 0;
+  for (const [type, count] of serviceTypeCounts) {
+    if (count > topCount) {
+      topCount = count;
+      topServiceType = type;
+    }
+  }
+
+  return {
+    monthTransactionCount,
+    monthSuccessfulCount,
+    monthServiceSpendKobo,
+    topServiceType,
+  };
 }
 
 export function computeMonthlyInsights(entries: Array<{ type: string; amount: string; createdAt: string }>): MonthlyInsights {

@@ -1,9 +1,11 @@
 import React from 'react';
 import {
-  TouchableOpacity, Text, ActivityIndicator,
+  TouchableOpacity, ActivityIndicator,
   ViewStyle, TextStyle, TouchableOpacityProps, View,
 } from 'react-native';
 import { Colors, Radius, Typography, Shadow } from '../../theme';
+import { AppText } from './AppText';
+import { isAndroid, platformSpacing } from '../../lib/platform-ui';
 
 interface ButtonProps extends TouchableOpacityProps {
   title: string;
@@ -36,12 +38,12 @@ export function Button({
   };
 
   const getPadding = () => {
-    if (size === 'sm') return { paddingVertical: 10, paddingHorizontal: 16 };
-    if (size === 'lg') return { paddingVertical: 18, paddingHorizontal: 24 };
-    return { paddingVertical: 15, paddingHorizontal: 20 };
+    if (size === 'sm') return { paddingVertical: platformSpacing(10), paddingHorizontal: 16 };
+    if (size === 'lg') return { paddingVertical: platformSpacing(18), paddingHorizontal: 24 };
+    return { paddingVertical: platformSpacing(15), paddingHorizontal: 20 };
   };
 
-  const getFontSize = () => size === 'sm' ? 13 : size === 'lg' ? 16 : 15;
+  const textVariant = size === 'sm' ? 'smallMed' : size === 'lg' ? 'bodyMed' : 'bodyMed';
 
   return (
     <TouchableOpacity
@@ -51,7 +53,7 @@ export function Button({
         backgroundColor: getBg(), width: fullWidth ? '100%' : undefined,
         borderWidth: variant === 'outline' ? 1.5 : 0,
         borderColor: variant === 'outline' ? Colors.primary : undefined,
-        ...(variant === 'primary' ? Shadow.md : {}),
+        ...(variant === 'primary' ? (isAndroid ? { elevation: 3 } : Shadow.md) : {}),
       }, getPadding(), style]}
       disabled={disabled || isLoading}
       activeOpacity={0.82}
@@ -61,12 +63,15 @@ export function Button({
         <ActivityIndicator color={getTextColor()} size="small" />
       ) : (
         <>
-          {leftIcon && <View style={{ marginRight: 8 }}>{leftIcon}</View>}
-          <Text style={[{
-            color: getTextColor(), fontWeight: '700',
-            fontSize: getFontSize(), letterSpacing: 0.1,
-          }, textStyle]}>{title}</Text>
-          {rightIcon && <View style={{ marginLeft: 8 }}>{rightIcon}</View>}
+          {leftIcon ? <View style={{ marginRight: 8 }}>{leftIcon}</View> : null}
+          <AppText
+            variant={textVariant}
+            weight="700"
+            style={[{ color: getTextColor(), letterSpacing: 0.1 }, textStyle]}
+          >
+            {title}
+          </AppText>
+          {rightIcon ? <View style={{ marginLeft: 8 }}>{rightIcon}</View> : null}
         </>
       )}
     </TouchableOpacity>

@@ -1,70 +1,118 @@
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, ActivityIndicator,
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useState, useEffect, useRef } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/lib/api';
 import { useAuthStore } from '../../src/stores';
-import { Toast } from '../../src/components/ui/Toast';
-import { Colors, Spacing, Typography, Radius, Shadow } from '../../src/theme';
+import { showToast } from '../../src/components/ui/Toast';
+import { Colors, Radius, Typography } from '../../src/theme';
+import { AuthShell, AuthCardHeader, AuthHeroIcon } from '../../src/components/auth/AuthShell';
+import { AuthGradientButton } from '../../src/components/auth/AuthControls';
+
+
+function PremiumOtpInput({
+  value,
+  onChange,
+  onComplete,
+  inputRef,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onComplete?: (value: string) => void;
+  inputRef: React.RefObject<TextInput | null>;
+}) {
+  const digits = value.padEnd(6, ' ').split('').slice(0, 6);
+
+  return (
+    <TouchableOpacity
+      style={styles.otpWrap}
+      onPress={() => inputRef.current?.focus()}
+      activeOpacity={1}
+    >
+      <View style={styles.otpRow}>
+        {digits.map((digit, index) => (
+          <View
+            key={index}
+            style={[
+              styles.otpBox,
+              value.length === index && styles.otpBoxActive,
+              digit.trim() && styles.otpBoxFilled,
+            ]}
+          >
+            <Text style={styles.otpDigit}>{digit.trim()}</Text>
+          </View>
+        ))}
+      </View>
+      <TextInput
+        ref={inputRef}
+        value={value}
+        onChangeText={(v) => {
+          const next = v.replace(/\D/g, '').slice(0, 6);
+          onChange(next);
+          if (next.length === 6) onComplete?.(next);
+        }}
+        keyboardType="number-pad"
+        maxLength={6}
+        autoFocus
+        caretHidden
+        selectionColor={Colors.primary}
+        style={styles.otpInputOverlay}
+      />
+    </TouchableOpacity>
+  );
+}
 
 export default function VerifyOTPScreen() {
   const { email, type } = useLocalSearchParams<{ email: string; type: string }>();
   const { setUser } = useAuthStore();
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(60);
   const [canResend, setCanResend] = useState(false);
-  const refs = useRef<(TextInput | null)[]>([]);
+  const otpInputRef = useRef<TextInput>(null);
   const isReg = type === 'complete_registration';
 
   useEffect(() => {
-    if (countdown > 0) { const t = setTimeout(() => setCountdown(c => c - 1), 1000); return () => clearTimeout(t); }
+    if (countdown > 0) {
+      const t = setTimeout(() => setCountdown((c) => c - 1), 1000);
+      return () => clearTimeout(t);
+    }
     setCanResend(true);
   }, [countdown]);
 
-  const handleChange = (idx: number, val: string) => {
-    if (val.length > 1) {
-      const digits = val.replace(/\D/g, '').slice(0, 6).split('');
-      const next = Array(6).fill('');
-      digits.forEach((d, i) => { next[i] = d; });
-      setOtp(next);
-      if (digits.length === 6) handleVerify(next.join(''));
+  const handleVerify = async (code?: string) => {
+    const c = code || otp;
+    if (c.length !== 6) {
+      showToast({ type: 'error', text1: 'Incomplete Code', text2: 'Enter the complete 6-digit code' });
       return;
     }
-    const next = [...otp]; next[idx] = val.replace(/\D/g, '');
-    setOtp(next);
-    if (val && idx < 5) refs.current[idx + 1]?.focus();
-    if (val && idx === 5) handleVerify(next.join(''));
-  };
-
-  const handleKey = (idx: number, key: string) => {
-    if (key === 'Backspace' && !otp[idx] && idx > 0) refs.current[idx - 1]?.focus();
-  };
-
-  const handleVerify = async (code?: string) => {
-    const c = code || otp.join('');
-    if (c.length !== 6) { Toast.show({ type: 'error', text1: 'Incomplete Code', text2: 'Enter the complete 6-digit code' }); return; }
     setLoading(true);
     try {
       if (isReg) {
         const res = await api.completeRegistration(email!, c);
         if (res.success && res.data) {
           if (res.data.user) setUser(res.data.user);
-          Toast.show({ type: 'success', text1: 'Account Created! 🎉', text2: 'Set your transaction PIN to get started' });
+          showToast({ type: 'success', text1: 'Account Created', text2: 'Set your transaction PIN to get started' });
           setTimeout(() => router.replace('/dashboard/setup-pin'), 700);
         } else {
-          Toast.show({ type: 'error', text1: 'Invalid Code', text2: res.message || 'Incorrect code. Please try again.' });
-          setOtp(Array(6).fill('')); refs.current[0]?.focus();
+          showToast({ type: 'error', text1: 'Invalid Code', text2: res.message || 'Incorrect code. Please try again.' });
+          setOtp('');
+          otpInputRef.current?.focus();
         }
       } else {
         router.push({ pathname: '/auth/reset-password', params: { email, otp: c } });
       }
     } catch (err: any) {
-      Toast.show({ type: 'error', text1: 'Verification Failed', text2: err?.data?.message || err?.message || 'Please try again' });
-      setOtp(Array(6).fill('')); refs.current[0]?.focus();
+      showToast({ type: 'error', text1: 'Verification Failed', text2: err?.data?.message || err?.message || 'Please try again' });
+      setOtp('');
+      otpInputRef.current?.focus();
     } finally { setLoading(false); }
   };
 
@@ -74,80 +122,136 @@ export default function VerifyOTPScreen() {
     try {
       if (isReg) await api.resendRegistrationOtp(email!);
       else await api.forgotPassword(email!);
-      setCountdown(60); setCanResend(false); setOtp(Array(6).fill(''));
-      refs.current[0]?.focus();
-      Toast.show({ type: 'success', text1: 'Code Resent', text2: `A new code was sent to ${email}` });
+      setCountdown(60);
+      setCanResend(false);
+      setOtp('');
+      otpInputRef.current?.focus();
+      showToast({ type: 'success', text1: 'Code Resent', text2: `A new code was sent to ${email}` });
     } catch (err: any) {
-      Toast.show({ type: 'error', text1: 'Resend Failed', text2: err?.data?.message || err?.message || 'Please try again' });
+      showToast({ type: 'error', text1: 'Resend Failed', text2: err?.data?.message || err?.message || 'Please try again' });
     } finally { setLoading(false); }
   };
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.root}>
-      <View style={styles.hero}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={20} color={Colors.white} />
-        </TouchableOpacity>
-        <View style={styles.iconCircle}>
-          <Ionicons name="mail-outline" size={30} color={Colors.white} />
+    <AuthShell
+      heroTitle={isReg ? 'Verify your email' : 'Check your inbox'}
+      onBack={() => router.back()}
+      showLogo={false}
+      heroIcon={<AuthHeroIcon icon="mail-outline" size={48} />}
+    >
+      <AuthCardHeader
+        title="Enter verification code"
+        subtitle={`We sent a 6-digit code to ${email}`}
+      />
+
+      <PremiumOtpInput
+        value={otp}
+        onChange={setOtp}
+        onComplete={(code) => void handleVerify(code)}
+        inputRef={otpInputRef}
+      />
+
+      {loading ? (
+        <View style={styles.loadRow}>
+          <ActivityIndicator color={Colors.primary} size="small" />
+          <Text style={styles.loadText}>Verifying...</Text>
         </View>
-        <Text style={styles.heroTitle}>Verify Email</Text>
-        <Text style={styles.heroSub}>
-          Code sent to{'\n'}
-          <Text style={{ color: Colors.primaryLight, fontWeight: '700' }}>{email}</Text>
+      ) : null}
+
+      <AuthGradientButton
+        title={isReg ? 'Verify & continue' : 'Continue'}
+        onPress={() => void handleVerify()}
+        isLoading={loading}
+        disabled={otp.length < 6}
+        icon={<Ionicons name="shield-checkmark-outline" size={18} color={Colors.white} />}
+        style={{ marginTop: 12 }}
+      />
+
+      <TouchableOpacity
+        style={[styles.resendBtn, !canResend && styles.resendBtnDisabled]}
+        onPress={() => void handleResend()}
+        disabled={!canResend || loading}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="refresh-outline" size={16} color={canResend ? Colors.primary : Colors.muted} />
+        <Text style={[styles.resendText, !canResend && styles.resendTextDisabled]}>
+          {canResend ? 'Resend code' : `Resend in ${countdown}s`}
         </Text>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.instruction}>Enter the 6-digit verification code</Text>
-
-        <View style={styles.otpRow}>
-          {otp.map((d, i) => (
-            <TextInput key={i} ref={r => { refs.current[i] = r; }}
-              style={[styles.otpBox, d && styles.otpBoxFilled]}
-              value={d} onChangeText={v => handleChange(i, v)}
-              onKeyPress={({ nativeEvent }) => handleKey(i, nativeEvent.key)}
-              keyboardType="number-pad" maxLength={6} selectTextOnFocus autoFocus={i === 0} />
-          ))}
-        </View>
-
-        {loading && (
-          <View style={styles.loadRow}>
-            <ActivityIndicator color={Colors.primary} size="small" />
-            <Text style={styles.loadText}>Verifying...</Text>
-          </View>
-        )}
-
-        <TouchableOpacity style={[styles.resendBtn, !canResend && { opacity: 0.5 }]}
-          onPress={handleResend} disabled={!canResend || loading}>
-          <Ionicons name="refresh-outline" size={14} color={canResend ? Colors.primary : Colors.muted} />
-          <Text style={[styles.resendText, !canResend && { color: Colors.muted }]}>
-            {canResend ? 'Resend code' : `Resend in ${countdown}s`}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+      </TouchableOpacity>
+    </AuthShell>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.primaryDeep },
-  hero: { paddingTop: 60, paddingBottom: 36, alignItems: 'center' },
-  backBtn: { position: 'absolute', top: 60, left: 20, padding: 8 },
-  iconCircle: { width: 68, height: 68, borderRadius: 34, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center', marginBottom: 14, ...Shadow.md },
-  heroTitle: { ...Typography.h2, color: Colors.white, marginBottom: 8 },
-  heroSub: { ...Typography.small, color: 'rgba(255,255,255,0.7)', textAlign: 'center', paddingHorizontal: 40 },
-  card: { flex: 1, backgroundColor: Colors.white, borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingHorizontal: Spacing.page, paddingTop: 36, paddingBottom: 48, alignItems: 'center' },
-  instruction: { ...Typography.small, color: Colors.muted, marginBottom: 28 },
-  otpRow: { flexDirection: 'row', gap: 10, marginBottom: 28 },
-  otpBox: {
-    width: 46, height: 54, borderRadius: Radius.md, borderWidth: 1.5,
-    borderColor: Colors.border, backgroundColor: Colors.surface,
-    fontSize: 22, fontWeight: '700', textAlign: 'center', color: Colors.dark,
+  otpWrap: {
+    marginBottom: 12,
   },
-  otpBoxFilled: { borderColor: Colors.primary, backgroundColor: Colors.primaryMuted, color: Colors.primary },
-  loadRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
-  loadText: { ...Typography.small, color: Colors.muted },
-  resendBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 12 },
-  resendText: { ...Typography.bodyMed, color: Colors.primary },
+  otpRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  otpBox: {
+    flex: 1,
+    maxWidth: 54,
+    height: 62,
+    borderRadius: Radius.lg,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  otpBoxActive: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.white,
+    borderWidth: 2,
+  },
+  otpBoxFilled: {
+    borderColor: 'rgba(124, 58, 237, 0.35)',
+    backgroundColor: Colors.primaryMuted,
+  },
+  otpDigit: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: Colors.dark,
+    letterSpacing: -0.5,
+  },
+  otpInputOverlay: {
+    position: 'absolute',
+    opacity: 0,
+    width: 1,
+    height: 1,
+  },
+  loadRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  loadText: {
+    ...Typography.small,
+    color: Colors.muted,
+  },
+  resendBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 18,
+    marginTop: 4,
+  },
+  resendBtnDisabled: {
+    opacity: 0.6,
+  },
+  resendText: {
+    ...Typography.bodyMed,
+    color: Colors.primary,
+    fontWeight: '600',
+  },
+  resendTextDisabled: {
+    color: Colors.muted,
+  },
 });

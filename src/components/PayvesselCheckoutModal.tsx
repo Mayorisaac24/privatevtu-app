@@ -15,8 +15,8 @@ import {
   sanitizePayvesselCheckoutError,
 } from '../lib/payvessel-checkout-errors';
 import { Colors } from '../theme';
+import { GlassSurface } from './ui/GlassSurface';
 
-const BRAND = '#7C3AED';
 const CHECKOUT_URL = 'https://checkout.payvessel.com';
 
 type TransactionData = {
@@ -187,12 +187,12 @@ export function PayvesselCheckoutModal({
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
+        <GlassSurface variant="light" borderRadius={0} style={styles.headerShell} contentStyle={styles.header}>
           <Text style={styles.headerTitle}>Fund Wallet</Text>
           <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Ionicons name="close" size={24} color={Colors.muted} />
           </TouchableOpacity>
-        </View>
+        </GlassSurface>
 
         <View style={styles.body}>
           {checkoutUrl && !hasError && (
@@ -232,19 +232,21 @@ export function PayvesselCheckoutModal({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.white },
+  container: { flex: 1, backgroundColor: Colors.pageBg },
+  headerShell: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(15, 23, 42, 0.08)',
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(15, 23, 42, 0.08)',
   },
   headerTitle: { fontSize: 17, fontWeight: '700', color: Colors.dark },
   body: { flex: 1 },
-  webview: { flex: 1 },
+  webview: { flex: 1, backgroundColor: Colors.white },
   centered: {
     flex: 1,
     justifyContent: 'center',
@@ -256,7 +258,7 @@ const styles = StyleSheet.create({
   errorMessage: { fontSize: 14, color: Colors.muted, textAlign: 'center', lineHeight: 21 },
   retryBtn: {
     marginTop: 8,
-    backgroundColor: BRAND,
+    backgroundColor: Colors.primary,
     paddingVertical: 14,
     paddingHorizontal: 28,
     borderRadius: 14,

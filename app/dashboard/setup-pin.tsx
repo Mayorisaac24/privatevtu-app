@@ -6,9 +6,11 @@ import { useState } from 'react';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/lib/api';
-import { Toast } from '../../src/components/ui/Toast';
+import { showToast } from '../../src/components/ui/Toast';
+import { useAuthStore } from '../../src/stores';
 import { useStatusBarStyle } from '../../src/hooks/useStatusBarStyle';
 import { Colors, Spacing, Typography, Radius } from '../../src/theme';
+import { GlassSurface } from '../../src/components/ui/GlassSurface';
 
 export default function SetupPinScreen() {
   useStatusBarStyle('light');
@@ -32,7 +34,7 @@ export default function SetupPinScreen() {
 
   const handleSubmit = async (finalConfirm: string) => {
     if (pin !== finalConfirm) {
-      Toast.show({ type: 'error', text1: "PINs Don't Match", text2: 'Please try again from the beginning' });
+      showToast({ type: 'error', text1: "PINs Don't Match", text2: 'Please try again from the beginning' });
       setPin(''); setConfirmPin(''); setStep('set');
       return;
     }
@@ -40,14 +42,15 @@ export default function SetupPinScreen() {
     try {
       const res = await api.setPin(pin, pin);
       if (res.success) {
-        Toast.show({ type: 'success', text1: 'PIN Set! 🔐', text2: 'Your transaction PIN is ready' });
+        useAuthStore.getState().updateUser({ hasPin: true });
+        showToast({ type: 'success', text1: 'PIN Set! 🔐', text2: 'Your transaction PIN is ready' });
         setTimeout(() => router.replace('/(tabs)'), 700);
       } else {
-        Toast.show({ type: 'error', text1: 'Failed to Set PIN', text2: res.message || 'Please try again' });
+        showToast({ type: 'error', text1: 'Failed to Set PIN', text2: res.message || 'Please try again' });
         setPin(''); setConfirmPin(''); setStep('set');
       }
     } catch (err: any) {
-      Toast.show({ type: 'error', text1: 'Failed to Set PIN', text2: err?.data?.message || err?.message || 'Please try again' });
+      showToast({ type: 'error', text1: 'Failed to Set PIN', text2: err?.data?.message || err?.message || 'Please try again' });
       setPin(''); setConfirmPin(''); setStep('set');
     } finally { setLoading(false); }
   };
@@ -69,7 +72,7 @@ export default function SetupPinScreen() {
         </Text>
       </View>
 
-      <View style={styles.card}>
+      <GlassSurface variant="light" borderRadius={32} style={styles.card} contentStyle={styles.cardContent}>
         {/* Step dots */}
         <View style={styles.stepRow}>
           <View style={[styles.stepDot, styles.stepDotActive]} />
@@ -98,7 +101,7 @@ export default function SetupPinScreen() {
           keyboardType="number-pad" maxLength={4} autoFocus caretHidden />
 
         <Text style={styles.tapHint}>Tap anywhere to show keyboard</Text>
-      </View>
+      </GlassSurface>
     </KeyboardAvoidingView>
   );
 }
@@ -110,7 +113,8 @@ const styles = StyleSheet.create({
   iconCircle: { width: 72, height: 72, borderRadius: 36, backgroundColor: Colors.success, justifyContent: 'center', alignItems: 'center', marginBottom: 16, shadowColor: Colors.success, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.35, shadowRadius: 16, elevation: 8 },
   heroTitle: { ...Typography.h2, color: Colors.white, marginBottom: 8 },
   heroSub: { ...Typography.small, color: 'rgba(255,255,255,0.7)', textAlign: 'center', paddingHorizontal: 40 },
-  card: { flex: 1, backgroundColor: Colors.white, borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingTop: 44, paddingBottom: 48, alignItems: 'center' },
+  card: { flex: 1, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
+  cardContent: { paddingTop: 44, paddingBottom: 48, alignItems: 'center' },
   stepRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   stepDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: Colors.border },
   stepDotActive: { backgroundColor: Colors.primary },

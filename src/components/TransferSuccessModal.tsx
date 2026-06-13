@@ -15,8 +15,12 @@ import type { Bank } from '../lib/api';
 import { enrichTransferBank } from '../lib/transfer-banks';
 import { BankLogo } from './BankLogo';
 import { Colors, Gradients, Radius, Shadow, Spacing } from '../theme';
+import { ThemedScreen } from '../components/ui/ThemedScreen';
+import { GradientButton } from '../components/ui/GradientButton';
+import { useGradients } from '../theme/hooks';
+import { gradientStops } from '../theme/gradient-utils';
+import { GlassCard } from './ui/GlassCard';
 
-const BRAND = '#7C3AED';
 
 type Props = {
   visible: boolean;
@@ -102,6 +106,7 @@ export function TransferSuccessModal({
   onDone,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const gradients = useGradients();
   const fade = useRef(new Animated.Value(0)).current;
   const slide = useRef(new Animated.Value(24)).current;
 
@@ -134,9 +139,9 @@ export function TransferSuccessModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onDone}>
-      <View style={styles.root}>
+      <ThemedScreen>
         <LinearGradient
-          colors={Gradients.card as [string, string, ...string[]]}
+          colors={gradientStops(gradients.card)}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[styles.hero, { paddingTop: insets.top + 28 }]}
@@ -164,7 +169,7 @@ export function TransferSuccessModal({
             },
           ]}
         >
-          <View style={styles.receiptCard}>
+          <GlassCard borderRadius={Radius.xl} padding={18} contentStyle={styles.receiptCard}>
             <Text style={styles.receiptLabel}>Recipient</Text>
 
             <View style={styles.recipientRow}>
@@ -173,7 +178,7 @@ export function TransferSuccessModal({
                   <BankLogo bank={bankDisplay} size={46} />
                 ) : (
                   <View style={styles.recipientLogoFallback}>
-                    <Ionicons name="business-outline" size={22} color={BRAND} />
+                    <Ionicons name="business-outline" size={22} color={Colors.primary} />
                   </View>
                 )}
               </View>
@@ -221,7 +226,7 @@ export function TransferSuccessModal({
                 </View>
               </>
             ) : null}
-          </View>
+          </GlassCard>
 
           <View style={styles.noticeRow}>
             <Ionicons name="notifications-outline" size={16} color={Colors.muted} />
@@ -230,19 +235,15 @@ export function TransferSuccessModal({
             </Text>
           </View>
 
-          <TouchableOpacity onPress={onDone} activeOpacity={0.9} style={styles.doneWrap}>
-            <LinearGradient
-              colors={['#8B5CF6', BRAND]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.doneBtn}
-            >
-              <Text style={styles.doneText}>Done</Text>
-              <Ionicons name="arrow-forward" size={18} color={Colors.white} />
-            </LinearGradient>
-          </TouchableOpacity>
+          <GradientButton
+            title="Done"
+            onPress={onDone}
+            rightIcon={<Ionicons name="arrow-forward" size={18} color={Colors.white} />}
+            style={styles.doneWrap}
+            gradientStyle={styles.doneBtn}
+          />
         </Animated.View>
-      </View>
+      </ThemedScreen>
     </Modal>
   );
 }
@@ -250,7 +251,6 @@ export function TransferSuccessModal({
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#F4F5FA',
   },
   hero: {
     alignItems: 'center',
@@ -347,12 +347,7 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   receiptCard: {
-    backgroundColor: Colors.white,
-    borderRadius: Radius.xl,
-    padding: 18,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(15, 23, 42, 0.08)',
-    ...Shadow.card,
+    gap: 0,
   },
   receiptLabel: {
     fontSize: 11,
@@ -438,12 +433,12 @@ const styles = StyleSheet.create({
   summaryKeyStrong: {
     fontSize: 13,
     fontWeight: '700',
-    color: BRAND,
+    color: Colors.primary,
   },
   summaryValueStrong: {
     fontSize: 16,
     fontWeight: '800',
-    color: BRAND,
+    color: Colors.primary,
   },
   referenceRow: {
     gap: 4,

@@ -28,6 +28,10 @@ import { BankLogo } from '../../src/components/BankLogo';
 import { BankPickerModal } from '../../src/components/BankPickerModal';
 import { PayvesselCheckoutModal } from '../../src/components/PayvesselCheckoutModal';
 import { LoadingOverlay } from '../../src/components/ui/LoadingOverlay';
+import { ThemedScreen } from '../../src/components/ui/ThemedScreen';
+import { GradientButton } from '../../src/components/ui/GradientButton';
+import { GlassCard } from '../../src/components/ui/GlassCard';
+import { GlassSurface } from '../../src/components/ui/GlassSurface';
 import {
   EMPTY_FUNDING_METHODS,
   getWalletFundingData,
@@ -37,17 +41,15 @@ import {
 import { refreshDashboardData } from '../../src/lib/dashboard-data';
 import { useWalletStore } from '../../src/stores';
 import { Colors, Spacing, Shadow, Radius } from '../../src/theme';
-import { Toast } from '../../src/components/ui/Toast';
+import { useGradients, useColors } from '../../src/theme/hooks';
+import { gradientStops } from '../../src/theme/gradient-utils';
+import { showToast } from '../../src/components/ui/Toast';
 import { useHardwareBack } from '../../src/hooks/useHardwareBack';
 import { useStatusBarStyle } from '../../src/hooks/useStatusBarStyle';
 import { navigateBack } from '../../src/lib/navigation';
 import { ServiceGate } from '../../src/components/ServiceGate';
 import { SERVICE_CODES } from '../../src/lib/service-availability';
 
-const PAGE_BG = '#F4F5FA';
-const CARD_DARK = '#1A0A3C';
-const BRAND = '#7C3AED';
-const BORDER = 'rgba(15, 23, 42, 0.08)';
 
 const QUICK_AMOUNTS = [1000, 2000, 5000, 10000, 20000, 50000];
 
@@ -95,6 +97,8 @@ function formatExpiry(expiresAt?: string | null): string {
 function FundWalletScreen() {
   useStatusBarStyle('light');
   const insets = useSafeAreaInsets();
+  const colors = useColors();
+  const gradients = useGradients();
   const { balance, balanceVisible } = useWalletStore();
   const fundingCache = peekWalletFundingCache();
 
@@ -256,13 +260,13 @@ function FundWalletScreen() {
     try {
       await Share.share({ message: accountNumber });
     } catch {
-      Toast.show({ type: 'error', text1: 'Could not share account number' });
+      showToast({ type: 'error', text1: 'Could not share account number' });
     }
   };
 
   const handlePaystackFund = async () => {
     if (!isValidAmount) {
-      Toast.show({ type: 'error', text1: 'Minimum amount is ₦100' });
+      showToast({ type: 'error', text1: 'Minimum amount is ₦100' });
       return;
     }
     setLoading(true);
@@ -275,10 +279,10 @@ function FundWalletScreen() {
           setPendingCheckoutGateway('paystack');
         }
       } else {
-        Toast.show({ type: 'error', text1: 'Payment failed', text2: res.message });
+        showToast({ type: 'error', text1: 'Payment failed', text2: res.message });
       }
     } catch (err: any) {
-      Toast.show({ type: 'error', text1: 'Payment failed', text2: err?.message });
+      showToast({ type: 'error', text1: 'Payment failed', text2: err?.message });
     } finally {
       setLoading(false);
     }
@@ -293,7 +297,7 @@ function FundWalletScreen() {
       for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
         const res = await api.verifyPayvesselCheckout(reference);
         if (isResponseSuccess(res) && res.data?.success) {
-          Toast.show({ type: 'success', text1: 'Wallet funded successfully' });
+          showToast({ type: 'success', text1: 'Wallet funded successfully' });
           setPendingCheckoutRef(null);
           setPendingCheckoutGateway(null);
           await loadInitial({ force: true });
@@ -310,13 +314,13 @@ function FundWalletScreen() {
         }
 
         if (isPending && showPendingToast) {
-          Toast.show({
+          showToast({
             type: 'info',
             text1: 'Payment processing',
             text2: 'Your wallet will update automatically once confirmed. Tap “Completed payment?” to check again.',
           });
         } else if (showPendingToast) {
-          Toast.show({
+          showToast({
             type: 'error',
             text1: 'Payment not verified yet',
             text2: res.message || res.data?.message,
@@ -327,7 +331,7 @@ function FundWalletScreen() {
       return false;
     } catch {
       if (showPendingToast) {
-        Toast.show({ type: 'error', text1: 'Could not verify payment' });
+        showToast({ type: 'error', text1: 'Could not verify payment' });
       }
       return false;
     } finally {
@@ -348,7 +352,7 @@ function FundWalletScreen() {
 
   const handlePayvesselCheckout = async () => {
     if (!isValidAmount) {
-      Toast.show({ type: 'error', text1: 'Minimum amount is ₦100' });
+      showToast({ type: 'error', text1: 'Minimum amount is ₦100' });
       return;
     }
     setCheckoutOverlayVisible(true);
@@ -359,12 +363,12 @@ function FundWalletScreen() {
         setPayvesselCheckoutVisible(true);
       } else {
         setCheckoutOverlayVisible(false);
-        Toast.show({ type: 'error', text1: 'Checkout failed', text2: res.message });
+        showToast({ type: 'error', text1: 'Checkout failed', text2: res.message });
       }
     } catch (err: any) {
       setCheckoutOverlayVisible(false);
       const message = err?.message || 'Checkout failed';
-      Toast.show({ type: 'error', text1: 'Checkout failed', text2: message });
+      showToast({ type: 'error', text1: 'Checkout failed', text2: message });
     }
   };
 
@@ -387,19 +391,19 @@ function FundWalletScreen() {
       if (pendingCheckoutGateway === 'paystack') {
         const res = await api.verifyFunding(pendingCheckoutRef);
         if (isResponseSuccess(res) && res.data?.amount) {
-          Toast.show({ type: 'success', text1: 'Wallet funded successfully' });
+          showToast({ type: 'success', text1: 'Wallet funded successfully' });
           setPendingCheckoutRef(null);
           setPendingCheckoutGateway(null);
           await loadInitial({ force: true });
         } else {
-          Toast.show({ type: 'error', text1: 'Not verified yet', text2: res.message });
+          showToast({ type: 'error', text1: 'Not verified yet', text2: res.message });
         }
         return;
       }
 
       await verifyPayvesselPayment(pendingCheckoutRef, true);
     } catch (err: any) {
-      Toast.show({ type: 'error', text1: 'Verification failed', text2: err?.message });
+      showToast({ type: 'error', text1: 'Verification failed', text2: err?.message });
     } finally {
       setLoading(false);
     }
@@ -408,7 +412,7 @@ function FundWalletScreen() {
   const handleCreateStatic = async () => {
     const bankCodes = selectedBanksToCreate.map((b) => b.code);
     if (bankCodes.length === 0) {
-      Toast.show({ type: 'error', text1: 'Select at least one bank' });
+      showToast({ type: 'error', text1: 'Select at least one bank' });
       return;
     }
     setStaticAccountOverlayVisible(true);
@@ -416,7 +420,7 @@ function FundWalletScreen() {
       const res = await api.createStaticVirtualAccount(bankCodes);
       if (isResponseSuccess(res) && res.data) {
         const createdCount = res.data.allAccounts?.length ?? bankCodes.length;
-        Toast.show({
+        showToast({
           type: 'success',
           text1: createdCount > 1 ? `${createdCount} accounts created` : 'Permanent account ready',
         });
@@ -425,13 +429,13 @@ function FundWalletScreen() {
         setSelectedBanks(new Set());
         await refreshFundingBanks();
       } else {
-        Toast.show({
+        showToast({
           type: 'error',
           text1: res.message || 'Error creating permanent virtual account',
         });
       }
     } catch {
-      Toast.show({ type: 'error', text1: 'Error creating permanent virtual account' });
+      showToast({ type: 'error', text1: 'Error creating permanent virtual account' });
     } finally {
       setStaticAccountOverlayVisible(false);
     }
@@ -446,13 +450,13 @@ function FundWalletScreen() {
       const { dynamicBanks: latestDynamic } = await refreshFundingBanks();
       if (latestDynamic.length === 0) {
         setShowDynamicBankPicker(false);
-        Toast.show({ type: 'error', text1: 'No banks available for one-time accounts' });
+        showToast({ type: 'error', text1: 'No banks available for one-time accounts' });
         return;
       }
       setPickerBanks(latestDynamic);
     } catch (err: any) {
       setShowDynamicBankPicker(false);
-      Toast.show({ type: 'error', text1: 'Could not load banks', text2: err?.message });
+      showToast({ type: 'error', text1: 'Could not load banks', text2: err?.message });
     } finally {
       setFetchingDynamicBanks(false);
     }
@@ -467,16 +471,16 @@ function FundWalletScreen() {
         setExpiryLabel('');
         const accountsRes = await api.getVirtualAccounts();
         if (isResponseSuccess(accountsRes)) setVirtualAccounts(accountsRes.data ?? []);
-        Toast.show({
+        showToast({
           type: 'success',
           text1: 'Account discarded',
           text2: 'You can generate a new one-time account now.',
         });
       } else {
-        Toast.show({ type: 'error', text1: 'Could not discard account', text2: res.message });
+        showToast({ type: 'error', text1: 'Could not discard account', text2: res.message });
       }
     } catch (err: any) {
-      Toast.show({ type: 'error', text1: 'Could not discard account', text2: err?.message });
+      showToast({ type: 'error', text1: 'Could not discard account', text2: err?.message });
     } finally {
       setLoading(false);
     }
@@ -504,18 +508,18 @@ function FundWalletScreen() {
       );
       if (isResponseSuccess(res) && res.data) {
         setDynamicAccount(res.data);
-        Toast.show({
+        showToast({
           type: 'success',
           text1: res.data.existing ? 'Using existing account' : 'Account generated',
         });
       } else {
-        Toast.show({
+        showToast({
           type: 'error',
           text1: res.message || 'Error creating dynamic virtual account',
         });
       }
     } catch {
-      Toast.show({ type: 'error', text1: 'Error creating dynamic virtual account' });
+      showToast({ type: 'error', text1: 'Error creating dynamic virtual account' });
     } finally {
       setLoading(false);
     }
@@ -532,7 +536,7 @@ function FundWalletScreen() {
   };
 
   const renderAmountInput = (optional = false) => (
-    <View style={styles.card}>
+    <GlassCard borderRadius={Radius.xl} padding={18} contentStyle={styles.card}>
       <Text style={styles.fieldLabel}>
         {optional ? 'Expected amount (optional)' : 'Amount to add'}
       </Text>
@@ -568,7 +572,7 @@ function FundWalletScreen() {
           </View>
         </>
       )}
-    </View>
+    </GlassCard>
   );
 
   const renderMethodBody = () => {
@@ -577,7 +581,7 @@ function FundWalletScreen() {
         <>
           {renderAmountInput()}
           <View style={styles.infoBanner}>
-            <Ionicons name="shield-checkmark" size={18} color={BRAND} />
+            <Ionicons name="shield-checkmark" size={18} color={Colors.primary} />
             <Text style={styles.infoText}>
               {activeMethod === 'checkout'
                 ? 'Pay in-app with Payvessel secure checkout (bank transfer). Wallet credits automatically after payment.'
@@ -585,13 +589,15 @@ function FundWalletScreen() {
             </Text>
           </View>
           {pendingCheckoutRef && (activeMethod === 'checkout' || activeMethod === 'paystack') && (
-            <TouchableOpacity style={styles.verifyCard} onPress={handleVerifyCheckout} disabled={loading}>
-              <Ionicons name="checkmark-circle-outline" size={22} color={Colors.success} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.verifyTitle}>Completed payment?</Text>
-                <Text style={styles.verifySub}>Tap to verify ref {pendingCheckoutRef.slice(0, 16)}…</Text>
-              </View>
-              {loading ? <ActivityIndicator color={BRAND} /> : <Ionicons name="chevron-forward" size={18} color={Colors.muted} />}
+            <TouchableOpacity onPress={handleVerifyCheckout} disabled={loading} activeOpacity={0.85}>
+              <GlassCard borderRadius={16} padding={14} contentStyle={styles.verifyCard}>
+                <Ionicons name="checkmark-circle-outline" size={22} color={Colors.success} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.verifyTitle}>Completed payment?</Text>
+                  <Text style={styles.verifySub}>Tap to verify ref {pendingCheckoutRef.slice(0, 16)}…</Text>
+                </View>
+                {loading ? <ActivityIndicator color={Colors.primary} /> : <Ionicons name="chevron-forward" size={18} color={Colors.muted} />}
+              </GlassCard>
             </TouchableOpacity>
           )}
         </>
@@ -601,17 +607,17 @@ function FundWalletScreen() {
     if (activeMethod === 'static') {
       if (hasBvn === null) {
         return (
-          <View style={[styles.card, styles.bvnGateLoading]}>
-            <ActivityIndicator color={BRAND} size="large" />
-          </View>
+          <GlassCard borderRadius={Radius.xl} padding={18} contentStyle={[styles.card, styles.bvnGateLoading]}>
+            <ActivityIndicator color={Colors.primary} size="large" />
+          </GlassCard>
         );
       }
 
       if (!hasBvn && staticAccounts.length === 0) {
         return (
-          <View style={styles.card}>
+          <GlassCard borderRadius={Radius.xl} padding={18} contentStyle={styles.card}>
             <View style={styles.bvnGateIcon}>
-              <Ionicons name="shield-outline" size={28} color={BRAND} />
+              <Ionicons name="shield-outline" size={28} color={Colors.primary} />
             </View>
             <Text style={styles.bvnGateTitle}>BVN required</Text>
             <Text style={styles.bvnGateMessage}>
@@ -623,20 +629,20 @@ function FundWalletScreen() {
             </TouchableOpacity>
             {dynamicMethodAvailable ? (
               <TouchableOpacity style={styles.bvnGateSecondary} onPress={() => setActiveMethod('dynamic')}>
-                <Ionicons name="time-outline" size={18} color={BRAND} />
+                <Ionicons name="time-outline" size={18} color={Colors.primary} />
                 <Text style={styles.bvnGateSecondaryText}>Use one-time account</Text>
               </TouchableOpacity>
             ) : (
               <Text style={styles.bvnGateNote}>One-time accounts are not available right now.</Text>
             )}
-          </View>
+          </GlassCard>
         );
       }
 
       return (
         <>
           {staticAccounts.length > 0 && (
-            <View style={styles.card}>
+            <GlassCard borderRadius={Radius.xl} padding={18} contentStyle={styles.card}>
               <Text style={styles.fieldLabel}>
                 Your permanent accounts ({staticAccounts.length})
               </Text>
@@ -653,7 +659,7 @@ function FundWalletScreen() {
                       {account.bankCode && bankByCode.get(account.bankCode) ? (
                         <BankLogo bank={bankByCode.get(account.bankCode)!} size={22} />
                       ) : (
-                        <Ionicons name="business-outline" size={14} color={BRAND} />
+                        <Ionicons name="business-outline" size={14} color={Colors.primary} />
                       )}
                       <Text style={styles.staticBankBadgeText}>{account.bankName}</Text>
                     </View>
@@ -666,28 +672,20 @@ function FundWalletScreen() {
                   {account.accountName ? (
                     <Text style={styles.staticAccountName}>{account.accountName}</Text>
                   ) : null}
-                  <TouchableOpacity
-                    style={styles.staticCopyBtn}
+                  <GradientButton
+                    title="Copy number"
                     onPress={() => copyAccount(account.accountNumber)}
-                    activeOpacity={0.85}
-                  >
-                    <LinearGradient
-                      colors={['#8B5CF6', '#7C3AED']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={styles.staticCopyBtnInner}
-                    >
-                      <Ionicons name="copy-outline" size={16} color={Colors.white} />
-                      <Text style={styles.staticCopyBtnText}>Copy number</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
+                    leftIcon={<Ionicons name="copy-outline" size={16} color={Colors.white} />}
+                    gradientStyle={styles.staticCopyBtnInner}
+                    style={styles.staticCopyBtn}
+                  />
                 </View>
               ))}
-            </View>
+            </GlassCard>
           )}
 
           {hasBvn && availableBanksToCreate.length > 0 && (
-            <View style={styles.card}>
+            <GlassCard borderRadius={Radius.xl} padding={18} contentStyle={styles.card}>
               <Text style={styles.fieldLabel}>
                 {staticAccounts.length > 0 ? 'Add bank' : 'Create permanent account'}
               </Text>
@@ -721,12 +719,12 @@ function FundWalletScreen() {
                   );
                 })}
               </View>
-            </View>
+            </GlassCard>
           )}
 
           {staticAccounts.length > 0 && availableBanksToCreate.length === 0 && (
             <View style={styles.infoBanner}>
-              <Ionicons name="checkmark-done" size={18} color={BRAND} />
+              <Ionicons name="checkmark-done" size={18} color={Colors.primary} />
               <Text style={styles.infoText}>
                 You have permanent accounts on all available banks. Transfer to any account above to fund your wallet.
               </Text>
@@ -740,7 +738,7 @@ function FundWalletScreen() {
     return (
       <>
         {!dynamicAccount ? renderAmountInput(true) : null}
-        <View style={styles.card}>
+        <GlassCard borderRadius={Radius.xl} padding={18} contentStyle={styles.card}>
           {dynamicAccount ? (
             <>
               <View style={styles.dynamicHeader}>
@@ -766,7 +764,7 @@ function FundWalletScreen() {
                 style={styles.secondaryBtn}
                 onPress={() => copyAccount(dynamicAccount.accountNumber)}
               >
-                <Ionicons name="copy-outline" size={18} color={BRAND} />
+                <Ionicons name="copy-outline" size={18} color={Colors.primary} />
                 <Text style={styles.secondaryBtnText}>Copy account number</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -786,7 +784,7 @@ function FundWalletScreen() {
               </Text>
             </>
           )}
-        </View>
+        </GlassCard>
       </>
     );
   };
@@ -835,9 +833,9 @@ function FundWalletScreen() {
   };
 
   return (
-    <View style={styles.root}>
+    <ThemedScreen>
       <LinearGradient
-        colors={[CARD_DARK, '#2E1065', '#4C1D95'] as [string, string, ...string[]]}
+        colors={gradientStops(gradients.hero)}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.header, { paddingTop: insets.top + 12 }]}
@@ -867,12 +865,12 @@ function FundWalletScreen() {
         </View>
       </LinearGradient>
 
-      <View style={styles.contentCurve} />
+      <View style={[styles.contentCurve, { backgroundColor: colors.pageBg }]} />
 
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {initializing ? (
           <View style={styles.loadingWrap}>
-            <ActivityIndicator color={BRAND} size="large" />
+            <ActivityIndicator color={Colors.primary} size="large" />
           </View>
         ) : availableMethods.length === 0 ? (
           <View style={styles.emptyWrap}>
@@ -895,16 +893,23 @@ function FundWalletScreen() {
                   return (
                     <TouchableOpacity
                       key={m}
-                      style={[styles.methodTab, active && styles.methodTabActive]}
                       onPress={() => setActiveMethod(m)}
                       activeOpacity={0.82}
                     >
-                      {active && <View style={styles.methodTabAccent} />}
-                      <View style={[styles.methodIconRing, active && styles.methodIconRingActive]}>
-                        <Ionicons name={meta.icon as any} size={20} color={active ? BRAND : Colors.muted} />
-                      </View>
-                      <Text style={[styles.methodTabLabel, active && styles.methodTabLabelActive]}>{meta.label}</Text>
-                      <Text style={[styles.methodTabSub, active && styles.methodTabSubActive]}>{meta.subtitle}</Text>
+                      <GlassCard
+                        variant={active ? 'tinted' : 'light'}
+                        borderRadius={Radius.lg}
+                        padding={14}
+                        style={[styles.methodTab, active && styles.methodTabActive]}
+                        contentStyle={styles.methodTabContent}
+                      >
+                        {active && <View style={styles.methodTabAccent} />}
+                        <View style={[styles.methodIconRing, active && styles.methodIconRingActive]}>
+                          <Ionicons name={meta.icon as any} size={20} color={active ? Colors.primary : Colors.muted} />
+                        </View>
+                        <Text style={[styles.methodTabLabel, active && styles.methodTabLabelActive]}>{meta.label}</Text>
+                        <Text style={[styles.methodTabSub, active && styles.methodTabSubActive]}>{meta.subtitle}</Text>
+                      </GlassCard>
                     </TouchableOpacity>
                   );
                 })}
@@ -917,46 +922,41 @@ function FundWalletScreen() {
               (activeMethod === 'static' && !hasBvn && staticAccounts.length === 0)
               || (activeMethod === 'static' && hasBvn && availableBanksToCreate.length === 0)
             ) && (
-              <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
-                <TouchableOpacity
+              <GlassSurface
+                variant="light"
+                borderRadius={0}
+                style={styles.footer}
+                contentStyle={{ paddingBottom: insets.bottom + 12, paddingHorizontal: Spacing.page, paddingTop: 14 }}
+              >
+                <GradientButton
                   onPress={handlePrimaryAction}
                   disabled={primaryDisabled()}
-                  activeOpacity={0.88}
-                >
-                  <LinearGradient
-                    colors={primaryDisabled() ? ['#C4B5FD', '#A78BFA'] : ['#8B5CF6', '#7C3AED']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={[styles.cta, primaryDisabled() && styles.ctaDisabled]}
-                  >
-                    {isButtonLoading ? (
-                      <>
-                        <ActivityIndicator color={Colors.white} />
-                        <Text style={styles.ctaText}>{primaryLabel()}</Text>
-                      </>
-                    ) : (
-                      <>
-                        <Ionicons
-                          name={
-                            activeMethod === 'static' || activeMethod === 'dynamic'
-                              ? 'wallet-outline'
-                              : 'lock-closed'
-                          }
-                          size={18}
-                          color={Colors.white}
-                        />
-                        <Text style={styles.ctaText}>{primaryLabel()}</Text>
-                      </>
-                    )}
-                  </LinearGradient>
-                </TouchableOpacity>
+                  inactive={primaryDisabled()}
+                  isLoading={isButtonLoading}
+                  title={primaryLabel()}
+                  gradientStyle={styles.cta}
+                  style={primaryDisabled() ? styles.ctaDisabled : undefined}
+                  leftIcon={
+                    !isButtonLoading ? (
+                      <Ionicons
+                        name={
+                          activeMethod === 'static' || activeMethod === 'dynamic'
+                            ? 'wallet-outline'
+                            : 'lock-closed'
+                        }
+                        size={18}
+                        color={Colors.white}
+                      />
+                    ) : undefined
+                  }
+                />
                 <View style={styles.secureRow}>
                   <View style={styles.secureIconWrap}>
-                    <Ionicons name="shield-checkmark" size={12} color={BRAND} />
+                    <Ionicons name="shield-checkmark" size={12} color={Colors.primary} />
                   </View>
                   <Text style={styles.secureNote}>Secured payment · Server-side verification</Text>
                 </View>
-              </View>
+              </GlassSurface>
             )}
           </>
         )}
@@ -982,7 +982,7 @@ function FundWalletScreen() {
         onPrepared={() => setCheckoutOverlayVisible(false)}
         onError={() => {
           setCheckoutOverlayVisible(false);
-          Toast.show({ type: 'error', text1: 'Checkout unavailable', text2: 'Please try again later or use another funding method.' });
+          showToast({ type: 'error', text1: 'Checkout unavailable', text2: 'Please try again later or use another funding method.' });
         }}
       />
       <LoadingOverlay
@@ -999,7 +999,7 @@ function FundWalletScreen() {
         }
         icon={checkoutOverlayVisible ? 'lock-closed' : 'wallet-outline'}
       />
-    </View>
+    </ThemedScreen>
   );
 }
 
@@ -1012,12 +1012,10 @@ export default function FundWalletRoute() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: PAGE_BG },
   flex: { flex: 1 },
   contentCurve: {
     height: 22,
     marginTop: -22,
-    backgroundColor: PAGE_BG,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
   },
@@ -1099,19 +1097,12 @@ const styles = StyleSheet.create({
   },
   methodTab: {
     width: 118,
-    backgroundColor: Colors.white,
-    borderRadius: Radius.lg,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: BORDER,
+    overflow: 'hidden',
+  },
+  methodTabActive: {},
+  methodTabContent: {
     gap: 6,
     overflow: 'hidden',
-    ...Shadow.sm,
-  },
-  methodTabActive: {
-    borderColor: 'rgba(124, 58, 237, 0.35)',
-    backgroundColor: '#FDFBFF',
-    ...Shadow.md,
   },
   methodTabAccent: {
     position: 'absolute',
@@ -1119,7 +1110,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 3,
-    backgroundColor: BRAND,
+    backgroundColor: Colors.primary,
     borderTopLeftRadius: Radius.lg,
     borderTopRightRadius: Radius.lg,
   },
@@ -1127,7 +1118,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: PAGE_BG,
+    backgroundColor: Colors.pageBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1135,17 +1126,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#EDE9FE',
   },
   methodTabLabel: { fontSize: 13, fontWeight: '700', color: Colors.mid },
-  methodTabLabelActive: { color: BRAND },
+  methodTabLabelActive: { color: Colors.primary },
   methodTabSub: { fontSize: 10, color: Colors.muted, lineHeight: 14 },
   methodTabSubActive: { color: '#7C6A9E' },
   card: {
-    backgroundColor: Colors.white,
-    borderRadius: Radius.xl,
-    padding: 18,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: BORDER,
     gap: 10,
-    ...Shadow.card,
   },
   fieldLabel: {
     fontSize: 11, fontWeight: '700', color: Colors.muted,
@@ -1157,16 +1142,16 @@ const styles = StyleSheet.create({
     borderRadius: 16, backgroundColor: '#FAF5FF',
     paddingHorizontal: 18, height: 68, gap: 6,
   },
-  nairaSign: { fontSize: 24, fontWeight: '700', color: BRAND },
-  amountInput: { flex: 1, fontSize: 30, fontWeight: '800', color: CARD_DARK, paddingVertical: 0 },
+  nairaSign: { fontSize: 24, fontWeight: '700', color: Colors.primary },
+  amountInput: { flex: 1, fontSize: 30, fontWeight: '800', color: Colors.heroDark, paddingVertical: 0 },
   minHint: { fontSize: 11, color: Colors.mutedLight },
   quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
   quickBtn: {
     width: '31%', paddingVertical: 10, borderRadius: 12,
-    backgroundColor: PAGE_BG, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER,
+    backgroundColor: Colors.pageBg, borderWidth: StyleSheet.hairlineWidth, borderColor: Colors.borderSubtle,
     alignItems: 'center',
   },
-  quickBtnActive: { backgroundColor: BRAND, borderColor: BRAND },
+  quickBtnActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   quickText: { fontSize: 13, fontWeight: '600', color: Colors.mid },
   quickTextActive: { color: Colors.white },
   infoBanner: {
@@ -1177,16 +1162,14 @@ const styles = StyleSheet.create({
   infoText: { flex: 1, fontSize: 13, color: '#5B21B6', lineHeight: 19 },
   verifyCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: Colors.white, borderRadius: 16, padding: 14,
-    borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(16, 185, 129, 0.25)',
   },
   verifyTitle: { fontSize: 14, fontWeight: '700', color: Colors.dark },
   verifySub: { fontSize: 11, color: Colors.muted, marginTop: 2 },
   accountHero: {
-    backgroundColor: PAGE_BG, borderRadius: 16, padding: 18,
-    alignItems: 'center', borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER,
+    backgroundColor: Colors.pageBg, borderRadius: 16, padding: 18,
+    alignItems: 'center', borderWidth: StyleSheet.hairlineWidth, borderColor: Colors.borderSubtle,
   },
-  accountNumber: { fontSize: 28, fontWeight: '800', color: CARD_DARK, letterSpacing: 1 },
+  accountNumber: { fontSize: 28, fontWeight: '800', color: Colors.heroDark, letterSpacing: 1 },
   accountBank: { fontSize: 14, fontWeight: '600', color: Colors.mid, marginTop: 6 },
   accountName: { fontSize: 12, color: Colors.muted, marginTop: 4 },
   accountHint: { fontSize: 13, color: Colors.muted, lineHeight: 19 },
@@ -1195,7 +1178,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14, borderRadius: 14,
     backgroundColor: '#F5F3FF', borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(124, 58, 237, 0.2)',
   },
-  secondaryBtnText: { fontSize: 14, fontWeight: '700', color: BRAND },
+  secondaryBtnText: { fontSize: 14, fontWeight: '700', color: Colors.primary },
   sentPaymentBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     paddingVertical: 14, borderRadius: 14, marginTop: 4,
@@ -1204,7 +1187,7 @@ const styles = StyleSheet.create({
   },
   sentPaymentBtnText: { fontSize: 14, fontWeight: '700', color: Colors.success },
   linkBtn: { alignItems: 'center', paddingVertical: 8 },
-  linkBtnText: { fontSize: 13, fontWeight: '600', color: BRAND },
+  linkBtnText: { fontSize: 13, fontWeight: '600', color: Colors.primary },
   staticAccountCard: {
     backgroundColor: '#FAFAFE',
     borderRadius: Radius.lg,
@@ -1220,10 +1203,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: '#F5F3FF', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20,
   },
-  staticBankBadgeText: { fontSize: 12, fontWeight: '700', color: BRAND },
+  staticBankBadgeText: { fontSize: 12, fontWeight: '700', color: Colors.primary },
   readyBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   readyBadgeText: { fontSize: 11, fontWeight: '600', color: Colors.success },
-  staticAccountNumber: { fontSize: 24, fontWeight: '800', color: CARD_DARK, letterSpacing: 0.5 },
+  staticAccountNumber: { fontSize: 24, fontWeight: '800', color: Colors.heroDark, letterSpacing: 0.5 },
   staticAccountName: { fontSize: 12, color: Colors.muted },
   staticCopyBtn: { borderRadius: 12, overflow: 'hidden', marginTop: 4 },
   staticCopyBtnInner: {
@@ -1244,7 +1227,7 @@ const styles = StyleSheet.create({
   bvnGateMessage: { fontSize: 14, color: Colors.muted, lineHeight: 21, textAlign: 'center' },
   bvnGatePrimary: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: BRAND, borderRadius: 14, paddingVertical: 15, marginTop: 4,
+    backgroundColor: Colors.primary, borderRadius: 14, paddingVertical: 15, marginTop: 4,
   },
   bvnGatePrimaryText: { fontSize: 15, fontWeight: '700', color: Colors.white },
   bvnGateSecondary: {
@@ -1252,7 +1235,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F3FF', borderRadius: 14, paddingVertical: 15,
     borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(124, 58, 237, 0.25)',
   },
-  bvnGateSecondaryText: { fontSize: 15, fontWeight: '700', color: BRAND },
+  bvnGateSecondaryText: { fontSize: 15, fontWeight: '700', color: Colors.primary },
   bvnGateNote: { fontSize: 12, color: Colors.muted, textAlign: 'center' },
   bankRowWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 6 },
   bankChip: {
@@ -1265,7 +1248,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: Colors.white,
     borderWidth: 1.5,
-    borderColor: BORDER,
+    borderColor: Colors.borderSubtle,
     gap: 10,
     position: 'relative',
     ...Shadow.sm,
@@ -1274,7 +1257,7 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: PAGE_BG,
+    backgroundColor: Colors.pageBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1288,17 +1271,17 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: BRAND,
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   bankChipActive: {
     backgroundColor: '#FAF5FF',
-    borderColor: BRAND,
+    borderColor: Colors.primary,
     ...Shadow.md,
   },
   bankChipText: { fontSize: 13, fontWeight: '600', color: Colors.mid, textAlign: 'center' },
-  bankChipTextActive: { color: BRAND },
+  bankChipTextActive: { color: Colors.primary },
   dynamicHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   expiryBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
@@ -1306,12 +1289,8 @@ const styles = StyleSheet.create({
   },
   expiryText: { fontSize: 11, fontWeight: '600', color: Colors.warningDark },
   footer: {
-    paddingHorizontal: Spacing.page,
-    paddingTop: 14,
-    backgroundColor: Colors.white,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: BORDER,
-    ...Shadow.sm,
+    borderTopColor: Colors.borderSubtle,
   },
   cta: {
     flexDirection: 'row',

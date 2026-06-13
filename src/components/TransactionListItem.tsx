@@ -5,7 +5,8 @@ import { formatCurrencyVisible } from '../lib/api';
 import { BankLogo } from './BankLogo';
 import { resolveTransferBankForDisplay } from '../lib/transfer-banks';
 import { getProviderLogo } from '../lib/providers';
-import { Colors, Radius, Shadow } from '../theme';
+import { Colors, Radius } from '../theme';
+import { GlassCard } from './ui/GlassCard';
 import {
   enrichTransaction,
   getAmountPresentation,
@@ -102,21 +103,37 @@ export function TransactionListItem({
     </>
   );
 
-  const rowStyle = [
-    styles.row,
-    embedded ? styles.rowEmbedded : styles.rowCard,
-    embedded && !isLast && styles.rowEmbeddedBorder,
-  ];
+  if (embedded) {
+    const rowStyle = [
+      styles.row,
+      styles.rowEmbedded,
+      !isLast && styles.rowEmbeddedBorder,
+    ];
+    if (onPress) {
+      return (
+        <Pressable style={rowStyle} onPress={onPress}>
+          {content}
+        </Pressable>
+      );
+    }
+    return <View style={rowStyle}>{content}</View>;
+  }
+
+  const card = (
+    <GlassCard borderRadius={Radius.lg} padding={14} style={styles.rowCardShell} contentStyle={styles.row}>
+      {content}
+    </GlassCard>
+  );
 
   if (onPress) {
     return (
-      <Pressable style={rowStyle} onPress={onPress}>
-        {content}
+      <Pressable onPress={onPress}>
+        {card}
       </Pressable>
     );
   }
 
-  return <View style={rowStyle}>{content}</View>;
+  return card;
 }
 
 const styles = StyleSheet.create({
@@ -125,19 +142,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  rowCard: {
-    backgroundColor: Colors.white,
-    borderRadius: Radius.lg,
-    padding: 14,
+  rowCardShell: {
     marginBottom: 8,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(15, 23, 42, 0.06)',
-    ...Shadow.xs,
   },
   rowEmbedded: {
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    backgroundColor: Colors.white,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: 'transparent',
   },
   rowEmbeddedBorder: {
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -158,8 +169,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   body: { flex: 1, gap: 3 },
-  title: { fontSize: 14, fontWeight: '700', color: Colors.dark },
-  subtitle: { fontSize: 11, color: Colors.muted, fontWeight: '500', lineHeight: 15 },
+  title: { fontSize: 14, fontWeight: '600', color: Colors.dark, letterSpacing: -0.2 },
+  subtitle: { fontSize: 12, color: Colors.muted, fontWeight: '400', lineHeight: 16 },
   right: { alignItems: 'flex-end', gap: 4 },
   amount: { fontSize: 14, fontWeight: '800' },
   statusBadge: {

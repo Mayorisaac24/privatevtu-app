@@ -30,9 +30,11 @@ import {
   getTransactionVisual,
 } from '../lib/transaction-display';
 import { showToast } from '../components/ui/Toast';
-
-const PAGE_BG = '#F4F5FA';
-const BORDER = 'rgba(15, 23, 42, 0.08)';
+import { ThemedScreen } from '../components/ui/ThemedScreen';
+import { useGradients } from '../theme/hooks';
+import { gradientStops } from '../theme/gradient-utils';
+import { GlassCard } from '../components/ui/GlassCard';
+import { GlassSurface } from '../components/ui/GlassSurface';
 const TIMELINE_BRAND = Colors.primary;
 const TIMELINE_BRAND_RING = 'rgba(124, 58, 237, 0.2)';
 const TIMELINE_BRAND_LINE = Colors.primaryLight;
@@ -67,17 +69,21 @@ function formatPaymentMethod(type: string): string {
   }
 }
 
-function getHeroGradient(tone: ReturnType<typeof getStatusMeta>['tone'], isFunding: boolean): string[] {
-  if (isFunding && tone === 'successful') return [...Gradients.success];
+function getHeroGradient(
+  tone: ReturnType<typeof getStatusMeta>['tone'],
+  isFunding: boolean,
+  gradients: ReturnType<typeof useGradients>,
+): string[] {
+  if (isFunding && tone === 'successful') return [...gradients.success];
   switch (tone) {
     case 'successful':
-      return [...Gradients.card];
+      return [...gradients.card];
     case 'failed':
-      return ['#7F1D1D', '#B91C1C', '#EF4444'];
+      return [...gradients.buttonDanger];
     case 'processing':
-      return ['#3730A3', '#5B21B6', '#7C3AED'];
+      return [...gradients.primary];
     default:
-      return ['#5B21B6', '#7C3AED', '#8B5CF6'];
+      return [...gradients.cardSoft];
   }
 }
 
@@ -188,7 +194,7 @@ function TransactionDetailSkeleton({ topInset }: { topInset: number }) {
     <View style={styles.skeletonWrap}>
       <Skeleton width="100%" height={220 + topInset} borderRadius={0} />
       <View style={styles.skeletonBody}>
-        <View style={styles.sectionCard}>
+        <GlassCard borderRadius={Radius.xl} padding={18} contentStyle={styles.sectionCard}>
           <Skeleton width="30%" height={14} />
           {[1, 2, 3].map((i) => (
             <View key={i} style={styles.skeletonTimelineRow}>
@@ -199,8 +205,8 @@ function TransactionDetailSkeleton({ topInset }: { topInset: number }) {
               </View>
             </View>
           ))}
-        </View>
-        <View style={styles.sectionCard}>
+        </GlassCard>
+        <GlassCard borderRadius={Radius.xl} padding={18} contentStyle={styles.sectionCard}>
           <Skeleton width="28%" height={14} />
           {[1, 2, 3, 4].map((i) => (
             <View key={i} style={{ gap: 6, marginTop: 14 }}>
@@ -208,7 +214,7 @@ function TransactionDetailSkeleton({ topInset }: { topInset: number }) {
               <Skeleton width="75%" height={12} />
             </View>
           ))}
-        </View>
+        </GlassCard>
       </View>
     </View>
   );
@@ -265,6 +271,7 @@ function SectionHeader({ icon, title }: { icon: keyof typeof Ionicons.glyphMap; 
 
 export default function TransactionDetailScreen({ id }: Props) {
   const insets = useSafeAreaInsets();
+  const gradients = useGradients();
   const [transaction, setTransaction] = useState<Transaction | null>(() => findCachedTransaction(id));
   const [loadingDetail, setLoadingDetail] = useState(() => !findCachedTransaction(id));
 
@@ -315,7 +322,12 @@ export default function TransactionDetailScreen({ id }: Props) {
   }, [tx]);
 
   const header = (
-    <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+    <GlassSurface
+      variant="light"
+      borderRadius={0}
+      style={styles.headerShell}
+      contentStyle={{ ...styles.header, paddingTop: insets.top + 8 }}
+    >
       <Pressable style={styles.headerBtn} onPress={() => router.back()}>
         <Ionicons name="chevron-back" size={22} color={Colors.dark} />
       </Pressable>
@@ -328,21 +340,21 @@ export default function TransactionDetailScreen({ id }: Props) {
         <Ionicons name="share-outline" size={16} color={tx ? Colors.primary : Colors.mutedLight} />
         <Text style={[styles.shareText, !tx && styles.shareTextDisabled]}>Share</Text>
       </Pressable>
-    </View>
+    </GlassSurface>
   );
 
   if (loadingDetail && !tx) {
     return (
-      <View style={styles.root}>
+      <ThemedScreen>
         {header}
         <TransactionDetailSkeleton topInset={insets.top} />
-      </View>
+      </ThemedScreen>
     );
   }
 
   if (!tx) {
     return (
-      <View style={[styles.root, styles.centered]}>
+      <ThemedScreen style={styles.centered}>
         {header}
         <View style={styles.emptyState}>
           <View style={styles.emptyIcon}>
@@ -354,7 +366,7 @@ export default function TransactionDetailScreen({ id }: Props) {
             <Text style={styles.backLinkText}>Go back</Text>
           </Pressable>
         </View>
-      </View>
+      </ThemedScreen>
     );
   }
 
@@ -376,7 +388,7 @@ export default function TransactionDetailScreen({ id }: Props) {
     || readMetaString(tx.metadata, 'accountName')
     || tx.displayTitle
     || 'Recipient';
-  const heroGradient = getHeroGradient(statusMeta.tone, isFunding);
+  const heroGradient = getHeroGradient(statusMeta.tone, isFunding, gradients);
   const detailRows: Array<{
     label: string;
     value: string;
@@ -399,7 +411,7 @@ export default function TransactionDetailScreen({ id }: Props) {
   }
 
   return (
-    <View style={styles.root}>
+    <ThemedScreen>
       {header}
 
       <ScrollView
@@ -407,7 +419,7 @@ export default function TransactionDetailScreen({ id }: Props) {
         showsVerticalScrollIndicator={false}
       >
         <LinearGradient
-          colors={heroGradient as [string, string, ...string[]]}
+          colors={gradientStops(heroGradient)}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.heroGradient}
@@ -439,7 +451,7 @@ export default function TransactionDetailScreen({ id }: Props) {
         </LinearGradient>
 
         <View style={styles.bodyStack}>
-          <View style={styles.sectionCard}>
+          <GlassCard borderRadius={Radius.xl} padding={18} contentStyle={styles.sectionCard}>
             <SectionHeader icon="git-network-outline" title="Status" />
             <TimelineStep
               title="Initiated"
@@ -479,9 +491,9 @@ export default function TransactionDetailScreen({ id }: Props) {
               accentColor={TIMELINE_BRAND}
               isLast
             />
-          </View>
+          </GlassCard>
 
-          <View style={styles.sectionCard}>
+          <GlassCard borderRadius={Radius.xl} padding={18} contentStyle={styles.sectionCard}>
             <SectionHeader icon="document-text-outline" title="Details" />
 
             {isTransfer ? (
@@ -537,25 +549,25 @@ export default function TransactionDetailScreen({ id }: Props) {
                 isLast={index === detailRows.length - 1}
               />
             ))}
-          </View>
+          </GlassCard>
         </View>
       </ScrollView>
-    </View>
+    </ThemedScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: PAGE_BG },
   centered: { justifyContent: 'center' },
+  headerShell: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.border,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.page,
     paddingBottom: 12,
-    backgroundColor: Colors.white,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
   },
   headerBtn: {
     width: 40,
@@ -683,12 +695,7 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   sectionCard: {
-    backgroundColor: Colors.white,
-    borderRadius: Radius.xl,
-    padding: 18,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: BORDER,
-    ...Shadow.card,
+    gap: 0,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -713,7 +720,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
     backgroundColor: Colors.surface,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: BORDER,
+    borderColor: Colors.borderSubtle,
   },
   recipientLogo: {
     width: 52,

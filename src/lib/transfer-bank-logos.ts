@@ -23,6 +23,7 @@ export const TRANSFER_BANK_LOGO_PROVIDER_CODES: Record<string, string> = {
   '000012': '000012',
   '000008': '000008',
   '120001': '120001',
+  '090175': '090175',
 };
 
 function buildLogoUrl(providerCode: string): string {

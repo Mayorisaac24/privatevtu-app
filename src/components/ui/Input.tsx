@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import {
-  View, TextInput, Text, TouchableOpacity, ViewStyle, TextStyle, TextInputProps,
+  View, TextInput, TouchableOpacity, ViewStyle, TextStyle, TextInputProps,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Radius, Typography } from '../../theme';
+import { AppText } from './AppText';
+import { FIELD_HEIGHT, mergeInputStyle, platformSpacing } from '../../lib/platform-ui';
 
 interface InputProps extends TextInputProps {
   label?: string;
@@ -26,15 +28,12 @@ export function Input({
   const borderColor = error ? Colors.error : focused ? Colors.primary : Colors.border;
 
   return (
-    <View style={[{ marginBottom: 16 }, containerStyle]}>
-      {label && (
-        <Text style={{
-          ...Typography.smallMed,
-          color: Colors.mid,
-          marginBottom: 7,
-          fontWeight: '600',
-        }}>{label}</Text>
-      )}
+    <View style={[{ marginBottom: platformSpacing(16) }, containerStyle]}>
+      {label ? (
+        <AppText variant="captionMed" style={{ color: Colors.muted, marginBottom: 7, fontWeight: '500' }}>
+          {label}
+        </AppText>
+      ) : null}
       <View style={{
         flexDirection: 'row', alignItems: 'center',
         borderWidth: focused ? 2 : 1.5,
@@ -42,31 +41,32 @@ export function Input({
         borderRadius: Radius.md,
         backgroundColor: focused ? Colors.white : Colors.surface,
         paddingHorizontal: 14,
-        height: 52,
+        minHeight: FIELD_HEIGHT,
       }}>
-        {leftIcon && <View style={{ marginRight: 10 }}>{leftIcon}</View>}
+        {leftIcon ? <View style={{ marginRight: 10 }}>{leftIcon}</View> : null}
         <TextInput
-          style={[{ flex: 1, fontSize: 15, color: Colors.dark, paddingVertical: 0 }, inputStyle]}
+          style={mergeInputStyle({ flex: 1, fontSize: 15, color: Colors.dark, ...(inputStyle as object) })}
           placeholderTextColor={Colors.mutedLight}
+          underlineColorAndroid="transparent"
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           secureTextEntry={isPassword && !showPw}
           {...props}
         />
-        {isPassword && (
+        {isPassword ? (
           <TouchableOpacity onPress={() => setShowPw(!showPw)} style={{ padding: 4 }}>
             <Ionicons name={showPw ? 'eye-off-outline' : 'eye-outline'} size={18} color={Colors.muted} />
           </TouchableOpacity>
-        )}
-        {rightIcon && !isPassword && <View>{rightIcon}</View>}
+        ) : null}
+        {rightIcon && !isPassword ? <View>{rightIcon}</View> : null}
       </View>
       {error ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5 }}>
           <Ionicons name="alert-circle-outline" size={12} color={Colors.error} />
-          <Text style={{ ...Typography.caption, color: Colors.error }}>{error}</Text>
+          <AppText variant="caption" style={{ color: Colors.error }}>{error}</AppText>
         </View>
       ) : hint ? (
-        <Text style={{ ...Typography.caption, color: Colors.muted, marginTop: 5 }}>{hint}</Text>
+        <AppText variant="caption" style={{ color: Colors.muted, marginTop: 5 }}>{hint}</AppText>
       ) : null}
     </View>
   );
