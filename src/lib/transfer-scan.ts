@@ -1,6 +1,5 @@
 import { ActionSheetIOS, Alert, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import TextRecognition from '@react-native-ml-kit/text-recognition';
 import type { Bank } from './api';
 import { parseTransferDetailsFromText, type TransferOcrResult } from './transfer-ocr';
 
@@ -41,9 +40,8 @@ async function pickImage(source: ScanSource): Promise<string | null> {
   return result.assets[0].uri;
 }
 
-async function recognizeTextFromUri(uri: string): Promise<string> {
-  const result = await TextRecognition.recognize(uri);
-  return result.text || '';
+async function recognizeTextFromUri(_uri: string): Promise<string> {
+  throw new Error('Account scanning is temporarily unavailable in this build.');
 }
 
 export async function scanTransferDetails(
