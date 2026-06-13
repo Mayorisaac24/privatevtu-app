@@ -7,7 +7,7 @@
     "icon": "./assets/icon.png",
     "scheme": "privatevtu",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "statusBar": {
       "style": "dark",
       "backgroundColor": "#FFFFFF"
