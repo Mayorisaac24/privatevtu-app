@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, Fragment } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -60,10 +60,33 @@ export function ServicePurchaseCard({ children, style }: ServicePurchaseCardProp
 type ServiceStepProgressProps = {
   activeIndex: number;
   labels: string[];
+  variant?: 'default' | 'hero';
 };
 
-export function ServiceStepProgress({ activeIndex, labels }: ServiceStepProgressProps) {
+export function ServiceStepProgress({ activeIndex, labels, variant = 'default' }: ServiceStepProgressProps) {
   const colors = useColors();
+
+  if (variant === 'hero') {
+    return (
+      <View style={styles.heroStepRow}>
+        {labels.map((label, index) => {
+          const active = index === activeIndex;
+          const last = index === labels.length - 1;
+
+          return (
+            <Fragment key={label}>
+              <View style={[styles.heroStepPill, active && styles.heroStepPillActive]}>
+                <Text style={[styles.heroStepText, active && styles.heroStepTextActive]}>
+                  {index + 1}. {label}
+                </Text>
+              </View>
+              {!last ? <View style={styles.heroStepLine} /> : null}
+            </Fragment>
+          );
+        })}
+      </View>
+    );
+  }
 
   return (
     <View style={styles.progressTrack}>
@@ -273,6 +296,34 @@ const styles = StyleSheet.create({
     height: 2,
     marginHorizontal: 8,
     borderRadius: 1,
+  },
+  heroStepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 18,
+    gap: 8,
+  },
+  heroStepPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  heroStepPillActive: {
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+  heroStepText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.55)',
+  },
+  heroStepTextActive: {
+    color: Colors.white,
+  },
+  heroStepLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.15)',
   },
   cta: {
     borderRadius: Radius.lg,

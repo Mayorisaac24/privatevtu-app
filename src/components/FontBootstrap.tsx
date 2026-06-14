@@ -1,6 +1,7 @@
 import { ReactNode, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
+import { Ionicons } from '@expo/vector-icons';
 import {
   useFonts,
   Inter_400Regular,
@@ -20,6 +21,7 @@ type FontBootstrapProps = {
 
 export function FontBootstrap({ children }: FontBootstrapProps) {
   const [loaded, error] = useFonts({
+    ...Ionicons.font,
     Inter_400Regular,
     Inter_500Medium,
     Inter_600SemiBold,
