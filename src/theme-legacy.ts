@@ -1,6 +1,9 @@
 // Layout tokens + typography — theme-independent sizing & fonts
 import { Platform, type ViewStyle } from 'react-native';
 import { platformShadow, platformText } from './lib/platform-ui';
+import { FontFamily, Radius, Spacing } from './theme/layout-tokens';
+
+export { FontFamily, Radius, Spacing };
 
 function type(style: import('react-native').TextStyle): import('react-native').TextStyle {
   const weight = style.fontWeight ?? '400';
@@ -15,34 +18,6 @@ function type(style: import('react-native').TextStyle): import('react-native').T
           : FontFamily.regular;
   return platformText({ fontFamily, ...style });
 }
-
-export const FontFamily = {
-  regular: 'Inter_400Regular',
-  medium: 'Inter_500Medium',
-  semibold: 'Inter_600SemiBold',
-  bold: 'Inter_700Bold',
-  extrabold: 'Inter_800ExtraBold',
-} as const;
-
-export const Spacing = {
-  xs: 4,
-  sm: 8,
-  md: 16,
-  lg: 24,
-  xl: 32,
-  xxl: 48,
-  page: 20,
-} as const;
-
-export const Radius = {
-  xs: 6,
-  sm: 10,
-  md: 14,
-  lg: 18,
-  xl: 24,
-  xxl: 32,
-  full: 9999,
-} as const;
 
 export const Shadow = {
   xs: platformShadow('xs'),
@@ -79,5 +54,3 @@ export const Typography = {
 
 /** @deprecated Use Colors.heroDark from useColors() */
 export const HERO_DARK = '#1A0A3C';
-
-export { useLayout, useGridTileWidth, textStyle, platformText, platformShadow } from './lib/platform-ui';

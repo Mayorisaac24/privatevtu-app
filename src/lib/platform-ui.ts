@@ -5,7 +5,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
-import { Spacing } from '../theme';
+import { Spacing } from '../theme/layout-tokens';
 
 export const isAndroid = Platform.OS === 'android';
 export const isIOS = Platform.OS === 'ios';

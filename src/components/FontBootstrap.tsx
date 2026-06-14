@@ -1,6 +1,7 @@
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
+import * as Font from 'expo-font';
 import { Ionicons } from '@expo/vector-icons';
 import {
   useFonts,
@@ -20,8 +21,8 @@ type FontBootstrapProps = {
 };
 
 export function FontBootstrap({ children }: FontBootstrapProps) {
-  const [loaded, error] = useFonts({
-    ...Ionicons.font,
+  const [iconsReady, setIconsReady] = useState(false);
+  const [interLoaded, interError] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
     Inter_600SemiBold,
@@ -30,12 +31,29 @@ export function FontBootstrap({ children }: FontBootstrapProps) {
   });
 
   useEffect(() => {
-    if (loaded || error) {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        await Ionicons.loadFont();
+      } catch {
+        await Font.loadAsync(Ionicons.font);
+      }
+      if (!cancelled) setIconsReady(true);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (iconsReady && (interLoaded || interError)) {
       SplashScreen.hideAsync().catch(() => {});
     }
-  }, [loaded, error]);
+  }, [iconsReady, interLoaded, interError]);
 
-  if (!loaded && !error) {
+  if (!iconsReady) {
     return (
       <View style={styles.boot}>
         <AppLogo size={168} />

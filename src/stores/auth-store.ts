@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import * as SecureStore from 'expo-secure-store';
 import type { User } from '../lib/api';
-import { resetDashboardCache } from '../lib/dashboard-data';
 import { resetTransferConfigCache } from '../lib/transfer-config-cache';
 import { resetWalletFundingCache } from '../lib/wallet-funding-cache';
 import { resetKycStatusCache } from '../lib/kyc-status-cache';
@@ -63,6 +62,7 @@ export const useAuthStore = create<AuthState>()(
         await secureStorage.removeItem('refreshToken');
         useWalletStore.getState().resetWalletData();
         useServiceAvailabilityStore.getState().reset();
+        const { resetDashboardCache } = await import('../lib/dashboard-data');
         resetDashboardCache();
         resetTransferConfigCache();
         resetWalletFundingCache();
