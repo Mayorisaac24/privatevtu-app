@@ -18,6 +18,7 @@ import {
   getHomeLastUpdated,
   pullToRefreshHome,
   refreshHomeInsights,
+  refreshWalletFundingData,
 } from '../lib/dashboard-data';
 import { useWalletStore } from '../stores';
 import { useTabContext } from '../stores/tab-context';
@@ -41,8 +42,7 @@ import { GlassCard } from '../components/ui/GlassCard';
 import { ScreenBody } from '../components/ui/ScreenBody';
 import { useLayout } from '../lib/platform-ui';
 
-const WALLET_TX_TYPES = new Set(['WALLET_FUND', 'TRANSFER', 'WITHDRAWAL']);
-
+const WALLET_FUNDING_PAGE_SIZE = 6;
 function getBalanceParts(kobo: string) {
   const raw = formatCurrency(kobo).replace('₦', '').trim();
   const [whole, decimal = '00'] = raw.split('.');
@@ -174,7 +174,7 @@ export default function WalletScreen() {
     toggleBalanceVisible,
     dataHydrated,
     dashboardVersion,
-    homeTransactions,
+    walletFundingTransactions,
   } = useWalletStore();
   const [refreshing, setRefreshing] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
@@ -190,15 +190,15 @@ export default function WalletScreen() {
 
   const walletActivity = useMemo(
     () =>
-      dedupeTransactionsForDisplay(homeTransactions)
-        .filter((tx) => WALLET_TX_TYPES.has(String(tx.type || '').toUpperCase()))
+      dedupeTransactionsForDisplay(walletFundingTransactions)
         .map((tx) => enrichTransaction(tx))
-        .slice(0, 4),
-    [homeTransactions, dashboardVersion],
+        .slice(0, WALLET_FUNDING_PAGE_SIZE),
+    [walletFundingTransactions, dashboardVersion],
   );
 
   useEffect(() => {
     void refreshHomeInsights();
+    void refreshWalletFundingData();
   }, []);
 
   const onRefresh = useCallback(async () => {
@@ -339,7 +339,7 @@ export default function WalletScreen() {
 
         <View style={styles.activitySection}>
           <View style={styles.activityHeader}>
-            <Text style={styles.activityTitle}>Recent activity</Text>
+            <Text style={styles.activityTitle}>Recent funding</Text>
             <TouchableOpacity onPress={() => setTab('history')} activeOpacity={0.7} hitSlop={8}>
               <Text style={styles.activityLink}>View all</Text>
             </TouchableOpacity>
@@ -357,7 +357,7 @@ export default function WalletScreen() {
               </View>
               <Text style={styles.emptyTitle}>Nothing here yet</Text>
               <Text style={styles.emptySub}>
-                Top-ups and bank transfers will show up in this list.
+                Wallet top-ups and credits will show up in this list.
               </Text>
             </GlassCard>
           ) : (

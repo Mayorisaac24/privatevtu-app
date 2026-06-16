@@ -40,6 +40,9 @@ interface WalletState {
 
   // Recent transactions shown on home (kept separate from history)
   homeTransactions: ServiceTransaction[];
+
+  // Wallet funding credits shown on the wallet screen
+  walletFundingTransactions: ServiceTransaction[];
   
   // Loading state
   isLoading: boolean;
@@ -58,6 +61,7 @@ interface WalletState {
   
   setTransactions: (transactions: ServiceTransaction[]) => void;
   setHomeTransactions: (transactions: ServiceTransaction[]) => void;
+  setWalletFundingTransactions: (transactions: ServiceTransaction[]) => void;
   addTransaction: (transaction: ServiceTransaction) => void;
   updateTransaction: (id: string, updates: Partial<ServiceTransaction>) => void;
   
@@ -76,6 +80,7 @@ export const useWalletStore = create<WalletState>((set) => ({
   ledger: [],
   transactions: [],
   homeTransactions: [],
+  walletFundingTransactions: [],
   isLoading: false,
   isLoadingTransactions: false,
   dataHydrated: false,
@@ -91,6 +96,7 @@ export const useWalletStore = create<WalletState>((set) => ({
   
   setTransactions: (transactions) => set({ transactions }),
   setHomeTransactions: (homeTransactions) => set({ homeTransactions }),
+  setWalletFundingTransactions: (walletFundingTransactions) => set({ walletFundingTransactions }),
   addTransaction: (transaction) =>
     set((state) => ({ transactions: [transaction, ...state.transactions] })),
   updateTransaction: (id, updates) =>
@@ -113,6 +119,7 @@ export const useWalletStore = create<WalletState>((set) => ({
       ledger: [],
       transactions: [],
       homeTransactions: [],
+      walletFundingTransactions: [],
       dataHydrated: false,
       historyHydrated: false,
       dashboardVersion: 0,

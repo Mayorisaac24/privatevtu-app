@@ -19,6 +19,7 @@ import { refreshUserProfile } from './profile-sync';
 
 const HOME_RECENT_LIMIT = 5;
 const HISTORY_PAGE_SIZE = 50;
+const WALLET_FUNDING_PAGE_SIZE = 20;
 const STATS_SAMPLE_SIZE = 30;
 
 const EMPTY_INSIGHTS: MonthlyInsights = { moneyIn: 0n, moneyOut: 0n, inCount: 0, outCount: 0 };
@@ -53,7 +54,8 @@ let homeLastUpdated: Date | null = null;
 let dashboardInflight: Promise<void> | null = null;
 let historyInflight: Promise<void> | null = null;
 let insightsInflight: Promise<void> | null = null;
-let statsInflight: Promise<void> | null = null;
+let walletFundingInflight: Promise<void> | null = null;
+let walletFundingFetchedAt: number | null = null;
 let prefetchInflight: Promise<void> | null = null;
 let dashboardFetchedAt: number | null = null;
 let historyFetchedAt: number | null = null;
@@ -199,13 +201,43 @@ export async function refreshHomeDashboardStats(options?: { force?: boolean }): 
   return statsInflight;
 }
 
+export async function refreshWalletFundingData(options?: { force?: boolean }): Promise<void> {
+  const force = Boolean(options?.force);
+  const isFresh = walletFundingFetchedAt && Date.now() - walletFundingFetchedAt < STALE_MS;
+  if (!force && isFresh) return;
+  if (!force && walletFundingInflight) return walletFundingInflight;
+
+  walletFundingInflight = (async () => {
+    const { setWalletFundingTransactions, bumpDashboardVersion } = useWalletStore.getState();
+
+    try {
+      const txRes = await api.getTransactions(1, WALLET_FUNDING_PAGE_SIZE, {
+        category: 'wallet_funding',
+      });
+      if (isResponseSuccess(txRes)) {
+        setWalletFundingTransactions(txRes.data?.transactions ?? []);
+        walletFundingFetchedAt = Date.now();
+        bumpDashboardVersion();
+      }
+    } catch {
+      // Keep cached values on failure.
+    } finally {
+      walletFundingInflight = null;
+    }
+  })();
+
+  return walletFundingInflight;
+}
+
 export async function pullToRefreshHome(): Promise<void> {
   dashboardInflight = null;
   dashboardFetchedAt = null;
   insightsFetchedAt = null;
+  walletFundingFetchedAt = null;
   await Promise.allSettled([
     fetchHomeSnapshot(),
     refreshHomeInsights({ force: true }),
+    refreshWalletFundingData({ force: true }),
   ]);
 }
 
@@ -271,6 +303,7 @@ export async function refreshHistoryData(options?: { force?: boolean; priority?:
       historyFetchedAt = Date.now();
       setHistoryHydrated(true);
       bumpDashboardVersion();
+      void refreshWalletFundingData({ force });
     } catch {
       // Keep cached values on failure.
     } finally {
@@ -289,12 +322,14 @@ export function resetDashboardCache(): void {
   historyInflight = null;
   insightsInflight = null;
   statsInflight = null;
+  walletFundingInflight = null;
   prefetchInflight = null;
   historyPreloadStarted = false;
   dashboardFetchedAt = null;
   historyFetchedAt = null;
   insightsFetchedAt = null;
   statsFetchedAt = null;
+  walletFundingFetchedAt = null;
 }
 
 export async function prefetchAppData(): Promise<void> {
@@ -322,6 +357,7 @@ export async function prefetchAppData(): Promise<void> {
     void Promise.allSettled([
       useServiceAvailabilityStore.getState().refresh({ force: true }),
       refreshHomeInsights(),
+      refreshWalletFundingData(),
     ]);
 
     preloadHistoryData();

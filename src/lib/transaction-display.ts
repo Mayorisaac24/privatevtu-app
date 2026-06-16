@@ -42,6 +42,7 @@ const TYPE_META: Record<string, Omit<TxDisplayMeta, 'isCredit'>> = {
   TRANSFER: { icon: 'paper-plane-outline', label: 'Transfer', ...BRAND_TX_ICON },
   WITHDRAWAL: { icon: 'paper-plane-outline', label: 'Bank Transfer', ...BRAND_TX_ICON },
   WALLET_FUND: { icon: 'wallet-outline', label: 'Wallet Funding', ...BRAND_TX_ICON },
+  ADMIN_CREDIT: { icon: 'wallet-outline', label: 'Wallet Funding', ...BRAND_TX_ICON },
   EDUCATION: { icon: 'school-outline', label: 'Education', ...BRAND_TX_ICON },
 };
 
@@ -56,7 +57,7 @@ function normalizeStatus(status?: string): DisplayStatus {
 function normalizeCategory(type: string): string {
   const normalized = String(type || '').toUpperCase();
   if (['AIRTIME', 'DATA', 'ELECTRICITY', 'CABLE'].includes(normalized)) return 'services';
-  if (normalized === 'WALLET_FUND') return 'wallet_funding';
+  if (normalized === 'WALLET_FUND' || normalized === 'ADMIN_CREDIT') return 'wallet_funding';
   if (['WITHDRAWAL', 'TRANSFER'].includes(normalized)) return 'transfer';
   return 'other';
 }
@@ -90,7 +91,7 @@ export function enrichTransaction(tx: Transaction): EnrichedTransaction {
       displayTitle = 'Electricity payment';
     } else if (txType === 'CABLE') {
       displayTitle = network ? `${network} Cable TV` : 'Cable TV payment';
-    } else if (txType === 'WALLET_FUND') {
+    } else if (txType === 'WALLET_FUND' || txType === 'ADMIN_CREDIT') {
       displayTitle = 'Wallet funding';
     } else {
       displayTitle = txType.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
@@ -130,7 +131,7 @@ export function enrichTransaction(tx: Transaction): EnrichedTransaction {
     }
   }
 
-  const isCredit = txType === 'WALLET_FUND' || Boolean(tx.isCredit);
+  const isCredit = txType === 'WALLET_FUND' || txType === 'ADMIN_CREDIT' || Boolean(tx.isCredit);
 
   return {
     ...tx,
@@ -157,7 +158,7 @@ export function getTransactionMeta(tx: Transaction): TxDisplayMeta {
   return {
     ...base,
     label: enriched.displayTitle || base.label,
-    isCredit: enriched.type === 'WALLET_FUND' || Boolean(enriched.isCredit),
+    isCredit: enriched.type === 'WALLET_FUND' || enriched.type === 'ADMIN_CREDIT' || Boolean(enriched.isCredit),
   };
 }
 
@@ -191,7 +192,7 @@ export function getTransactionDetailLine(tx: EnrichedTransaction): string {
 
 export function getAmountPresentation(tx: EnrichedTransaction): { prefix: '+' | '-'; color: string } {
   const status = normalizeStatus(tx.displayStatus || tx.status);
-  const isFunding = tx.type === 'WALLET_FUND';
+  const isFunding = tx.type === 'WALLET_FUND' || tx.type === 'ADMIN_CREDIT';
   const prefix: '+' | '-' = isFunding || tx.isCredit ? '+' : '-';
   if (status === 'failed') return { prefix, color: Colors.error };
   if (isFunding) return { prefix, color: Colors.success };
