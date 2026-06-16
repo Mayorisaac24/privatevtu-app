@@ -333,7 +333,7 @@ export default function ProfileScreen() {
 
       <View style={styles.footer}>
         <Ionicons name="lock-closed" size={12} color={Colors.muted} />
-        <Text style={styles.footerText}>PrivateVTU v1.0.0 · Secured & NDPR compliant</Text>
+        <Text style={styles.footerText}>DataMartNG v1.0.0 · Secured & NDPR compliant</Text>
       </View>
       </ScreenBody>
       </ScrollView>

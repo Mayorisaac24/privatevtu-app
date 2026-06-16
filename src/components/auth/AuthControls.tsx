@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Radius, Shadow, Typography } from '../../theme';
-import { isAndroid, platformSpacing } from '../../lib/platform-ui';
+import { isAndroid, platformSpacing, AUTH_SEGMENT_HEIGHT } from '../../lib/platform-ui';
 import { GradientButton } from '../ui/GradientButton';
 
 
@@ -96,7 +96,6 @@ export function AuthGradientButton({
       loadingLabel={loadingLabel}
       leftIcon={icon}
       style={style}
-      gradientStyle={styles.btnGradient}
     />
   );
 }
@@ -161,20 +160,21 @@ const styles = StyleSheet.create({
   segmented: {
     flexDirection: 'row',
     backgroundColor: Colors.surface,
-    borderRadius: 18,
-    padding: 5,
-    marginBottom: platformSpacing(24, -2),
+    borderRadius: isAndroid ? 16 : 18,
+    padding: isAndroid ? 4 : 5,
+    marginBottom: platformSpacing(24, -6),
     borderWidth: 1,
     borderColor: Colors.border,
-    gap: 6,
+    gap: isAndroid ? 4 : 6,
   },
   segmentLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: Colors.muted,
     letterSpacing: 0.3,
-    marginBottom: 10,
+    marginBottom: isAndroid ? 8 : 10,
     textTransform: 'uppercase',
+    ...(isAndroid ? { includeFontPadding: false } : null),
   },
   segment: {
     flex: 1,
@@ -183,11 +183,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: isAndroid ? 12 : 13,
-    paddingHorizontal: 10,
-    borderRadius: 14,
-    minHeight: isAndroid ? 48 : 50,
+    gap: isAndroid ? 6 : 8,
+    paddingVertical: isAndroid ? 8 : 13,
+    paddingHorizontal: isAndroid ? 8 : 10,
+    borderRadius: isAndroid ? 12 : 14,
+    minHeight: AUTH_SEGMENT_HEIGHT,
   },
   segmentInnerActive: {
     backgroundColor: Colors.white,
@@ -196,9 +196,9 @@ const styles = StyleSheet.create({
     ...(isAndroid ? { elevation: 1 } : Shadow.sm),
   },
   segmentIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 10,
+    width: isAndroid ? 26 : 30,
+    height: isAndroid ? 26 : 30,
+    borderRadius: isAndroid ? 8 : 10,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
@@ -207,13 +207,13 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryMuted,
   },
   segmentText: {
-    fontSize: 15,
+    fontSize: isAndroid ? 14 : 15,
     fontWeight: '500',
     color: Colors.mutedLight,
     ...(isAndroid ? { includeFontPadding: false } : null),
   },
   segmentTextActive: {
-    fontSize: 15,
+    fontSize: isAndroid ? 14 : 15,
     fontWeight: '700',
     color: Colors.primary,
     ...(isAndroid ? { includeFontPadding: false } : null),
@@ -227,29 +227,10 @@ const styles = StyleSheet.create({
     opacity: 0.72,
     ...(isAndroid ? { elevation: 1 } : Shadow.sm),
   },
-  btnGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: isAndroid ? 16 : 17,
-    paddingHorizontal: 20,
-    minHeight: isAndroid ? 54 : 56,
-  },
-  btnGradientLoading: {
-    opacity: 0.96,
-  },
-  btnText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.white,
-    letterSpacing: 0.2,
-    ...(isAndroid ? { includeFontPadding: false } : null),
-  },
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: isAndroid ? 18 : 22,
+    marginVertical: isAndroid ? 14 : 22,
     gap: 12,
   },
   dividerLine: {

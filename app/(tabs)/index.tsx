@@ -10,6 +10,7 @@ import { ThemedScreen } from '../../src/components/ui/ThemedScreen';
 import { refreshDashboardData, refreshHistoryData, refreshHomeDashboardStats, refreshHomeInsights } from '../../src/lib/dashboard-data';
 import { TabContext } from '../../src/stores/tab-context';
 import { GlassSurface } from '../../src/components/ui/GlassSurface';
+import { useAndroidDoubleBackExit } from '../../src/hooks/useAndroidDoubleBackExit';
 
 import HomeScreen from '../../src/screens/HomeScreen';
 import ServicesScreen from '../../src/screens/ServicesScreen';
@@ -70,6 +71,11 @@ export default function TabNavigator() {
       void refreshHomeInsights();
     }
   }, [activeTab]);
+
+  useAndroidDoubleBackExit(activeTab === 'home', {
+    text1: 'Exit app',
+    text2: 'Swipe back again to leave DataMartNG',
+  });
 
   return (
     <TabContext.Provider value={{ activeTab, setTab: setActiveTab }}>

@@ -69,7 +69,7 @@ export default function PersonalInfoScreen() {
 
   const firstName = user?.firstName || '';
   const lastName = user?.lastName || '';
-  const fullName = `${firstName} ${lastName}`.trim() || 'PrivateVTU User';
+  const fullName = `${firstName} ${lastName}`.trim() || 'DataMartNG User';
 
   useFocusEffect(
     useCallback(() => {

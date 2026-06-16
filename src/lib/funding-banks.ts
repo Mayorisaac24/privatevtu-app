@@ -20,7 +20,7 @@ export function filterDynamicBanks(banks: FundingBank[]): FundingBank[] {
 export function enrichBankLogo(bank: FundingBank): FundingBank {
   const code = normalizeBankCode(bank.code);
   const stored = bank.logoUrl?.trim() || null;
-  const logoUrl = resolveTransferBankLogoUrl(bank.code, null) || stored;
+  const logoUrl = resolveTransferBankLogoUrl(bank.code, stored) || stored;
   return {
     ...bank,
     code,

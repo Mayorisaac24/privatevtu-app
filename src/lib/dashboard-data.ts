@@ -10,6 +10,7 @@ import { preloadTransferBanks } from './transfer-banks-cache';
 import { preloadRecentTransferRecipients } from './transfer-recipients-cache';
 import { preloadNumberPrefixes } from './number-prefix-cache';
 import { preloadServiceCatalog } from './service-catalog-cache';
+import { preloadVtuProviders } from './vtu-providers-cache';
 import { getKycStatusData } from './kyc-status-cache';
 import { preloadTwoFactorMethods, getTwoFactorMethods } from './two-factor-methods-cache';
 import { useServiceAvailabilityStore } from '../stores/service-availability-store';

@@ -37,11 +37,11 @@ export default function ResetPasswordScreen() {
 
   return (
     <AuthShell
-      heroTitle="New password"
       showLogo={false}
-      heroIcon={<AuthHeroIcon icon="key-outline" size={48} />}
+      heroIcon={<AuthHeroIcon icon="key-outline" size={52} />}
     >
       <AuthCardHeader
+        eyebrow="New password"
         title="Set new password"
         subtitle="Choose a strong password you haven't used before"
       />

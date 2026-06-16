@@ -2,14 +2,13 @@ import { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { api, ApiError } from '../src/lib/api';
-import { AppLogo } from '../src/components/ui/AppLogo';
 import {
   isNetworkFailureStatus,
-  isSessionExpiredError,
   isSessionRevoked,
   setSuppressSessionExpiryUi,
 } from '../src/lib/session';
+import { api, ApiError, isSessionExpiredError } from '../src/lib/api';
+import { AppLogo, BOOT_LOGO_SIZE } from '../src/components/ui/AppLogo';
 import { useAuthStore, waitForAuthStoreHydration } from '../src/stores';
 import { ScreenStatusBar } from '../src/hooks/useStatusBarStyle';
 import { Colors } from '../src/theme';
@@ -114,7 +113,7 @@ export default function SplashScreen() {
   return (
     <View style={styles.root}>
       <ScreenStatusBar style="dark" />
-      <AppLogo size={188} />
+      <AppLogo size={BOOT_LOGO_SIZE} />
     </View>
   );
 }

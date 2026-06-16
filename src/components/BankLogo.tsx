@@ -23,6 +23,7 @@ const BRAND_COLORS: Record<string, { bg: string; fg: string; label: string }> = 
   '000221': { bg: '#0F766E', fg: '#FFFFFF', label: 'SB' },
   '090405': { bg: '#2563EB', fg: '#FFFFFF', label: 'MP' },
   '090267': { bg: '#7C3AED', fg: '#FFFFFF', label: 'KD' },
+  '100039': { bg: '#0BA4DB', fg: '#FFFFFF', label: 'PS' },
 };
 
 type Props = {

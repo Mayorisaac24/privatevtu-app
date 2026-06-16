@@ -130,13 +130,13 @@ export default function Verify2FAScreen() {
   return (
     <>
       <AuthShell
-        heroTitle="Two-factor auth"
         onBack={() => router.back()}
         showLogo={false}
         scrollable
-        heroIcon={<AuthHeroIcon icon="shield-checkmark" size={48} />}
+        heroIcon={<AuthHeroIcon icon="shield-checkmark" size={52} />}
       >
         <AuthCardHeader
+          eyebrow="Two-factor auth"
           title="Verification code"
           subtitle={
             twoFactorMethod === 'AUTHENTICATOR'

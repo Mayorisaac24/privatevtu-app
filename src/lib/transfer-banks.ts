@@ -1,6 +1,7 @@
 import type { Bank, FundingBank } from './api';
 import { normalizeBankCode } from './funding-banks';
 import { resolveTransferBankLogoUrl } from './transfer-bank-logos';
+import { peekCachedTransferBanks } from './transfer-banks-cache';
 
 /**
  * Banks shown first in the transfer picker and probed early for account resolve.
@@ -71,6 +72,7 @@ const BANK_SHORT_NAMES: Record<string, string> = {
   '000023': 'Providus',
   '000006': 'Jaiz Bank',
   '000026': 'Taj Bank',
+  '100039': 'Paystack-Titan',
 };
 
 export type TransferBankDisplay = Pick<FundingBank, 'code' | 'name' | 'shortName' | 'logoUrl' | 'logoVersion'>;
@@ -89,11 +91,41 @@ function lookupBankShortName(code: string): string | undefined {
       : undefined);
 }
 
+const PAYSTACK_TITAN_CODE = '100039';
+
+function isPaystackTitanBank(code: string, bankName?: string | null): boolean {
+  const normalizedCode = normalizeTransferBankCode(code);
+  if (normalizedCode === PAYSTACK_TITAN_CODE) return true;
+  return /paystack[-\s]?titan/i.test(String(bankName || '').trim());
+}
+
+function findCachedTransferBank(code: string): Bank | undefined {
+  const normalized = normalizeTransferBankCode(code);
+  const padded = /^\d+$/.test(normalized) && normalized.length < 6
+    ? normalized.padStart(6, '0')
+    : normalized;
+
+  return peekCachedTransferBanks()?.find((bank) => {
+    const bankCode = normalizeTransferBankCode(bank.code);
+    return bankCode === normalized
+      || bankCode === padded
+      || normalizeBankCode(bank.code) === normalizeBankCode(normalized);
+  });
+}
+
 export function resolveTransferBankForDisplay(
   bankCode: string,
   bankName?: string | null,
 ): TransferBankDisplay {
-  const code = normalizeTransferBankCode(bankCode);
+  const code = isPaystackTitanBank(bankCode, bankName)
+    ? PAYSTACK_TITAN_CODE
+    : normalizeTransferBankCode(bankCode);
+
+  const cached = findCachedTransferBank(code);
+  if (cached) {
+    return enrichTransferBank(cached);
+  }
+
   const label = String(bankName || '').trim();
   const isNumericLabel = /^\d+$/.test(label);
   if (label && label !== code && !isNumericLabel) {

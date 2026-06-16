@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Radius, Typography } from '../../theme';
-import { isAndroid, platformInputText } from '../../lib/platform-ui';
+import { isAndroid, platformInputText, AUTH_FIELD_HEIGHT } from '../../lib/platform-ui';
 
 
 interface AuthInputProps extends TextInputProps {
@@ -35,7 +35,7 @@ export function AuthInput({
   };
 
   return (
-    <View style={[{ marginBottom: 20 }, containerStyle]}>
+    <View style={[{ marginBottom: isAndroid ? 16 : 20 }, containerStyle]}>
       {label ? (
         <Text style={styles.label}>{label}</Text>
       ) : null}
@@ -101,8 +101,8 @@ const styles = {
     alignItems: 'center' as const,
     borderRadius: Radius.lg,
     backgroundColor: Colors.surface,
-    paddingHorizontal: 16,
-    minHeight: isAndroid ? 54 : 56,
+    paddingHorizontal: isAndroid ? 14 : 16,
+    minHeight: AUTH_FIELD_HEIGHT,
   },
   fieldFocused: {
     backgroundColor: Colors.white,
@@ -111,9 +111,9 @@ const styles = {
     backgroundColor: Colors.errorLight,
   },
   iconChip: {
-    width: isAndroid ? 34 : 36,
-    height: isAndroid ? 34 : 36,
-    borderRadius: 11,
+    width: isAndroid ? 32 : 36,
+    height: isAndroid ? 32 : 36,
+    borderRadius: isAndroid ? 10 : 11,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
     backgroundColor: Colors.white,
@@ -127,7 +127,7 @@ const styles = {
   },
   input: {
     flex: 1,
-    fontSize: 16,
+    fontSize: isAndroid ? 15 : 16,
     color: Colors.dark,
     paddingVertical: isAndroid ? 0 : 14,
     fontWeight: '500' as const,

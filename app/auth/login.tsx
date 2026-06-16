@@ -6,6 +6,7 @@ import { api } from '../../src/lib/api';
 import { useAuthStore } from '../../src/stores';
 import { showToast } from '../../src/components/ui/Toast';
 import { Colors, Radius } from '../../src/theme';
+import { isAndroid, AUTH_BUTTON_HEIGHT } from '../../src/lib/platform-ui';
 import { registerPushNotifications } from '../../src/lib/push-notifications';
 import { getLoginDeviceId } from '../../src/lib/login-context';
 import {
@@ -253,14 +254,14 @@ export default function LoginScreen() {
           onPress={handleLogin}
           isLoading={isLoading}
           icon={<Ionicons name="log-in-outline" size={18} color={Colors.white} />}
-          style={{ marginTop: 20 }}
+          style={{ marginTop: isAndroid ? 16 : 20 }}
         />
       )}
 
       <AuthDivider />
 
       <AuthFooterLink
-        prefix="New to PrivateVTU?"
+        prefix="New to DataMartNG?"
         linkLabel="Create account"
         onPress={() => router.push('/auth')}
       />
@@ -273,14 +274,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginTop: 20,
+    marginTop: isAndroid ? 16 : 20,
   },
   actionPrimary: {
     flex: 1,
   },
   bioIconBtn: {
-    width: 54,
-    height: 54,
+    width: AUTH_BUTTON_HEIGHT,
+    height: AUTH_BUTTON_HEIGHT,
     borderRadius: Radius.lg,
     borderWidth: 1.5,
     borderColor: 'rgba(124, 58, 237, 0.3)',

@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "PrivateVTU",
-    "slug": "vtu-app",
+    "name": "DataMartNG",
+    "slug": "datamartng",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "scheme": "privatevtu",
+    "scheme": "datamartng",
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
     "statusBar": {
@@ -15,26 +15,35 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#FFFFFF"
+      "backgroundColor": "#FFFFFF",
+      "imageWidth": 168
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.privatevtu.app",
+      "bundleIdentifier": "com.devnex.datamartng",
       "infoPlist": {
         "NSCameraUsageDescription": "Allow camera to scan bank account details from photos",
         "NSPhotoLibraryUsageDescription": "Allow photo library access to scan bank account details",
         "NSContactsUsageDescription": "Allow access to contacts to fill in phone numbers for airtime and data purchases",
         "ITSAppUsesNonExemptEncryption": false,
-        "UIViewControllerBasedStatusBarAppearance": true
-      }
+        "UIViewControllerBasedStatusBarAppearance": false
+      },
+      "appleTeamId": "43UXY4KMDV"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
       },
-      "package": "com.privatevtu.app",
-      "permissions": ["android.permission.CAMERA", "android.permission.READ_CONTACTS"],
+      "package": "com.devnex.datamartng",
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_CONTACTS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.WRITE_CONTACTS",
+        "android.permission.POST_NOTIFICATIONS"
+      ],
       "usesCleartextTraffic": true,
       "softwareKeyboardLayoutMode": "resize"
     },
@@ -44,8 +53,17 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      "expo-dev-client",
       "expo-router",
-      "expo-font",
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/ionicons.ttf"
+          ]
+        }
+      ],
+      "./plugins/with-ionicons-font.js",
       [
         "expo-image-picker",
         {
@@ -76,8 +94,9 @@
         "origin": false
       },
       "eas": {
-        "projectId": "6c380c3b-75de-4a30-bc21-b40f329ca6bd"
+        "projectId": "68bdfda2-9f49-4b2e-b423-1f68131fdb11"
       }
-    }
+    },
+    "owner": "mayorisaac"
   }
 }

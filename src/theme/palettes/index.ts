@@ -29,7 +29,7 @@ export const THEME_DEFINITIONS: ThemeDefinition[] = [
     'violet-light',
     'violet',
     'light',
-    'PrivateVTU Classic',
+    'DataMartNG Classic',
     'Our signature violet fintech look',
     [Palette.violet600, Palette.violet400, Palette.pageBg],
     createVioletLightColors(),

@@ -159,10 +159,11 @@ export function ServiceContinueButton({
       title={label}
       onPress={onPress}
       disabled={disabled}
+      inactive={disabled && !loading}
       isLoading={loading}
-      rightIcon={<Ionicons name={icon} size={18} color={Colors.white} />}
+      size="compact"
+      rightIcon={<Ionicons name={icon} size={17} color={Colors.white} />}
       style={styles.cta}
-      gradientStyle={styles.ctaGradient}
     />
   );
 }
@@ -327,9 +328,7 @@ const styles = StyleSheet.create({
   },
   cta: {
     borderRadius: Radius.lg,
-  },
-  ctaGradient: {
-    paddingVertical: 17,
+    marginTop: 2,
   },
   detectedBadge: {
     flexDirection: 'row',

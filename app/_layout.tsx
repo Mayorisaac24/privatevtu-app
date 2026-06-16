@@ -1,3 +1,4 @@
+import 'react-native-gesture-handler';
 import { View } from 'react-native';
 import { Stack } from 'expo-router';
 import { stackScreenOptions } from '../src/lib/stack-options';

@@ -15,6 +15,7 @@ Notifications.setNotificationHandler({
 
 export async function registerPushNotifications(): Promise<boolean> {
   if (!Device.isDevice) {
+    console.warn('[Push] Skipped — not a physical device');
     return false;
   }
 
@@ -27,12 +28,13 @@ export async function registerPushNotifications(): Promise<boolean> {
   }
 
   if (finalStatus !== 'granted') {
+    console.warn('[Push] Permission not granted:', finalStatus);
     return false;
   }
 
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
-      name: 'PrivateVTU',
+      name: 'DataMartNG',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#7C3AED',
@@ -42,12 +44,15 @@ export async function registerPushNotifications(): Promise<boolean> {
   const projectId = Constants.expoConfig?.extra?.eas?.projectId
     ?? Constants.easConfig?.projectId;
 
-  const tokenResult = await Notifications.getExpoPushTokenAsync(
-    projectId ? { projectId } : undefined,
-  );
+  if (!projectId) {
+    console.error('[Push] Missing EAS projectId in app config');
+    return false;
+  }
 
+  const tokenResult = await Notifications.getExpoPushTokenAsync({ projectId });
   const deviceId = await getStableDeviceId();
-  await api.registerDevice({
+
+  const res = await api.registerDevice({
     deviceId,
     pushToken: tokenResult.data,
     platform: Platform.OS,
@@ -55,6 +60,15 @@ export async function registerPushNotifications(): Promise<boolean> {
     appVersion: Constants.expoConfig?.version,
   });
 
+  if (!res.success) {
+    console.error('[Push] Device registration failed:', res.message);
+    return false;
+  }
+
+  console.log('[Push] Registered token for device', deviceId.slice(0, 8), {
+    projectId,
+    token: tokenResult.data.slice(0, 28) + '…',
+  });
   return true;
 }
 

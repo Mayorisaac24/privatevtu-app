@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "274299190222",
+    "firebase_url": "https://mayor-966a1.firebaseio.com",
+    "project_id": "mayor-966a1",
+    "storage_bucket": "mayor-966a1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:274299190222:android:38f538160f58561996c99f",
+        "android_client_info": {
+          "package_name": "com.devnex.datamartng"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "274299190222-dqd0jicnaju18tp2a2ok234qo09p7int.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC80II-P68Fjhn-vvMW8hDqVmY1X4hpb_4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "274299190222-dqd0jicnaju18tp2a2ok234qo09p7int.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

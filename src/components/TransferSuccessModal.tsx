@@ -471,17 +471,7 @@ const styles = StyleSheet.create({
     marginTop: 'auto',
   },
   doneBtn: {
-    height: 54,
+    minHeight: 54,
     borderRadius: Radius.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    ...Shadow.sm,
-  },
-  doneText: {
-    color: Colors.white,
-    fontSize: 16,
-    fontWeight: '700',
   },
 });

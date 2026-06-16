@@ -57,7 +57,8 @@ export function GlassSurface({
 }: GlassSurfaceProps) {
   const preset = VARIANTS[variant];
   const blurIntensity = intensity ?? preset.intensity;
-  const useBlur = preset.blur && blurIntensity > 0;
+  // BlurView is unreliable on some Android devices — use solid overlay instead.
+  const useBlur = preset.blur && blurIntensity > 0 && Platform.OS === 'ios';
 
   return (
     <View style={[styles.shell, { borderRadius }, style]}>

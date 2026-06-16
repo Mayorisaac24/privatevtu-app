@@ -134,12 +134,12 @@ export default function VerifyOTPScreen() {
 
   return (
     <AuthShell
-      heroTitle={isReg ? 'Verify your email' : 'Check your inbox'}
       onBack={() => router.back()}
       showLogo={false}
-      heroIcon={<AuthHeroIcon icon="mail-outline" size={48} />}
+      heroIcon={<AuthHeroIcon icon="mail-outline" size={52} />}
     >
       <AuthCardHeader
+        eyebrow={isReg ? 'Verify your email' : 'Check your inbox'}
         title="Enter verification code"
         subtitle={`We sent a 6-digit code to ${email}`}
       />

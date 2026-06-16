@@ -18,7 +18,7 @@ import { AppLogo } from '../ui/AppLogo';
 import { Colors, Spacing } from '../../theme';
 import { useGradients } from '../../theme/hooks';
 import { ThemedScreen } from '../ui/ThemedScreen';
-import { isAndroid, platformSpacing } from '../../lib/platform-ui';
+import { isAndroid, platformSpacing, useLayout } from '../../lib/platform-ui';
 
 type AuthShellProps = {
   children: ReactNode;
@@ -38,14 +38,32 @@ type AuthShellProps = {
 
 type LogoSize = 'xs' | 'sm' | 'md';
 
+/** Auth hero logo sizes — inline (xs) sits beside the tagline on sign-in/register. */
 const LOGO_DIMS: Record<LogoSize, number> = {
-  xs: 72,
-  sm: 108,
-  md: 132,
+  xs: 60,
+  sm: 76,
+  md: 96,
 };
 
+function resolveAuthHeroLogoPx(
+  size: LogoSize,
+  width: number,
+  isTablet: boolean,
+): number {
+  const base = LOGO_DIMS[size];
+  if (size === 'xs') {
+    if (width < 360) return 54;
+    if (isTablet) return 64;
+    return base;
+  }
+  if (isTablet) return base + 6;
+  return base;
+}
+
 export function AuthHeroLogo({ size = 'md' }: { size?: LogoSize }) {
-  return <AppLogo size={LOGO_DIMS[size]} />;
+  const { width, isTablet } = useLayout();
+  const px = resolveAuthHeroLogoPx(size, width, isTablet);
+  return <AppLogo size={px} />;
 }
 
 export function AuthHeroIcon({
@@ -122,7 +140,9 @@ function AuthBrandedHero({
     return (
       <View style={[styles.iconHero, compact && styles.iconHeroCompact]}>
         {!compact ? heroIcon : null}
-        {heroTitle && !compact ? <Text style={styles.heroTitle}>{heroTitle}</Text> : null}
+        {heroTitle && !compact ? (
+          <Text style={styles.iconHeroTitle} numberOfLines={2}>{heroTitle}</Text>
+        ) : null}
         {heroSubtitle && !compact ? (
           <Text style={styles.heroSubtitle} numberOfLines={2}>{heroSubtitle}</Text>
         ) : null}
@@ -143,7 +163,7 @@ function AuthBrandedHero({
       {showLogo ? (
         <>
           <View style={styles.brandLockup}>
-            <AuthHeroLogo size={showBrandInline ? 'sm' : 'md'} />
+            <AuthHeroLogo size={showBrandInline ? 'xs' : 'md'} />
             {showBrandInline ? (
               <View style={styles.brandTextCol}>
                 <Text style={styles.brandTagline}>
@@ -197,6 +217,7 @@ function AuthHeroSection({
   compact?: boolean;
 }) {
   const gradients = useGradients();
+  const iconHeroMode = Boolean(heroIcon) && !showLogo;
 
   return (
     <LinearGradient
@@ -205,9 +226,14 @@ function AuthHeroSection({
       end={{ x: 1, y: 1 }}
       style={[
         styles.hero,
+        iconHeroMode && styles.heroIconMode,
         {
-          paddingTop: insetsTop + (compact ? 6 : 10),
-          paddingBottom: compact ? 10 : 22,
+          paddingTop: insetsTop + (compact ? 6 : iconHeroMode ? 6 : 8),
+          paddingBottom: compact
+            ? 10
+            : iconHeroMode
+              ? (isAndroid ? 36 : 40)
+              : (isAndroid ? 20 : 22),
         },
       ]}
     >
@@ -289,7 +315,7 @@ export function AuthShell({
         />
       </View>
       <KeyboardAvoidingView
-        style={styles.body}
+        style={[styles.body, heroIcon && !showLogo && styles.bodyIconHero]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
@@ -335,14 +361,20 @@ const styles = StyleSheet.create({
     marginTop: isAndroid ? -18 : -14,
     zIndex: 1,
   },
+  bodyIconHero: {
+    marginTop: isAndroid ? -6 : -4,
+  },
   heroWrap: {
     zIndex: 0,
   },
   hero: {
-    paddingBottom: isAndroid ? 18 : 22,
     paddingHorizontal: Spacing.page,
     overflow: 'hidden',
     position: 'relative',
+  },
+  heroIconMode: {
+    minHeight: isAndroid ? 168 : 176,
+    justifyContent: 'flex-end',
   },
   heroMeshPrimary: {
     position: 'absolute',
@@ -398,17 +430,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   brandedHero: {
-    gap: 12,
-    paddingTop: 4,
+    gap: 10,
+    paddingTop: 2,
   },
   brandLockup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 10,
   },
   brandTextCol: {
     flex: 1,
-    gap: 4,
+    gap: 2,
   },
   logoGlow: {
     alignItems: 'center',
@@ -436,37 +468,48 @@ const styles = StyleSheet.create({
     letterSpacing: -0.4,
   },
   brandTagline: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.58)',
-    lineHeight: 17,
+    color: 'rgba(255, 255, 255, 0.56)',
+    lineHeight: 16,
+    letterSpacing: 0.1,
   },
   brandAccent: {
-    height: 2,
-    width: '72%',
+    height: 1.5,
+    width: '58%',
     borderRadius: 1,
-    marginTop: 2,
+    marginTop: 0,
   },
   trustMicro: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginTop: 2,
+    gap: 5,
+    marginTop: 0,
   },
   trustMicroText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.48)',
-    letterSpacing: 0.25,
+    color: 'rgba(255, 255, 255, 0.44)',
+    letterSpacing: 0.2,
   },
   iconHero: {
     alignItems: 'center',
-    gap: 10,
-    paddingTop: 4,
+    gap: 12,
+    paddingTop: isAndroid ? 4 : 8,
+    paddingBottom: isAndroid ? 8 : 12,
   },
   iconHeroCompact: {
     paddingTop: 0,
+    paddingBottom: 0,
     minHeight: 0,
+  },
+  iconHeroTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.9)',
+    letterSpacing: -0.1,
+    textAlign: 'center',
+    ...(isAndroid ? { includeFontPadding: false } : null),
   },
   compactBrandRow: {
     flexDirection: 'row',
@@ -503,8 +546,8 @@ const styles = StyleSheet.create({
     marginTop: 0,
   },
   cardHeader: {
-    marginBottom: platformSpacing(26, -4),
-    gap: 5,
+    marginBottom: platformSpacing(26, -8),
+    gap: platformSpacing(5, 3),
   },
   cardEyebrow: {
     fontSize: 13,

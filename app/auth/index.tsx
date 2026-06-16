@@ -86,7 +86,7 @@ export default function RegisterScreen() {
       <AuthCardHeader
         eyebrow="Get started"
         title="Create account"
-        subtitle="Fill in your details to set up your free PrivateVTU account"
+        subtitle="Fill in your details to set up your free DataMartNG account"
       />
 
       <View style={styles.nameRow}>

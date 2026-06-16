@@ -126,7 +126,7 @@ export default function NotificationSettingsScreen() {
                   title={option.title}
                   subtitle={
                     inactive
-                      ? 'Currently unavailable on PrivateVTU'
+                      ? 'Currently unavailable on DataMartNG'
                       : option.description
                   }
                   value={option.userEnabled}

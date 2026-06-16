@@ -1230,28 +1230,25 @@ export default function TransferScreen() {
           )}
         </ScrollView>
 
-        <View style={[styles.footer, { paddingBottom: insets.bottom + 12, paddingHorizontal: Spacing.page, paddingTop: 12 }]}>
+        <View style={[styles.footer, { paddingBottom: insets.bottom + 10, paddingHorizontal: Spacing.page, paddingTop: 10 }]}>
           {step === 'form' ? (
             <GradientButton
               title="Review transfer"
               onPress={handleContinue}
               inactive={!accountName || !selectedBank || !isValidAmount || resolving || scanning}
               disabled={!accountName || !selectedBank || !isValidAmount || resolving || scanning}
-              rightIcon={<Ionicons name="arrow-forward" size={18} color={Colors.white} />}
-              gradientStyle={styles.cta}
+              size="compact"
+              rightIcon={<Ionicons name="arrow-forward" size={17} color={Colors.white} />}
             />
           ) : (
             <GradientButton
+              title={`Send ₦${(transferFee > 0 ? totalDebit : numericAmount).toLocaleString()}`}
               onPress={() => setShowLock(true)}
               disabled={loading}
               isLoading={loading}
-              gradientStyle={styles.cta}
-            >
-              <Ionicons name="paper-plane" size={18} color={Colors.white} />
-              <Text style={styles.ctaText}>
-                Send ₦{(transferFee > 0 ? totalDebit : numericAmount).toLocaleString()}
-              </Text>
-            </GradientButton>
+              size="compact"
+              leftIcon={<Ionicons name="paper-plane" size={17} color={Colors.white} />}
+            />
           )}
           <View style={styles.secureRow}>
             <Ionicons name="shield-checkmark" size={12} color={Colors.primary} />
@@ -1990,16 +1987,6 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: Colors.borderSubtle,
   },
-  cta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    borderRadius: Radius.lg,
-    paddingVertical: 16,
-    ...Shadow.sm,
-  },
-  ctaText: { fontSize: 16, fontWeight: '700', color: Colors.white },
-  secureRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 10 },
+  secureRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8 },
   secureNote: { fontSize: 11, color: Colors.muted },
 });

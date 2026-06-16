@@ -87,7 +87,7 @@ export async function biometricQuickSignIn(): Promise<
     const creds = await getBiometricCredentials();
     if (!creds) return { ok: false, message: 'Biometric sign-in is not set up on this device' };
 
-    const localOk = await promptLocalBiometric('Sign in to PrivateVTU');
+    const localOk = await promptLocalBiometric('Sign in to DataMartNG');
     if (!localOk) return { ok: false, message: 'Biometric sign-in cancelled' };
 
     const res = await api.biometricLogin({
@@ -126,7 +126,7 @@ export async function biometricQuickSignIn(): Promise<
 }
 
 export async function unlockWithBiometric(): Promise<boolean> {
-  return promptLocalBiometric('Unlock PrivateVTU');
+  return promptLocalBiometric('Unlock DataMartNG');
 }
 
 export async function hasBiometricSignInEnabled(): Promise<boolean> {

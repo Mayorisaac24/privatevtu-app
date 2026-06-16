@@ -21,6 +21,14 @@ export const CONTENT_MAX_WIDTH = 520;
 export const FIELD_HEIGHT = isAndroid ? 54 : 56;
 export const FIELD_HEIGHT_SM = isAndroid ? 48 : 50;
 
+/** Tighter auth form rhythm — Android extra font padding makes controls feel oversized. */
+export const AUTH_FIELD_HEIGHT = isAndroid ? 50 : 54;
+export const AUTH_BUTTON_HEIGHT = isAndroid ? 48 : 52;
+export const AUTH_SEGMENT_HEIGHT = isAndroid ? 42 : 46;
+
+/** Service / transfer CTAs — slightly shorter than auth primary buttons. */
+export const CTA_BUTTON_HEIGHT = isAndroid ? 46 : 50;
+
 /** Removes extra top/bottom padding Android adds around text. */
 export function platformText(style: TextStyle): TextStyle {
   if (!isAndroid) return style;

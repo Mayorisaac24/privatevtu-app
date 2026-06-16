@@ -1,12 +1,14 @@
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
-  ActivityIndicator, Linking, KeyboardAvoidingView, Platform, Share, Alert,
+  ActivityIndicator, Linking, KeyboardAvoidingView, Platform, Alert, RefreshControl,
+  useWindowDimensions,
 } from 'react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Clipboard from 'expo-clipboard';
 import {
   api,
   formatCurrencyVisible,
@@ -37,8 +39,10 @@ import {
   getWalletFundingData,
   hasWalletFundingCache,
   peekWalletFundingCache,
+  pullToRefreshWalletFunding,
 } from '../../src/lib/wallet-funding-cache';
 import { refreshDashboardData } from '../../src/lib/dashboard-data';
+import { formatAccountNumberDisplay } from '../../src/lib/transfer-banks';
 import { useWalletStore } from '../../src/stores';
 import { Colors, Spacing, Shadow, Radius } from '../../src/theme';
 import { useGradients, useColors } from '../../src/theme/hooks';
@@ -49,6 +53,7 @@ import { useStatusBarStyle } from '../../src/hooks/useStatusBarStyle';
 import { navigateBack } from '../../src/lib/navigation';
 import { ServiceGate } from '../../src/components/ServiceGate';
 import { SERVICE_CODES } from '../../src/lib/service-availability';
+import { isAndroid, textStyle } from '../../src/lib/platform-ui';
 
 
 const QUICK_AMOUNTS = [1000, 2000, 5000, 10000, 20000, 50000];
@@ -97,6 +102,7 @@ function formatExpiry(expiresAt?: string | null): string {
 function FundWalletScreen() {
   useStatusBarStyle('light');
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
   const colors = useColors();
   const gradients = useGradients();
   const { balance, balanceVisible } = useWalletStore();
@@ -128,6 +134,7 @@ function FundWalletScreen() {
   const [payvesselCheckoutVisible, setPayvesselCheckoutVisible] = useState(false);
   const [checkoutOverlayVisible, setCheckoutOverlayVisible] = useState(false);
   const [staticAccountOverlayVisible, setStaticAccountOverlayVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const numericAmount = parseFloat(amount.replace(/,/g, ''));
   const isValidAmount = !isNaN(numericAmount) && numericAmount >= 100;
@@ -174,6 +181,31 @@ function FundWalletScreen() {
   const availableMethods = useMemo(() => enabledMethods(methods), [methods]);
   const dynamicMethodAvailable = methods.dynamicVirtualAccount;
 
+  const methodTabsLayout = useMemo(() => {
+    const count = availableMethods.length;
+    const gap = 10;
+    const maxWidth = 118;
+    const minWidth = 76;
+    const availableWidth = screenWidth - Spacing.page * 2;
+
+    if (count === 0) {
+      return { tabWidth: maxWidth, scrollable: false, tight: false, gap };
+    }
+
+    const maxTotal = count * maxWidth + (count - 1) * gap;
+    if (maxTotal <= availableWidth) {
+      return { tabWidth: maxWidth, scrollable: false, tight: false, gap };
+    }
+
+    const fitted = (availableWidth - (count - 1) * gap) / count;
+    const tabWidth = Math.floor(fitted);
+    if (tabWidth >= minWidth) {
+      return { tabWidth, scrollable: false, tight: tabWidth < 100, gap };
+    }
+
+    return { tabWidth: minWidth, scrollable: true, tight: true, gap };
+  }, [availableMethods.length, screenWidth]);
+
   useHardwareBack(navigateBack);
 
   const refreshFundingBanks = useCallback(async () => {
@@ -210,6 +242,17 @@ function FundWalletScreen() {
       void refreshDashboardData();
     } finally {
       setInitializing(false);
+    }
+  }, [applyFundingSnapshot]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const snapshot = await pullToRefreshWalletFunding();
+      applyFundingSnapshot(snapshot);
+      void refreshDashboardData();
+    } finally {
+      setRefreshing(false);
     }
   }, [applyFundingSnapshot]);
 
@@ -256,13 +299,14 @@ function FundWalletScreen() {
     return () => clearInterval(id);
   }, [dynamicAccount?.expiresAt]);
 
-  const copyAccount = async (accountNumber: string) => {
+  const copyAccount = useCallback(async (accountNumber: string) => {
     try {
-      await Share.share({ message: accountNumber });
+      await Clipboard.setStringAsync(accountNumber);
+      showToast({ type: 'success', text1: 'Account number copied' });
     } catch {
-      showToast({ type: 'error', text1: 'Could not share account number' });
+      showToast({ type: 'error', text1: 'Could not copy account number' });
     }
-  };
+  }, []);
 
   const handlePaystackFund = async () => {
     if (!isValidAmount) {
@@ -641,6 +685,22 @@ function FundWalletScreen() {
 
       return (
         <>
+          {hasBvn && staticAccounts.length === 0 && methods.permanentVirtualAccount ? (
+            <GlassCard borderRadius={Radius.xl} padding={18} contentStyle={styles.card}>
+              <View style={styles.accountsRefreshHint}>
+                <View style={styles.accountsRefreshIcon}>
+                  <Ionicons name="refresh-outline" size={22} color={Colors.primary} />
+                </View>
+                <Text style={styles.accountsRefreshTitle}>Permanent accounts</Text>
+                <Text style={styles.accountsRefreshMessage}>
+                  {refreshing
+                    ? 'Fetching your accounts…'
+                    : 'If you already have a permanent account, pull down to refresh and load it.'}
+                </Text>
+              </View>
+            </GlassCard>
+          ) : null}
+
           {staticAccounts.length > 0 && (
             <GlassCard borderRadius={Radius.xl} padding={18} contentStyle={styles.card}>
               <Text style={styles.fieldLabel}>
@@ -654,31 +714,55 @@ function FundWalletScreen() {
                   key={account.id ?? `${account.accountNumber}-${account.bankCode ?? index}`}
                   style={[styles.staticAccountCard, index > 0 && styles.staticAccountCardGap]}
                 >
-                  <View style={styles.staticAccountHeader}>
-                    <View style={styles.staticBankBadge}>
+                  <View style={styles.staticAccountRow}>
+                    <View style={styles.staticBankLogoWrap}>
                       {account.bankCode && bankByCode.get(account.bankCode) ? (
-                        <BankLogo bank={bankByCode.get(account.bankCode)!} size={22} />
+                        <BankLogo bank={bankByCode.get(account.bankCode)!} size={isAndroid ? 40 : 48} />
                       ) : (
-                        <Ionicons name="business-outline" size={14} color={Colors.primary} />
+                        <View style={styles.staticBankLogoFallback}>
+                          <Ionicons name="business-outline" size={24} color={Colors.primary} />
+                        </View>
                       )}
-                      <Text style={styles.staticBankBadgeText}>{account.bankName}</Text>
                     </View>
-                    <View style={styles.readyBadge}>
-                      <Ionicons name="checkmark-circle" size={12} color={Colors.success} />
-                      <Text style={styles.readyBadgeText}>Ready</Text>
+
+                    <View style={styles.staticAccountBody}>
+                      <Text style={styles.staticBankLabel} numberOfLines={1}>
+                        {account.bankName}
+                      </Text>
+                      <Text
+                        style={styles.staticAccountNumber}
+                        selectable
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.82}
+                      >
+                        {formatAccountNumberDisplay(account.accountNumber)}
+                      </Text>
+                      <View style={styles.staticMetaLine}>
+                        {account.accountName ? (
+                          <Text style={styles.staticAccountName} numberOfLines={1}>
+                            {account.accountName}
+                          </Text>
+                        ) : (
+                          <View style={styles.staticMetaSpacer} />
+                        )}
+                        <View style={styles.staticReadyPill}>
+                          <View style={styles.staticReadyDot} />
+                          <Text style={styles.staticReadyText}>Active</Text>
+                        </View>
+                      </View>
                     </View>
+
+                    <TouchableOpacity
+                      style={styles.staticCopyIconBtn}
+                      onPress={() => copyAccount(account.accountNumber)}
+                      activeOpacity={0.75}
+                      accessibilityRole="button"
+                      accessibilityLabel="Copy account number"
+                    >
+                      <Ionicons name="copy-outline" size={isAndroid ? 18 : 20} color={Colors.primary} />
+                    </TouchableOpacity>
                   </View>
-                  <Text style={styles.staticAccountNumber}>{account.accountNumber}</Text>
-                  {account.accountName ? (
-                    <Text style={styles.staticAccountName}>{account.accountName}</Text>
-                  ) : null}
-                  <GradientButton
-                    title="Copy number"
-                    onPress={() => copyAccount(account.accountNumber)}
-                    leftIcon={<Ionicons name="copy-outline" size={16} color={Colors.white} />}
-                    gradientStyle={styles.staticCopyBtnInner}
-                    style={styles.staticCopyBtn}
-                  />
                 </View>
               ))}
             </GlassCard>
@@ -880,16 +964,35 @@ function FundWalletScreen() {
           </View>
         ) : (
           <>
-            <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+            <ScrollView
+              contentContainerStyle={styles.scroll}
+              showsVerticalScrollIndicator={false}
+              alwaysBounceVertical
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={onRefresh}
+                  tintColor={Colors.primary}
+                  colors={[Colors.primary]}
+                  progressBackgroundColor={Colors.white}
+                />
+              }
+            >
               <Text style={styles.sectionEyebrow}>Funding method</Text>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.methodTabsScroll}
+                scrollEnabled={methodTabsLayout.scrollable}
+                contentContainerStyle={[
+                  styles.methodTabsScroll,
+                  { gap: methodTabsLayout.gap },
+                  !methodTabsLayout.scrollable && { width: screenWidth - Spacing.page * 2 },
+                ]}
               >
                 {availableMethods.map((m) => {
                   const meta = METHOD_META[m];
                   const active = activeMethod === m;
+                  const tight = methodTabsLayout.tight;
                   return (
                     <TouchableOpacity
                       key={m}
@@ -899,16 +1002,48 @@ function FundWalletScreen() {
                       <GlassCard
                         variant={active ? 'tinted' : 'light'}
                         borderRadius={Radius.lg}
-                        padding={14}
-                        style={[styles.methodTab, active && styles.methodTabActive]}
+                        padding={tight ? 10 : 14}
+                        style={[
+                          styles.methodTab,
+                          { width: methodTabsLayout.tabWidth },
+                          active && styles.methodTabActive,
+                        ]}
                         contentStyle={styles.methodTabContent}
                       >
                         {active && <View style={styles.methodTabAccent} />}
-                        <View style={[styles.methodIconRing, active && styles.methodIconRingActive]}>
-                          <Ionicons name={meta.icon as any} size={20} color={active ? Colors.primary : Colors.muted} />
+                        <View
+                          style={[
+                            styles.methodIconRing,
+                            tight && styles.methodIconRingCompact,
+                            active && styles.methodIconRingActive,
+                          ]}
+                        >
+                          <Ionicons
+                            name={meta.icon as any}
+                            size={tight ? 18 : 20}
+                            color={active ? Colors.primary : Colors.muted}
+                          />
                         </View>
-                        <Text style={[styles.methodTabLabel, active && styles.methodTabLabelActive]}>{meta.label}</Text>
-                        <Text style={[styles.methodTabSub, active && styles.methodTabSubActive]}>{meta.subtitle}</Text>
+                        <Text
+                          style={[
+                            styles.methodTabLabel,
+                            tight && styles.methodTabLabelCompact,
+                            active && styles.methodTabLabelActive,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {meta.label}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.methodTabSub,
+                            tight && styles.methodTabSubCompact,
+                            active && styles.methodTabSubActive,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {meta.subtitle}
+                        </Text>
                       </GlassCard>
                     </TouchableOpacity>
                   );
@@ -934,7 +1069,7 @@ function FundWalletScreen() {
                   inactive={primaryDisabled()}
                   isLoading={isButtonLoading}
                   title={primaryLabel()}
-                  gradientStyle={styles.cta}
+                  size="compact"
                   style={primaryDisabled() ? styles.ctaDisabled : undefined}
                   leftIcon={
                     !isButtonLoading ? (
@@ -1091,12 +1226,10 @@ const styles = StyleSheet.create({
     marginBottom: -6,
   },
   methodTabsScroll: {
-    gap: 10,
     paddingVertical: 4,
     paddingRight: 4,
   },
   methodTab: {
-    width: 118,
     overflow: 'hidden',
   },
   methodTabActive: {},
@@ -1122,12 +1255,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  methodIconRingCompact: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+  },
   methodIconRingActive: {
     backgroundColor: '#EDE9FE',
   },
   methodTabLabel: { fontSize: 13, fontWeight: '700', color: Colors.mid },
+  methodTabLabelCompact: { fontSize: 12 },
   methodTabLabelActive: { color: Colors.primary },
   methodTabSub: { fontSize: 10, color: Colors.muted, lineHeight: 14 },
+  methodTabSubCompact: { fontSize: 9, lineHeight: 13 },
   methodTabSubActive: { color: '#7C6A9E' },
   card: {
     gap: 10,
@@ -1189,34 +1329,130 @@ const styles = StyleSheet.create({
   linkBtn: { alignItems: 'center', paddingVertical: 8 },
   linkBtnText: { fontSize: 13, fontWeight: '600', color: Colors.primary },
   staticAccountCard: {
-    backgroundColor: '#FAFAFE',
+    backgroundColor: Colors.white,
     borderRadius: Radius.lg,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.1)',
-    gap: 8,
-    overflow: 'hidden',
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.borderSubtle,
+    ...Shadow.sm,
   },
-  staticAccountCardGap: { marginTop: 10 },
-  staticAccountHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  staticBankBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#F5F3FF', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20,
-  },
-  staticBankBadgeText: { fontSize: 12, fontWeight: '700', color: Colors.primary },
-  readyBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  readyBadgeText: { fontSize: 11, fontWeight: '600', color: Colors.success },
-  staticAccountNumber: { fontSize: 24, fontWeight: '800', color: Colors.heroDark, letterSpacing: 0.5 },
-  staticAccountName: { fontSize: 12, color: Colors.muted },
-  staticCopyBtn: { borderRadius: 12, overflow: 'hidden', marginTop: 4 },
-  staticCopyBtnInner: {
+  staticAccountCardGap: { marginTop: 12 },
+  staticAccountRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 11,
+    gap: isAndroid ? 10 : 14,
   },
-  staticCopyBtnText: { fontSize: 13, fontWeight: '700', color: Colors.white },
+  staticBankLogoWrap: {
+    width: isAndroid ? 48 : 56,
+    height: isAndroid ? 48 : 56,
+    borderRadius: isAndroid ? 14 : 16,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: 'rgba(124, 58, 237, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  staticBankLogoFallback: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: Colors.primaryMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  staticAccountBody: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  staticMetaLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 1,
+  },
+  staticMetaSpacer: {
+    flex: 1,
+  },
+  staticBankLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.muted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  staticReadyPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.successLight,
+    flexShrink: 0,
+  },
+  staticReadyDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.success,
+  },
+  staticReadyText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: Colors.successDark,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  staticAccountNumber: textStyle({
+    fontSize: isAndroid ? 16 : 19,
+    fontWeight: isAndroid ? '700' : '800',
+    color: Colors.heroDark,
+    letterSpacing: isAndroid ? 0.1 : 0.35,
+  }),
+  staticAccountName: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '500',
+    color: Colors.muted,
+  },
+  staticCopyIconBtn: {
+    width: isAndroid ? 36 : 40,
+    height: isAndroid ? 36 : 40,
+    borderRadius: isAndroid ? 10 : 12,
+    backgroundColor: Colors.primaryMuted,
+    borderWidth: 1,
+    borderColor: 'rgba(124, 58, 237, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  accountsRefreshHint: {
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 6,
+  },
+  accountsRefreshIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.primaryMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  accountsRefreshTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.dark,
+  },
+  accountsRefreshMessage: {
+    fontSize: 13,
+    color: Colors.muted,
+    textAlign: 'center',
+    lineHeight: 19,
+    maxWidth: 300,
+  },
   bvnGateLoading: { alignItems: 'center', paddingVertical: 40 },
   bvnGateIcon: {
     width: 56, height: 56, borderRadius: 28,
@@ -1292,17 +1528,7 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: Colors.borderSubtle,
   },
-  cta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    borderRadius: Radius.lg,
-    paddingVertical: 16,
-    ...Shadow.sm,
-  },
   ctaDisabled: { opacity: 0.72 },
-  ctaText: { fontSize: 15, fontWeight: '700', color: Colors.white, flexShrink: 1, textAlign: 'center' },
   secureRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12 },
   secureIconWrap: {
     width: 22,

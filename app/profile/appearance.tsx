@@ -31,7 +31,7 @@ export default function AppearanceScreen() {
   return (
     <ProfileSubScreen
       title="Appearance"
-      subtitle="Choose how PrivateVTU looks on your device"
+      subtitle="Choose how DataMartNG looks on your device"
       headerIcon="color-palette-outline"
     >
       <GlassCard variant="solid" borderRadius={Radius.lg} padding={16} contentStyle={styles.intro}>
@@ -42,7 +42,7 @@ export default function AppearanceScreen() {
 
       <View style={styles.section}>
         <AppText variant="label" style={{ color: colors.primary, marginBottom: 10 }}>
-          PrivateVTU
+          DataMartNG
         </AppText>
         {brandThemes.map((theme) => (
           <ThemePreviewCard

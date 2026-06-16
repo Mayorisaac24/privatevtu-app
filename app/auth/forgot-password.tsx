@@ -49,12 +49,12 @@ export default function ForgotPasswordScreen() {
   return (
     <AuthShell
       scrollable
-      heroTitle="Forgot password?"
       onBack={() => router.back()}
       showLogo={false}
-      heroIcon={<AuthHeroIcon icon="lock-open-outline" size={48} />}
+      heroIcon={<AuthHeroIcon icon="lock-open-outline" size={52} />}
     >
       <AuthCardHeader
+        eyebrow="Forgot password?"
         title="Reset access"
         subtitle="Choose how you'd like to receive your reset code"
       />

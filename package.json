@@ -1,12 +1,15 @@
 {
-  "name": "privatevtu-expo-app",
+  "name": "datamartng-expo-app",
   "version": "1.0.0",
-  "description": "PrivateVTU Mobile App",
+  "description": "DataMartNG Mobile App",
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
+    "start:dev": "expo start --dev-client --lan",
     "android": "expo run:android",
+    "android:install": "expo run:android --no-bundler",
     "ios": "expo run:ios",
+    "ios:device": "expo run:ios --device --no-bundler",
     "web": "expo start --web",
     "build:android": "eas build --platform android",
     "build:apk": "eas build --platform android --profile preview",
@@ -23,6 +26,7 @@
     "expo-clipboard": "~7.0.1",
     "expo-constants": "~17.0.8",
     "expo-contacts": "~14.0.5",
+    "expo-dev-client": "~5.0.20",
     "expo-device": "~7.0.3",
     "expo-font": "13.0.4",
     "expo-image": "~2.0.7",
@@ -67,7 +71,7 @@
     "nigeria",
     "expo"
   ],
-  "author": "PrivateVTU",
+  "author": "DataMartNG",
   "license": "MIT",
   "private": true
 }

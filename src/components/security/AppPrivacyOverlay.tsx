@@ -10,14 +10,17 @@ type AppPrivacyOverlayProps = {
 export function AppPrivacyOverlay({ visible }: AppPrivacyOverlayProps) {
   if (!visible) return null;
 
+  const useBlur = Platform.OS === 'ios';
+
   return (
     <View style={styles.root} pointerEvents="auto">
-      <BlurView
-        intensity={Platform.OS === 'android' ? 90 : 55}
-        tint="dark"
-        style={StyleSheet.absoluteFill}
-        experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined}
-      />
+      {useBlur ? (
+        <BlurView
+          intensity={55}
+          tint="dark"
+          style={StyleSheet.absoluteFill}
+        />
+      ) : null}
       <View style={styles.scrim} />
       <View style={styles.content}>
         <AppLogo size={132} />

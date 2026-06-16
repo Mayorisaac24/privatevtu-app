@@ -24,6 +24,7 @@ export const TRANSFER_BANK_LOGO_PROVIDER_CODES: Record<string, string> = {
   '000008': '000008',
   '120001': '120001',
   '090175': '090175',
+  '100039': '100039', // Paystack-Titan
 };
 
 function buildLogoUrl(providerCode: string): string {

@@ -14,6 +14,9 @@ web-build/
 .env.local
 .env.*
 !.env.example
+# Firebase FCM service account keys (never commit — upload to EAS only)
+mayor-966a1-*.json
+*-firebase-adminsdk*.json
 ios/
 android/
 
