@@ -15,7 +15,6 @@ web-build/
 .env.*
 !.env.example
 # Firebase / FCM secrets (never commit — use EAS credentials + local files)
-google-services.json
 GoogleService-Info.plist
 mayor-966a1-*.json
 *-firebase-adminsdk*.json
