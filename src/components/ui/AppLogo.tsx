@@ -2,7 +2,7 @@ import { Image, StyleSheet, type ImageStyle, type StyleProp } from 'react-native
 
 const APP_LOGO = require('../../../assets/images/app-logo.png');
 
-/** Shared splash / boot logo size — keep in sync with app.json splash.imageWidth. */
+/** Default in-app logo width (wordmark). */
 export const BOOT_LOGO_SIZE = 120;
 
 type AppLogoProps = {
@@ -17,7 +17,7 @@ export function AppLogo({ size = BOOT_LOGO_SIZE, style }: AppLogoProps) {
       style={[styles.logo, { width: size, height: size }, style]}
       resizeMode="contain"
       accessibilityRole="image"
-      accessibilityLabel="DataMartNG logo"
+      accessibilityLabel="Datamart logo"
     />
   );
 }

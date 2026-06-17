@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { ProfileSubScreen } from '../../src/components/profile/ProfileSubScreen';
@@ -88,7 +89,7 @@ export default function PersonalInfoScreen() {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.85,
+      quality: 0.7,
       base64: true,
     });
     if (result.canceled || !result.assets[0]?.base64) return;
@@ -96,8 +97,26 @@ export default function PersonalInfoScreen() {
     setUploading(true);
     try {
       const asset = result.assets[0];
-      const mime = asset.mimeType || 'image/jpeg';
-      const dataUri = `data:${mime};base64,${asset.base64}`;
+
+      // Extra safety: downscale very large photos before upload to avoid backend body-size limits.
+      let finalBase64 = asset.base64;
+      let mime = asset.mimeType || 'image/jpeg';
+
+      if (!finalBase64 || (asset.width ?? 0) > 1600 || (asset.height ?? 0) > 1600) {
+        const manipulated = await ImageManipulator.manipulateAsync(
+          asset.uri,
+          [{ resize: { width: 1200 } }],
+          { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true },
+        );
+        finalBase64 = manipulated.base64 ?? finalBase64;
+        mime = 'image/jpeg';
+      }
+
+      if (!finalBase64) {
+        throw new Error('Could not process selected photo. Please try another image.');
+      }
+
+      const dataUri = `data:${mime};base64,${finalBase64}`;
       const uploadRes = await api.uploadAvatar(dataUri);
       if (!isResponseSuccess(uploadRes) || !uploadRes.data?.url) {
         throw new Error(uploadRes.message || 'Upload failed');
@@ -112,7 +131,11 @@ export default function PersonalInfoScreen() {
       setUser(profileRes.data);
       showToast({ type: 'success', text1: 'Photo updated', text2: 'Your profile photo is now synced across devices' });
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Could not update photo';
+      let message = error instanceof Error ? error.message : 'Could not update photo';
+      const lower = message.toLowerCase();
+      if (lower.includes('body') && (lower.includes('too big') || lower.includes('too large'))) {
+        message = 'Photo is too large. Please pick a smaller image or screenshot and try again.';
+      }
       showToast({ type: 'error', text1: 'Update failed', text2: message });
     } finally {
       setUploading(false);

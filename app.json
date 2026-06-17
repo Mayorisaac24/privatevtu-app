@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "DataMartNG",
+    "name": "Datamart",
     "slug": "datamartng",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -9,20 +9,21 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
     "statusBar": {
-      "style": "dark",
-      "backgroundColor": "#FFFFFF"
+      "style": "light",
+      "backgroundColor": "#7B2CFE"
     },
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#FFFFFF",
-      "imageWidth": 168
+      "backgroundColor": "#7B2CFE",
+      "imageWidth": 120
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.devnex.datamartng",
       "infoPlist": {
-        "NSCameraUsageDescription": "Allow camera to scan bank account details from photos",
+        "CFBundleDisplayName": "Datamart",
+        "NSCameraUsageDescription": "Allow camera for KYC live face scan and document capture",
         "NSPhotoLibraryUsageDescription": "Allow photo library access to scan bank account details",
         "NSContactsUsageDescription": "Allow access to contacts to fill in phone numbers for airtime and data purchases",
         "ITSAppUsesNonExemptEncryption": false,
@@ -33,7 +34,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#FFFFFF"
+        "backgroundColor": "#7B2CFE"
       },
       "package": "com.devnex.datamartng",
       "googleServicesFile": "./google-services.json",
@@ -75,6 +76,21 @@
         "expo-contacts",
         {
           "contactsPermission": "Allow $(PRODUCT_NAME) to access your contacts to fill in phone numbers."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to use your camera for live face scan during KYC verification.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "Allow $(PRODUCT_NAME) to use your camera for live face scan during KYC verification.",
+          "enableMicrophonePermission": false
         }
       ],
       "expo-secure-store",

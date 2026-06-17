@@ -31,6 +31,7 @@ export default function RootLayout() {
           <View style={{ flex: 1 }}>
             <Stack screenOptions={stackScreenOptions}>
               <Stack.Screen name="index" />
+              <Stack.Screen name="onboarding" options={{ animation: 'fade', gestureEnabled: false }} />
               <Stack.Screen name="auth" />
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="wallet" />

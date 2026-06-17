@@ -74,7 +74,7 @@ export default function TabNavigator() {
 
   useAndroidDoubleBackExit(activeTab === 'home', {
     text1: 'Exit app',
-    text2: 'Swipe back again to leave DataMartNG',
+    text2: 'Swipe back again to leave Datamart',
   });
 
   return (

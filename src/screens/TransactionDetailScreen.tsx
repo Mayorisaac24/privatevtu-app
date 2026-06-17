@@ -26,6 +26,7 @@ import {
   formatTransactionDateTime,
   getAmountPresentation,
   getStatusMeta,
+  getTransactionFeeKobo,
   getTransactionMeta,
   getTransactionVisual,
 } from '../lib/transaction-display';
@@ -309,9 +310,10 @@ export default function TransactionDetailScreen({ id }: Props) {
 
   const handleShare = useCallback(async () => {
     if (!tx) return;
+    const displayAmount = tx.displayAmountKobo || tx.amount;
     const lines = [
       tx.displayTitle || tx.type,
-      formatCurrencyVisible(tx.amount, true, getAmountPresentation(tx).prefix),
+      formatCurrencyVisible(displayAmount, true, getAmountPresentation(tx).prefix),
       `Status: ${tx.displayStatusLabel || tx.status}`,
       `Reference: ${tx.reference}`,
     ];
@@ -382,7 +384,10 @@ export default function TransactionDetailScreen({ id }: Props) {
   const isFailed = statusMeta.tone === 'failed';
   const isSuccessful = statusMeta.tone === 'successful';
   const isProcessing = statusMeta.tone === 'processing' || statusMeta.tone === 'pending';
-  const isFunding = tx.type === 'WALLET_FUND';
+  const isFunding = tx.type === 'WALLET_FUND' || tx.type === 'ADMIN_CREDIT';
+  const displayAmount = tx.displayAmountKobo || tx.displayAmount || tx.amount;
+  const feeKobo = getTransactionFeeKobo(tx);
+  const hasFee = BigInt(feeKobo || '0') > 0n;
   const accountNumber = transfer?.accountNumber || readMetaString(tx.metadata, 'accountNumber');
   const recipientName = transfer?.accountName
     || readMetaString(tx.metadata, 'accountName')
@@ -401,10 +406,28 @@ export default function TransactionDetailScreen({ id }: Props) {
     if (tx.provider) detailRows.push({ label: 'Provider', value: tx.provider });
   }
 
+  detailRows.push({
+    label: 'Amount',
+    value: tx.formattedDisplayAmount || formatCurrencyVisible(displayAmount, true),
+  });
+
+  if (hasFee) {
+    detailRows.push({
+      label: 'Fee',
+      value: tx.formattedFee || formatCurrencyVisible(feeKobo, true),
+    });
+    if (tx.formattedTotalDebited) {
+      detailRows.push({ label: 'Total debited', value: tx.formattedTotalDebited });
+    }
+  }
+
   detailRows.push({ label: 'Payment method', value: formatPaymentMethod(tx.type) });
   detailRows.push({ label: 'Reference', value: tx.reference, copyValue: tx.reference, mono: true });
   if (tx.providerRef) {
     detailRows.push({ label: 'Provider reference', value: tx.providerRef, copyValue: tx.providerRef, mono: true });
+  }
+  if (tx.formattedBalanceBefore) {
+    detailRows.push({ label: 'Balance before', value: tx.formattedBalanceBefore });
   }
   if (tx.formattedBalanceAfter) {
     detailRows.push({ label: 'Balance after', value: tx.formattedBalanceAfter });
@@ -430,7 +453,7 @@ export default function TransactionDetailScreen({ id }: Props) {
           <TransactionAvatar tx={tx} onDark />
 
           <Text style={styles.heroAmount}>
-            {formatCurrencyVisible(tx.amount, true, prefix)}
+            {formatCurrencyVisible(displayAmount, true, prefix)}
           </Text>
           <Text style={styles.heroTitle} numberOfLines={2}>
             {tx.displayTitle}

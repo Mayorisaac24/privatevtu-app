@@ -1,4 +1,5 @@
 import { api, isResponseSuccess, type KycStatusData } from './api';
+import { enrichKycStatusData } from './kyc-status-utils';
 
 const STALE_MS = 5 * 60 * 1000;
 
@@ -14,9 +15,10 @@ function isFresh(): boolean {
 async function fetchFromApi(): Promise<KycStatusData | null> {
   const res = await api.getKycStatus();
   if (isResponseSuccess(res) && res.data) {
-    memoryCache = res.data;
+    const enriched = enrichKycStatusData(res.data);
+    memoryCache = enriched;
     fetchedAt = Date.now();
-    return res.data;
+    return enriched;
   }
   return memoryCache;
 }
@@ -30,7 +32,7 @@ export function hasKycStatusCache(): boolean {
 }
 
 export function setKycStatusCache(data: KycStatusData): void {
-  memoryCache = data;
+  memoryCache = enrichKycStatusData(data);
   fetchedAt = Date.now();
 }
 

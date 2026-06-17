@@ -1,119 +1,39 @@
 import { useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, Image, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
-import {
-  isNetworkFailureStatus,
-  isSessionRevoked,
-  setSuppressSessionExpiryUi,
-} from '../src/lib/session';
-import { api, ApiError, isSessionExpiredError } from '../src/lib/api';
-import { AppLogo, BOOT_LOGO_SIZE } from '../src/components/ui/AppLogo';
-import { useAuthStore, waitForAuthStoreHydration } from '../src/stores';
+import { resolveBootDestination } from '../src/lib/boot-navigation';
 import { ScreenStatusBar } from '../src/hooks/useStatusBarStyle';
-import { Colors } from '../src/theme';
+import { Colors, FontFamily } from '../src/theme';
 
-function navigateHome(hasPin: boolean | undefined) {
-  router.replace(hasPin === false ? '/dashboard/setup-pin' : '/(tabs)');
-}
+const APP_ICON = require('../assets/icon.png');
 
-export default function SplashScreen() {
-  const { setUser, setTokens } = useAuthStore();
+export default function BootScreen() {
+  useEffect(() => {
+    void (async () => {
+      const destination = await resolveBootDestination();
 
-  useEffect(() => { void init(); }, []);
-
-  const init = async () => {
-    setSuppressSessionExpiryUi(true);
-    try {
-      await waitForAuthStoreHydration();
-      const cachedUser = useAuthStore.getState().user;
-
-      const { refreshToken } = await api.initTokens();
-      if (!refreshToken) {
-        await useAuthStore.getState().clearTokens();
-        setTimeout(() => router.replace('/auth/login'), 800);
-        return;
-      }
-
-      const accessToken = await api.getValidToken({ logoutOnAuthFailure: false });
-      if (!accessToken) {
-        const stillHasRefresh = await SecureStore.getItemAsync('refreshToken');
-        if (!stillHasRefresh) {
-          await useAuthStore.getState().clearTokens();
-          setTimeout(() => router.replace('/auth/login'), 800);
-          return;
-        }
-
-        await api.getValidToken({ logoutOnAuthFailure: true });
-        setTimeout(() => router.replace('/auth/login'), 800);
-        return;
-      }
-
-      await setTokens(accessToken, refreshToken);
-
-      try {
-        const res = await api.getProfile();
-        if (res.success && res.data) {
-          setUser(res.data);
-          setTimeout(() => navigateHome(res.data.hasPin), 600);
-          return;
-        }
-
-        if (cachedUser) {
-          setUser(cachedUser);
-          setTimeout(() => navigateHome(cachedUser.hasPin), 600);
-          return;
-        }
-
-        await api.clearTokens();
-        setTimeout(() => router.replace('/auth/login'), 800);
-      } catch (err) {
-        const refreshStillPresent = await SecureStore.getItemAsync('refreshToken');
-        const isNetworkError = err instanceof ApiError && isNetworkFailureStatus(err.statusCode);
-        const isAuthError = err instanceof ApiError && (
-          isSessionExpiredError(err)
-          || isSessionRevoked(err.statusCode, err.data)
+      if (destination.type === 'home') {
+        router.replace(
+          destination.hasPin === false ? '/dashboard/setup-pin' : '/(tabs)',
         );
-
-        if (isAuthError) {
-          await api.clearTokens();
-          setTimeout(() => router.replace('/auth/login'), 800);
-          return;
-        }
-
-        if ((isNetworkError || refreshStillPresent) && cachedUser) {
-          setUser(cachedUser);
-          setTimeout(() => navigateHome(cachedUser.hasPin), 600);
-          return;
-        }
-
-        if (refreshStillPresent && cachedUser) {
-          setUser(cachedUser);
-          setTimeout(() => navigateHome(cachedUser.hasPin), 600);
-          return;
-        }
-
-        await api.clearTokens();
-        setTimeout(() => router.replace('/auth/login'), 800);
-      }
-    } catch {
-      const cachedUser = useAuthStore.getState().user;
-      const refreshToken = await SecureStore.getItemAsync('refreshToken');
-      if (cachedUser && refreshToken) {
-        setTimeout(() => navigateHome(cachedUser.hasPin), 600);
         return;
       }
-      await api.clearTokens();
-      setTimeout(() => router.replace('/auth/login'), 800);
-    } finally {
-      setSuppressSessionExpiryUi(false);
-    }
-  };
+
+      if (destination.type === 'onboarding') {
+        router.replace('/onboarding');
+        return;
+      }
+
+      router.replace('/auth/login');
+    })();
+  }, []);
 
   return (
     <View style={styles.root}>
       <ScreenStatusBar style="dark" />
-      <AppLogo size={BOOT_LOGO_SIZE} />
+      <Image source={APP_ICON} style={styles.icon} resizeMode="contain" accessibilityLabel="Datamart" />
+      <Text style={styles.name}>Datamart</Text>
+      <ActivityIndicator color={Colors.primary} size="small" style={styles.spinner} />
     </View>
   );
 }
@@ -122,7 +42,24 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: Colors.white,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  icon: {
+    width: 88,
+    height: 88,
+    borderRadius: 22,
+    marginBottom: 16,
+  },
+  name: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: Colors.dark,
+    fontFamily: FontFamily.bold,
+    letterSpacing: -0.3,
+  },
+  spinner: {
+    marginTop: 28,
   },
 });

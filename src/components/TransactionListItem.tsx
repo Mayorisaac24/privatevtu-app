@@ -96,7 +96,7 @@ export function TransactionListItem({
 
       <View style={styles.right}>
         <Text style={[styles.amount, { color: amountColor }]}>
-          {formatCurrencyVisible(tx.amount, balanceVisible, prefix)}
+          {formatCurrencyVisible(tx.displayAmountKobo || tx.amount, balanceVisible, prefix)}
         </Text>
         {showStatus ? <StatusBadge status={tx.displayStatus || 'pending'} /> : null}
       </View>

@@ -199,6 +199,10 @@ export interface Transaction {
   logoType?: 'provider' | 'bank' | 'service';
   logoKey?: string;
   isCredit?: boolean;
+  displayAmount?: string;
+  formattedDisplayAmount?: string;
+  totalDebited?: string;
+  formattedTotalDebited?: string;
   fee?: string;
   formattedFee?: string;
   providerRef?: string;
@@ -1708,6 +1712,28 @@ class ApiClient {
     return this.request('/kyc/address', {
       method: 'PUT',
       body: JSON.stringify(data),
+    });
+  }
+
+  async submitKycDocument(data: {
+    documentType: string;
+    documentUrl: string;
+    documentNumber?: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<ApiResponse> {
+    return this.request('/kyc/documents', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async uploadDocument(
+    image: string,
+    folder?: string,
+  ): Promise<ApiResponse<{ url: string; publicId: string }>> {
+    return this.request('/upload/document', {
+      method: 'POST',
+      body: JSON.stringify({ image, folder }),
     });
   }
 

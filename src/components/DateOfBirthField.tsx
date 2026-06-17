@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Radius } from '../theme';
+import { CTA_BUTTON_HEIGHT } from '../lib/platform-ui';
 import { GradientButton } from './ui/GradientButton';
 import { GlassCard } from './ui/GlassCard';
 import { GlassSurface } from './ui/GlassSurface';
@@ -339,8 +340,9 @@ export function DateOfBirthField({
                 <GradientButton
                   title="Confirm date"
                   onPress={confirmDate}
-                  gradientStyle={styles.confirmBtn}
+                  size="compact"
                   style={styles.confirmWrap}
+                  gradientStyle={styles.confirmBtn}
                 />
               </View>
             </GlassSurface>
@@ -581,27 +583,35 @@ const styles = StyleSheet.create({
   },
   sheetActions: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'stretch',
     gap: 10,
+    width: '100%',
     paddingHorizontal: 20,
-    paddingTop: 4,
+    paddingTop: 8,
+    paddingBottom: 4,
   },
   cancelBtn: {
     flex: 1,
-    paddingVertical: 14,
+    flexBasis: 0,
+    minHeight: CTA_BUTTON_HEIGHT,
     alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 14,
     backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
   },
   cancelText: {
     fontSize: 15,
     fontWeight: '500',
     color: Colors.muted,
   },
-  confirmWrap: { flex: 1 },
+  confirmWrap: {
+    flex: 1,
+    flexBasis: 0,
+    minWidth: 0,
+  },
   confirmBtn: {
-    paddingVertical: 14,
-    alignItems: 'center',
+    minHeight: CTA_BUTTON_HEIGHT,
     borderRadius: 14,
   },
   confirmText: {

@@ -261,7 +261,7 @@ export default function LoginScreen() {
       <AuthDivider />
 
       <AuthFooterLink
-        prefix="New to DataMartNG?"
+        prefix="New to Datamart?"
         linkLabel="Create account"
         onPress={() => router.push('/auth')}
       />

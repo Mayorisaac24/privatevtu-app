@@ -7,6 +7,7 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  Image,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
@@ -19,6 +20,8 @@ import { Colors, Spacing } from '../../theme';
 import { useGradients } from '../../theme/hooks';
 import { ThemedScreen } from '../ui/ThemedScreen';
 import { isAndroid, platformSpacing, useLayout } from '../../lib/platform-ui';
+
+const APP_ICON = require('../../../assets/icon.png');
 
 type AuthShellProps = {
   children: ReactNode;
@@ -64,6 +67,26 @@ export function AuthHeroLogo({ size = 'md' }: { size?: LogoSize }) {
   const { width, isTablet } = useLayout();
   const px = resolveAuthHeroLogoPx(size, width, isTablet);
   return <AppLogo size={px} />;
+}
+
+function AuthHeroBrandMark({ compact }: { compact?: boolean }) {
+  const iconSize = compact ? 36 : 44;
+  return (
+    <View style={styles.authBrandMark}>
+      <View style={[styles.authBrandIconWrap, { width: iconSize + 8, height: iconSize + 8, borderRadius: (iconSize + 8) * 0.24 }]}>
+        <Image
+          source={APP_ICON}
+          style={{ width: iconSize, height: iconSize, borderRadius: iconSize * 0.22 }}
+          resizeMode="contain"
+          accessibilityLabel="Datamart"
+        />
+      </View>
+      <View style={styles.authBrandTextCol}>
+        <Text style={[styles.authBrandName, compact && styles.authBrandNameCompact]}>Datamart</Text>
+        <Text style={styles.authBrandTagline}>Your trusted VTU platform</Text>
+      </View>
+    </View>
+  );
 }
 
 export function AuthHeroIcon({
@@ -153,7 +176,7 @@ function AuthBrandedHero({
   if (compact && showLogo) {
     return (
       <View style={styles.compactBrandRow}>
-        <AuthHeroLogo size="xs" />
+        <AuthHeroBrandMark compact />
       </View>
     );
   }
@@ -162,23 +185,7 @@ function AuthBrandedHero({
     <View style={styles.brandedHero}>
       {showLogo ? (
         <>
-          <View style={styles.brandLockup}>
-            <AuthHeroLogo size={showBrandInline ? 'xs' : 'md'} />
-            {showBrandInline ? (
-              <View style={styles.brandTextCol}>
-                <Text style={styles.brandTagline}>
-                  {tagline || 'Your trusted VTU platform'}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-
-          <LinearGradient
-            colors={['rgba(167,139,250,0.55)', 'rgba(124,58,237,0.35)', 'transparent']}
-            start={{ x: 0, y: 0.5 }}
-            end={{ x: 1, y: 0.5 }}
-            style={styles.brandAccent}
-          />
+          <AuthHeroBrandMark compact={showBrandInline} />
 
           <View style={styles.trustMicro}>
             <Ionicons name="shield-checkmark" size={12} color="rgba(255,255,255,0.55)" />
@@ -437,6 +444,45 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+  },
+  authBrandMark: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  authBrandIconWrap: {
+    backgroundColor: Colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.12,
+        shadowRadius: 8,
+      },
+      android: { elevation: 3 },
+      default: {},
+    }),
+  },
+  authBrandTextCol: {
+    flex: 1,
+    gap: 2,
+  },
+  authBrandName: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: Colors.white,
+    letterSpacing: -0.3,
+  },
+  authBrandNameCompact: {
+    fontSize: 18,
+  },
+  authBrandTagline: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.72)',
+    lineHeight: 16,
   },
   brandTextCol: {
     flex: 1,

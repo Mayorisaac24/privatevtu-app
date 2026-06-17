@@ -26,6 +26,7 @@ import { preloadTwoFactorMethods } from '../lib/two-factor-methods-cache';
 import { preloadBiometricSettings } from '../lib/biometric-settings-cache';
 import { getNotificationSettingsCached, hydrateNotificationSettingsCache } from '../lib/notification-settings-cache';
 import { getKycStatusData, peekKycStatusCache, preloadKycStatusData } from '../lib/kyc-status-cache';
+import { preloadNigeriaLocations } from '../lib/nigeria-locations-cache';
 import { getProfileKycDisplay } from '../lib/kyc-display';
 import type { KycStatusData } from '../lib/api';
 
@@ -60,6 +61,7 @@ export default function ProfileScreen() {
     preloadTwoFactorMethods();
     preloadBiometricSettings();
     preloadKycStatusData();
+    preloadNigeriaLocations();
     void hydrateNotificationSettingsCache();
     void getNotificationSettingsCached().catch(() => undefined);
     void getKycStatusData().then((data) => {
@@ -333,7 +335,7 @@ export default function ProfileScreen() {
 
       <View style={styles.footer}>
         <Ionicons name="lock-closed" size={12} color={Colors.muted} />
-        <Text style={styles.footerText}>DataMartNG v1.0.0 · Secured & NDPR compliant</Text>
+        <Text style={styles.footerText}>Datamart v1.0.0 · Secured & NDPR compliant</Text>
       </View>
       </ScreenBody>
       </ScrollView>

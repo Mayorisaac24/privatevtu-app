@@ -7,6 +7,8 @@ import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import {
   api,
   getKycTierLabel,
@@ -33,8 +35,32 @@ import { GradientButton } from '../../src/components/ui/GradientButton';
 import { useGradients } from '../../src/theme/hooks';
 import { gradientStops } from '../../src/theme/gradient-utils';
 import { GlassCard } from '../../src/components/ui/GlassCard';
+import { LocationPickerModal } from '../../src/components/LocationPickerModal';
+import { FaceLivenessScannerGate } from '../../src/components/FaceLivenessScannerGate';
+import type { FaceLivenessResult } from '../../src/lib/face-liveness-types';
+import {
+  formatStateLabel,
+  getCitiesForState,
+  getNigeriaLocationsCached,
+  peekNigeriaLocations,
+  POPULAR_NIGERIA_STATES,
+  preloadNigeriaLocations,
+  type NigeriaLocationsSnapshot,
+} from '../../src/lib/nigeria-locations-cache';
 
-type Step = 'status' | 'tier2' | 'phone-verify' | 'phone-otp' | 'tier3';
+import {
+  enrichKycStatusData,
+  getTier3ActionLabel,
+  getTier3DocumentSummary,
+  hasSavedKycAddress,
+  KYC_ID_TYPE_LABELS,
+  KYC_ID_TYPES,
+  KYC_ID_TYPE_VALUES,
+} from '../../src/lib/kyc-status-utils';
+
+type Step = 'status' | 'tier2' | 'phone-verify' | 'phone-otp' | 'tier3' | 'tier3-docs';
+
+const MAX_KYC_IMAGE_BYTES = 5 * 1024 * 1024;
 
 const TIER_META: Record<string, {
   icon: keyof typeof Ionicons.glyphMap;
@@ -64,7 +90,7 @@ function tierIndex(tier: string): number {
 const TIER_STEP_REQ_IDS: Record<string, string[]> = {
   TIER_1: ['email', 'phone'],
   TIER_2: ['dob', 'bvn'],
-  TIER_3: ['address', 'id', 'selfie'],
+  TIER_3: ['address', 'proof_of_address', 'id', 'selfie'],
 };
 
 function getTierStepRequirements(
@@ -118,7 +144,8 @@ function LimitRow({
 
 const REQ_COMPACT_LABELS: Record<string, string> = {
   id: 'Gov ID',
-  selfie: 'Selfie',
+  proof_of_address: 'Address proof',
+  selfie: 'Face scan',
 };
 
 function RequirementPills({
@@ -347,6 +374,7 @@ const STEP_HEADER: Record<Step, string> = {
   'phone-verify': 'Phone verification',
   'phone-otp': 'Enter verification code',
   tier3: 'Residential address',
+  'tier3-docs': 'Identity documents',
 };
 
 function FormField({
@@ -371,6 +399,149 @@ function FormField({
           <Ionicons name={icon} size={18} color={Colors.primary} />
         </View>
         {children}
+      </View>
+    </View>
+  );
+}
+
+function FormSelectField({
+  label,
+  icon,
+  value,
+  placeholder,
+  disabled,
+  onPress,
+}: {
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  value: string;
+  placeholder: string;
+  disabled?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <FormField label={label} icon={icon}>
+      <TouchableOpacity
+        style={[styles.selectTrigger, disabled && styles.selectTriggerDisabled]}
+        onPress={onPress}
+        disabled={disabled}
+        activeOpacity={0.75}
+      >
+        <Text style={[styles.selectText, !value && styles.selectPlaceholder]}>
+          {value || placeholder}
+        </Text>
+        <Ionicons name="chevron-down" size={16} color={Colors.mutedLight} />
+      </TouchableOpacity>
+    </FormField>
+  );
+}
+
+function KycUploadTile({
+  label,
+  hint,
+  imageUrl,
+  uploading,
+  statusLabel,
+  onCamera,
+  onGallery,
+  onClear,
+}: {
+  label: string;
+  hint: string;
+  imageUrl: string;
+  uploading: boolean;
+  statusLabel?: string;
+  onCamera: () => void;
+  onGallery?: () => void;
+  onClear: () => void;
+}) {
+  return (
+    <View style={styles.uploadWrap}>
+      <View style={styles.uploadLabelRow}>
+        <Text style={styles.fieldLabel}>{label}</Text>
+        {statusLabel ? (
+          <View style={styles.uploadStatusPill}>
+            <Text style={styles.uploadStatusText}>{statusLabel}</Text>
+          </View>
+        ) : null}
+      </View>
+      {imageUrl ? (
+        <View style={styles.uploadPreviewWrap}>
+          <Image source={{ uri: imageUrl }} style={styles.uploadPreview} contentFit="cover" />
+          <TouchableOpacity style={styles.uploadClearBtn} onPress={onClear} activeOpacity={0.85}>
+            <Ionicons name="close" size={16} color={Colors.white} />
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.uploadDropzone}>
+          {uploading ? (
+            <ActivityIndicator color={Colors.primary} />
+          ) : (
+            <>
+              <View style={styles.uploadDropIcon}>
+                <Ionicons name="cloud-upload-outline" size={22} color={Colors.primary} />
+              </View>
+              <Text style={styles.uploadDropTitle}>{hint}</Text>
+              <Text style={styles.uploadDropSub}>PNG or JPG, up to 5MB</Text>
+              <View style={styles.uploadActionRow}>
+                <TouchableOpacity style={styles.uploadActionBtn} onPress={onCamera} activeOpacity={0.85}>
+                  <Ionicons name="camera-outline" size={16} color={Colors.primary} />
+                  <Text style={styles.uploadActionText}>{onGallery ? 'Camera' : 'Take photo'}</Text>
+                </TouchableOpacity>
+                {onGallery ? (
+                  <TouchableOpacity style={styles.uploadActionBtn} onPress={onGallery} activeOpacity={0.85}>
+                    <Ionicons name="images-outline" size={16} color={Colors.primary} />
+                    <Text style={styles.uploadActionText}>Gallery</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            </>
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function Tier3Progress({ currentStep }: { currentStep: 'address' | 'documents' }) {
+  const stepIndex = currentStep === 'address' ? 0 : 1;
+
+  return (
+    <View style={styles.tier3Progress}>
+      <View style={styles.tier3ProgressTrack}>
+        <View style={[styles.tier3ProgressFill, { width: stepIndex === 0 ? '50%' : '100%' }]} />
+      </View>
+      <View style={styles.tier3ProgressLabels}>
+        <Text style={[styles.tier3ProgressLabel, stepIndex >= 0 && styles.tier3ProgressLabelActive]}>
+          1 · Address
+        </Text>
+        <Text style={[styles.tier3ProgressLabel, stepIndex >= 1 && styles.tier3ProgressLabelActive]}>
+          2 · Documents
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function DocStatusBanner({
+  title,
+  subtitle,
+  tone,
+}: {
+  title: string;
+  subtitle: string;
+  tone: 'pending' | 'rejected';
+}) {
+  return (
+    <View style={[styles.docStatusBanner, tone === 'rejected' ? styles.docStatusBannerRejected : styles.docStatusBannerPending]}>
+      <Ionicons
+        name={tone === 'rejected' ? 'alert-circle' : 'time-outline'}
+        size={18}
+        color={tone === 'rejected' ? Colors.error : Colors.warning}
+      />
+      <View style={{ flex: 1 }}>
+        <Text style={styles.docStatusTitle}>{title}</Text>
+        <Text style={styles.docStatusSub}>{subtitle}</Text>
       </View>
     </View>
   );
@@ -480,7 +651,10 @@ export default function KycScreen() {
   const insets = useSafeAreaInsets();
   const { updateUser } = useAuthStore();
 
-  const [kycData, setKycData] = useState<KycStatusData | null>(() => peekKycStatusCache());
+  const [kycData, setKycData] = useState<KycStatusData | null>(() => {
+    const cached = peekKycStatusCache();
+    return cached ? enrichKycStatusData(cached) : null;
+  });
   const [loading, setLoading] = useState(() => !hasKycStatusCache());
   const [submitting, setSubmitting] = useState(false);
   const [step, setStep] = useState<Step>('status');
@@ -494,6 +668,24 @@ export default function KycScreen() {
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
   const [country, setCountry] = useState('Nigeria');
+  const [showStatePicker, setShowStatePicker] = useState(false);
+  const [showCityPicker, setShowCityPicker] = useState(false);
+  const [showDocTypePicker, setShowDocTypePicker] = useState(false);
+  const [locationsSnapshot, setLocationsSnapshot] = useState<NigeriaLocationsSnapshot | null>(
+    () => peekNigeriaLocations(),
+  );
+  const [locationsLoading, setLocationsLoading] = useState(() => !peekNigeriaLocations());
+
+  const [documentType, setDocumentType] = useState<string>(KYC_ID_TYPES[0].value);
+  const [documentUrl, setDocumentUrl] = useState('');
+  const [documentNumber, setDocumentNumber] = useState('');
+  const [proofOfAddressUrl, setProofOfAddressUrl] = useState('');
+  const [selfieUrl, setSelfieUrl] = useState('');
+  const [selfieLivenessMeta, setSelfieLivenessMeta] = useState<FaceLivenessResult['metadata'] | null>(null);
+  const [uploadingDocument, setUploadingDocument] = useState(false);
+  const [uploadingProof, setUploadingProof] = useState(false);
+  const [uploadingSelfie, setUploadingSelfie] = useState(false);
+  const [showFaceScan, setShowFaceScan] = useState(false);
 
   const currentTier = kycData?.currentTier ?? 'PENDING';
   const tiers = kycData?.tierRequirements ?? {};
@@ -509,8 +701,12 @@ export default function KycScreen() {
       setStep('phone-verify');
       return;
     }
+    if (step === 'tier3-docs') {
+      setStep(hasSavedKycAddress(kycData) ? 'status' : 'tier3');
+      return;
+    }
     setStep('status');
-  }, [step]);
+  }, [step, kycData]);
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -521,14 +717,56 @@ export default function KycScreen() {
     return () => sub.remove();
   }, [step, handleHeaderBack]);
 
+  useEffect(() => {
+    preloadNigeriaLocations();
+    let cancelled = false;
+    if (!peekNigeriaLocations()) {
+      setLocationsLoading(true);
+    }
+    void getNigeriaLocationsCached()
+      .then((snapshot) => {
+        if (!cancelled) {
+          setLocationsSnapshot(snapshot);
+          setLocationsLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLocationsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const cityOptions = useMemo(
+    () => {
+      const options = getCitiesForState(state, locationsSnapshot);
+      if (city && !options.includes(city)) return [city, ...options];
+      return options;
+    },
+    [city, locationsSnapshot, state],
+  );
+
+  const stateOptions = useMemo(() => {
+    const options = locationsSnapshot?.states ?? [];
+    if (state && !options.includes(state)) return [state, ...options];
+    return options;
+  }, [locationsSnapshot?.states, state]);
+
+  const tier3DocSummary = useMemo(
+    () => getTier3DocumentSummary(kycData),
+    [kycData],
+  );
+
   const applyKycData = useCallback((data: KycStatusData) => {
-    setKycData(data);
-    setKycStatusCache(data);
-    if (data.user.address) setAddress(data.user.address);
-    if (data.user.city) setCity(data.user.city);
-    if (data.user.state) setState(data.user.state);
-    if (data.user.country) setCountry(data.user.country);
-    if (data.user.dateOfBirth) setDateOfBirth(data.user.dateOfBirth.slice(0, 10));
+    const enriched = enrichKycStatusData(data);
+    setKycData(enriched);
+    setKycStatusCache(enriched);
+    if (enriched.user.address) setAddress(enriched.user.address);
+    if (enriched.user.city) setCity(enriched.user.city);
+    if (enriched.user.state) setState(enriched.user.state);
+    if (enriched.user.country) setCountry(enriched.user.country);
+    if (enriched.user.dateOfBirth) setDateOfBirth(enriched.user.dateOfBirth.slice(0, 10));
   }, []);
 
   const fetchStatus = useCallback(async (options?: { silent?: boolean; force?: boolean }) => {
@@ -691,9 +929,105 @@ export default function KycScreen() {
     }
   };
 
+  const startTier3 = useCallback(() => {
+    setStep(hasSavedKycAddress(kycData) ? 'tier3-docs' : 'tier3');
+  }, [kycData]);
+
+  const uploadKycImage = useCallback(async (asset: ImagePicker.ImagePickerAsset, folder: string) => {
+    if (asset.fileSize && asset.fileSize > MAX_KYC_IMAGE_BYTES) {
+      throw new Error('Image must be 5MB or smaller');
+    }
+    if (!asset.base64) {
+      throw new Error('Could not read the selected image');
+    }
+    const mime = asset.mimeType || 'image/jpeg';
+    const dataUri = `data:${mime};base64,${asset.base64}`;
+    const uploadRes = await api.uploadDocument(dataUri, folder);
+    if (!isResponseSuccess(uploadRes) || !uploadRes.data?.url) {
+      throw new Error(uploadRes.message || 'Upload failed');
+    }
+    return uploadRes.data.url;
+  }, []);
+
+  const captureKycImage = useCallback(async (
+    kind: 'document' | 'proof_of_address',
+    source: 'camera' | 'library',
+  ) => {
+    const setUploading = kind === 'proof_of_address' ? setUploadingProof : setUploadingDocument;
+    const setUrl = kind === 'proof_of_address' ? setProofOfAddressUrl : setDocumentUrl;
+    const folder = kind === 'proof_of_address' ? 'kyc-proof-of-address' : 'kyc-documents';
+
+    const permission = source === 'camera'
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      showToast({
+        type: 'error',
+        text1: source === 'camera' ? 'Camera access needed' : 'Photo access needed',
+      });
+      return;
+    }
+
+    const pickerOptions: ImagePicker.ImagePickerOptions = {
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.85,
+      base64: true,
+    };
+
+    const result = source === 'camera'
+      ? await ImagePicker.launchCameraAsync(pickerOptions)
+      : await ImagePicker.launchImageLibraryAsync(pickerOptions);
+
+    if (result.canceled || !result.assets[0]) return;
+
+    setUploading(true);
+    try {
+      const url = await uploadKycImage(result.assets[0], folder);
+      setUrl(url);
+      showToast({
+        type: 'success',
+        text1: kind === 'proof_of_address' ? 'Proof of address added' : 'Document added',
+      });
+    } catch (err: any) {
+      showToast({
+        type: 'error',
+        text1: err?.message || (kind === 'proof_of_address' ? 'Could not add proof of address' : 'Could not add document'),
+      });
+    } finally {
+      setUploading(false);
+    }
+  }, [uploadKycImage]);
+
+  const handleFaceScanComplete = useCallback(async (result: FaceLivenessResult) => {
+    setUploadingSelfie(true);
+    try {
+      const uploadRes = await api.uploadDocument(result.dataUri, 'kyc-selfies');
+      if (!isResponseSuccess(uploadRes) || !uploadRes.data?.url) {
+        throw new Error(uploadRes.message || 'Upload failed');
+      }
+      setSelfieUrl(uploadRes.data.url);
+      setSelfieLivenessMeta(result.metadata);
+      showToast({ type: 'success', text1: 'Live face scan captured' });
+    } catch (err: any) {
+      showToast({ type: 'error', text1: err?.message || 'Could not save face scan' });
+    } finally {
+      setUploadingSelfie(false);
+    }
+  }, []);
+
   const handleSaveAddress = async () => {
-    if (!address.trim() || !city.trim() || !state.trim()) {
-      showToast({ type: 'error', text1: 'Complete your address details' });
+    if (!state.trim()) {
+      showToast({ type: 'error', text1: 'Select your state' });
+      return;
+    }
+    if (!city.trim()) {
+      showToast({ type: 'error', text1: 'Select your city' });
+      return;
+    }
+    if (!address.trim()) {
+      showToast({ type: 'error', text1: 'Enter your street address' });
       return;
     }
     setSubmitting(true);
@@ -703,10 +1037,10 @@ export default function KycScreen() {
         showToast({
           type: 'success',
           text1: 'Address saved',
-          text2: 'Upload ID documents on the web app to finish Tier 3.',
+          text2: 'Next, upload your documents and complete the live face scan.',
         });
-        setStep('status');
         await fetchStatus({ silent: true, force: true });
+        setStep('tier3-docs');
       } else {
         showToast({ type: 'error', text1: res.message || 'Could not save address' });
       }
@@ -716,6 +1050,79 @@ export default function KycScreen() {
       setSubmitting(false);
     }
   };
+
+  const handleSubmitDocuments = async () => {
+    if (!documentUrl) {
+      showToast({ type: 'error', text1: 'Upload your government ID' });
+      return;
+    }
+    if (!proofOfAddressUrl) {
+      showToast({ type: 'error', text1: 'Upload proof of address' });
+      return;
+    }
+    if (!documentNumber.trim()) {
+      showToast({ type: 'error', text1: 'Document number is required' });
+      return;
+    }
+    if (!selfieUrl || !selfieLivenessMeta) {
+      showToast({ type: 'error', text1: 'Complete the live face scan' });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const idRes = await api.submitKycDocument({
+        documentType,
+        documentUrl,
+        documentNumber: documentNumber.trim(),
+      });
+      if (!isResponseSuccess(idRes)) {
+        throw new Error(idRes.message || 'Could not submit ID document');
+      }
+
+      const proofRes = await api.submitKycDocument({
+        documentType: 'PROOF_OF_ADDRESS',
+        documentUrl: proofOfAddressUrl,
+      });
+      if (!isResponseSuccess(proofRes)) {
+        throw new Error(proofRes.message || 'Could not submit proof of address');
+      }
+
+      const selfieRes = await api.submitKycDocument({
+        documentType: 'SELFIE',
+        documentUrl: selfieUrl,
+        metadata: selfieLivenessMeta,
+      });
+      if (!isResponseSuccess(selfieRes)) {
+        throw new Error(selfieRes.message || 'Could not submit selfie');
+      }
+
+      showToast({
+        type: 'success',
+        text1: 'Documents submitted',
+        text2: 'Our team will review them shortly.',
+      });
+      setStep('status');
+      await fetchStatus({ silent: true, force: true });
+    } catch (err: any) {
+      showToast({ type: 'error', text1: err?.message || 'Could not submit documents' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSelectState = useCallback((nextState: string) => {
+    setState((prev) => {
+      if (prev === nextState) return prev;
+      setCity('');
+      return nextState;
+    });
+    setShowStatePicker(false);
+  }, []);
+
+  const handleSelectCity = useCallback((nextCity: string) => {
+    setCity(nextCity);
+    setShowCityPicker(false);
+  }, []);
 
   const renderPrimaryBtn = (label: string, onPress: () => void, disabled?: boolean) => (
     <TouchableOpacity onPress={onPress} disabled={disabled || submitting} activeOpacity={0.88}>
@@ -825,9 +1232,25 @@ export default function KycScreen() {
           icon="location-outline"
           title="Residential address"
           subtitle="Your home address for Tier 3."
-          stepBadge="Tier 3 · Address"
-          perks={['ID & selfie on web app']}
+          stepBadge="Tier 3 · Step 1 of 2"
+          perks={['All steps completed in-app']}
         >
+          <Tier3Progress currentStep="address" />
+          <FormSelectField
+            label="State"
+            icon="map-outline"
+            value={state ? formatStateLabel(state) : ''}
+            placeholder="Choose state"
+            onPress={() => setShowStatePicker(true)}
+          />
+          <FormSelectField
+            label="City"
+            icon="business-outline"
+            value={city}
+            placeholder={state ? 'Choose city / LGA' : 'Select state first'}
+            disabled={!state}
+            onPress={() => setShowCityPicker(true)}
+          />
           <FormField label="Street address" icon="home-outline">
             <TextInput
               style={styles.inputField}
@@ -837,25 +1260,177 @@ export default function KycScreen() {
               placeholderTextColor={Colors.mutedLight}
             />
           </FormField>
-          <FormField label="City" icon="business-outline">
-            <TextInput
-              style={styles.inputField}
-              value={city}
-              onChangeText={setCity}
-              placeholder="City"
-              placeholderTextColor={Colors.mutedLight}
-            />
-          </FormField>
-          <FormField label="State" icon="map-outline">
-            <TextInput
-              style={styles.inputField}
-              value={state}
-              onChangeText={setState}
-              placeholder="State"
-              placeholderTextColor={Colors.mutedLight}
-            />
-          </FormField>
           {renderPrimaryBtn('Save address', handleSaveAddress)}
+        </FormShell>
+      );
+    }
+
+    if (step === 'tier3-docs') {
+      const awaitingReview = tier3DocSummary.allSubmitted
+        && tier3DocSummary.anyPending
+        && !tier3DocSummary.anyRejected
+        && !documentUrl
+        && !proofOfAddressUrl
+        && !selfieUrl;
+      const showUploadForm = tier3DocSummary.needsUpload || !!documentUrl || !!proofOfAddressUrl || !!selfieUrl;
+
+      return (
+        <FormShell
+          icon="id-card-outline"
+          title={awaitingReview ? 'Submission received' : 'Upload documents'}
+          subtitle={
+            awaitingReview
+              ? 'Your documents and face scan are being reviewed.'
+              : 'Government ID, proof of address, and a live face scan for Tier 3.'
+          }
+          stepBadge="Tier 3 · Step 2 of 2"
+          perks={['Reviewed by our team in admin']}
+        >
+          <Tier3Progress currentStep="documents" />
+
+          {awaitingReview ? (
+            <>
+              <DocStatusBanner
+                tone="pending"
+                title="Under review"
+                subtitle="We usually review submissions within 1–2 business days. Tier 3 unlocks after admin approves all documents and your live face scan."
+              />
+              <View style={styles.docReviewList}>
+                <View style={styles.docReviewRow}>
+                  <Text style={styles.docReviewLabel}>Government ID</Text>
+                  <Text style={styles.docReviewStatus}>{tier3DocSummary.idDoc?.status ?? 'Pending'}</Text>
+                </View>
+                <View style={styles.docReviewRow}>
+                  <Text style={styles.docReviewLabel}>Proof of address</Text>
+                  <Text style={styles.docReviewStatus}>{tier3DocSummary.proofDoc?.status ?? 'Pending'}</Text>
+                </View>
+                <View style={[styles.docReviewRow, styles.docReviewRowLast]}>
+                  <Text style={styles.docReviewLabel}>Live face scan</Text>
+                  <Text style={styles.docReviewStatus}>{tier3DocSummary.selfieDoc?.status ?? 'Pending'}</Text>
+                </View>
+              </View>
+              {renderPrimaryBtn('Back to overview', () => setStep('status'))}
+            </>
+          ) : null}
+
+          {tier3DocSummary.anyRejected ? (
+            <DocStatusBanner
+              tone="rejected"
+              title="Resubmission required"
+              subtitle={[
+                tier3DocSummary.idDoc?.status === 'REJECTED' ? tier3DocSummary.idDoc.rejectionReason : null,
+                tier3DocSummary.proofDoc?.status === 'REJECTED' ? tier3DocSummary.proofDoc.rejectionReason : null,
+                tier3DocSummary.selfieDoc?.status === 'REJECTED' ? tier3DocSummary.selfieDoc.rejectionReason : null,
+              ].filter(Boolean).join(' · ') || 'One or more documents were rejected. Please upload again.'}
+            />
+          ) : null}
+
+          {showUploadForm ? (
+            <>
+              <FormSelectField
+                label="Document type"
+                icon="card-outline"
+                value={KYC_ID_TYPE_LABELS[documentType] ?? documentType}
+                placeholder="Choose document type"
+                onPress={() => setShowDocTypePicker(true)}
+              />
+              <FormField label="Document number" icon="keypad-outline">
+                <TextInput
+                  style={styles.inputField}
+                  value={documentNumber}
+                  onChangeText={setDocumentNumber}
+                  placeholder="Enter ID number"
+                  placeholderTextColor={Colors.mutedLight}
+                  autoCapitalize="characters"
+                />
+              </FormField>
+              <KycUploadTile
+                label="Government ID"
+                hint="Add a clear photo of your ID"
+                imageUrl={documentUrl}
+                uploading={uploadingDocument}
+                statusLabel={
+                  !documentUrl && tier3DocSummary.idDoc?.status === 'REJECTED' ? 'Rejected' : undefined
+                }
+                onCamera={() => { void captureKycImage('document', 'camera'); }}
+                onGallery={() => { void captureKycImage('document', 'library'); }}
+                onClear={() => setDocumentUrl('')}
+              />
+              <KycUploadTile
+                label="Proof of address"
+                hint="Utility bill, tenancy, or bank statement"
+                imageUrl={proofOfAddressUrl}
+                uploading={uploadingProof}
+                statusLabel={
+                  !proofOfAddressUrl && tier3DocSummary.proofDoc?.status === 'REJECTED' ? 'Rejected' : undefined
+                }
+                onCamera={() => { void captureKycImage('proof_of_address', 'camera'); }}
+                onGallery={() => { void captureKycImage('proof_of_address', 'library'); }}
+                onClear={() => setProofOfAddressUrl('')}
+              />
+              <View style={styles.uploadWrap}>
+                <View style={styles.uploadLabelRow}>
+                  <Text style={styles.fieldLabel}>Live face scan</Text>
+                  {selfieUrl ? (
+                    <View style={[styles.uploadStatusPill, styles.uploadStatusPillSuccess]}>
+                      <Text style={[styles.uploadStatusText, styles.uploadStatusTextSuccess]}>Verified live</Text>
+                    </View>
+                  ) : tier3DocSummary.selfieDoc?.status === 'REJECTED' ? (
+                    <View style={styles.uploadStatusPill}>
+                      <Text style={styles.uploadStatusText}>Rejected</Text>
+                    </View>
+                  ) : null}
+                </View>
+                {selfieUrl ? (
+                  <View style={styles.uploadPreviewWrap}>
+                    <Image source={{ uri: selfieUrl }} style={styles.uploadPreview} contentFit="cover" />
+                    <TouchableOpacity
+                      style={styles.uploadClearBtn}
+                      onPress={() => {
+                        setSelfieUrl('');
+                        setSelfieLivenessMeta(null);
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <Ionicons name="close" size={16} color={Colors.white} />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.faceScanBtn}
+                    onPress={() => setShowFaceScan(true)}
+                    disabled={uploadingSelfie}
+                    activeOpacity={0.85}
+                  >
+                    {uploadingSelfie ? (
+                      <ActivityIndicator color={Colors.primary} />
+                    ) : (
+                      <>
+                        <View style={styles.uploadDropIcon}>
+                          <Ionicons name="scan-outline" size={22} color={Colors.primary} />
+                        </View>
+                        <Text style={styles.uploadDropTitle}>Start live face scan</Text>
+                        <Text style={styles.uploadDropSub}>Camera only · guided blink and head-turn checks</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
+              <View style={styles.secureNote}>
+                <View style={styles.secureNoteIcon}>
+                  <Ionicons name="shield-checkmark" size={16} color={Colors.primary} />
+                </View>
+                <Text style={styles.secureNoteText}>
+                  Documents upload to secure storage. Face scan must be captured live on camera.
+                </Text>
+              </View>
+              {renderPrimaryBtn(
+                tier3DocSummary.anyRejected ? 'Resubmit for review' : 'Submit for review',
+                handleSubmitDocuments,
+                !documentUrl || !documentNumber.trim() || !proofOfAddressUrl || !selfieUrl || !selfieLivenessMeta,
+              )}
+            </>
+          ) : null}
         </FormShell>
       );
     }
@@ -902,11 +1477,23 @@ export default function KycScreen() {
           tierKey="TIER_3"
           tier={tiers.TIER_3}
           currentTier={currentTier}
-          onAction={currentTier === 'TIER_2' ? () => setStep('tier3') : undefined}
-          actionLabel={currentTier === 'TIER_2' ? 'Start Tier 3' : undefined}
+          onAction={currentTier === 'TIER_2' ? startTier3 : undefined}
+          actionLabel={currentTier === 'TIER_2' ? getTier3ActionLabel(kycData) : undefined}
           showVerified={currentTier === 'TIER_3'}
           isLast
         />
+
+        {currentTier === 'TIER_2' && tier3DocSummary.allSubmitted && tier3DocSummary.anyPending ? (
+          <GlassCard borderRadius={Radius.lg} padding={14} variant="tinted" contentStyle={styles.reviewBanner}>
+            <View style={styles.perkIcon}>
+              <Ionicons name="time-outline" size={18} color={Colors.warning} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.perkTitle}>Documents under review</Text>
+              <Text style={styles.perkSub}>Tier 3 unlocks after admin approves your documents and live face scan</Text>
+            </View>
+          </GlassCard>
+        ) : null}
 
         <View style={styles.trustFooter}>
           <Ionicons name="lock-closed" size={13} color={Colors.muted} />
@@ -975,6 +1562,53 @@ export default function KycScreen() {
           </ScrollView>
         )}
       </KeyboardAvoidingView>
+
+      <LocationPickerModal
+        visible={showStatePicker}
+        title="Select state"
+        subtitle="Choose your state of residence"
+        options={stateOptions}
+        popularOptions={POPULAR_NIGERIA_STATES}
+        formatLabel={formatStateLabel}
+        loading={locationsLoading}
+        selectedValue={state || null}
+        onClose={() => setShowStatePicker(false)}
+        onSelect={handleSelectState}
+      />
+
+      <LocationPickerModal
+        visible={showCityPicker}
+        title="Select city"
+        subtitle={state ? `Cities and LGAs in ${formatStateLabel(state)}` : undefined}
+        options={cityOptions}
+        loading={locationsLoading}
+        selectedValue={city || null}
+        onClose={() => setShowCityPicker(false)}
+        onSelect={handleSelectCity}
+      />
+
+      <LocationPickerModal
+        visible={showDocTypePicker}
+        title="Document type"
+        subtitle="Choose the ID you want to submit"
+        options={[...KYC_ID_TYPE_VALUES]}
+        formatLabel={(value) => KYC_ID_TYPE_LABELS[value] ?? value}
+        selectedValue={documentType}
+        onClose={() => setShowDocTypePicker(false)}
+        onSelect={(value) => {
+          setDocumentType(value);
+          setShowDocTypePicker(false);
+        }}
+      />
+
+      <FaceLivenessScannerGate
+        visible={showFaceScan}
+        onClose={() => setShowFaceScan(false)}
+        onComplete={(result) => {
+          setShowFaceScan(false);
+          void handleFaceScanComplete(result);
+        }}
+      />
     </ThemedScreen>
   );
 }
@@ -1387,6 +2021,231 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.dark,
     fontWeight: '500',
+  },
+  selectTrigger: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    gap: 8,
+  },
+  selectTriggerDisabled: {
+    opacity: 0.55,
+  },
+  selectText: {
+    flex: 1,
+    fontSize: 16,
+    color: Colors.dark,
+    fontWeight: '500',
+  },
+  selectPlaceholder: {
+    color: Colors.mutedLight,
+    fontWeight: '400',
+  },
+  uploadWrap: { gap: 8 },
+  uploadDropzone: {
+    minHeight: 132,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(124, 58, 237, 0.22)',
+    backgroundColor: '#FAFAFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 18,
+    gap: 6,
+  },
+  uploadDropIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: Colors.primaryMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+  uploadDropTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.dark,
+    textAlign: 'center',
+  },
+  uploadDropSub: {
+    fontSize: 12,
+    color: Colors.muted,
+    textAlign: 'center',
+  },
+  uploadPreviewWrap: {
+    position: 'relative',
+    borderRadius: 14,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(124, 58, 237, 0.14)',
+  },
+  uploadPreview: {
+    width: '100%',
+    height: 180,
+    backgroundColor: '#F1F5F9',
+  },
+  uploadClearBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(15, 23, 42, 0.72)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  uploadLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  uploadStatusPill: {
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: Radius.full,
+  },
+  uploadStatusText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: Colors.error,
+    textTransform: 'uppercase',
+  },
+  uploadStatusPillSuccess: {
+    backgroundColor: '#DCFCE7',
+  },
+  uploadStatusTextSuccess: {
+    color: Colors.success,
+  },
+  faceScanBtn: {
+    minHeight: 132,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(124, 58, 237, 0.22)',
+    backgroundColor: '#FAFAFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 18,
+    gap: 6,
+  },
+  uploadActionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 8,
+  },
+  uploadActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: 'rgba(124, 58, 237, 0.18)',
+    borderRadius: Radius.full,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  uploadActionText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.primary,
+  },
+  tier3Progress: { gap: 8, marginBottom: 4 },
+  tier3ProgressTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#EDE9FE',
+    overflow: 'hidden',
+  },
+  tier3ProgressFill: {
+    height: '100%',
+    borderRadius: 3,
+    backgroundColor: Colors.primary,
+  },
+  tier3ProgressLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  tier3ProgressLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: Colors.mutedLight,
+  },
+  tier3ProgressLabelActive: {
+    color: Colors.primary,
+    fontWeight: '700',
+  },
+  docStatusBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  docStatusBannerPending: {
+    backgroundColor: '#FFFBEB',
+    borderColor: 'rgba(245, 158, 11, 0.2)',
+  },
+  docStatusBannerRejected: {
+    backgroundColor: '#FEF2F2',
+    borderColor: 'rgba(239, 68, 68, 0.18)',
+  },
+  docStatusTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.dark,
+  },
+  docStatusSub: {
+    fontSize: 12,
+    color: Colors.muted,
+    marginTop: 3,
+    lineHeight: 17,
+  },
+  docReviewList: {
+    backgroundColor: '#FAFAFE',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(124, 58, 237, 0.12)',
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+  },
+  docReviewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(15, 23, 42, 0.06)',
+  },
+  docReviewRowLast: {
+    borderBottomWidth: 0,
+  },
+  docReviewLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.dark,
+  },
+  docReviewStatus: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.warning,
+    textTransform: 'capitalize',
+  },
+  reviewBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 8,
   },
   otpWrap: { alignItems: 'center', gap: 12, paddingVertical: 8 },
   otpRow: { flexDirection: 'row', gap: 8, justifyContent: 'center' },

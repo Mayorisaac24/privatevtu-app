@@ -14,6 +14,7 @@ export interface EnrichedTransaction extends Transaction {
   logoKey?: string;
   isCredit?: boolean;
   network?: string;
+  displayAmountKobo?: string;
 }
 
 export interface TxDisplayMeta {
@@ -52,6 +53,69 @@ function normalizeStatus(status?: string): DisplayStatus {
   if (value === 'failed' || value === 'reversed') return 'failed';
   if (value === 'processing') return 'processing';
   return 'pending';
+}
+
+function readMetadataRecord(metadata: unknown): Record<string, unknown> | null {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return null;
+  return metadata as Record<string, unknown>;
+}
+
+function resolveDisplayAmountKobo(tx: Transaction): string {
+  if (tx.displayAmount) return tx.displayAmount;
+
+  const type = String(tx.type || '').toUpperCase();
+  const storedAmount = String(tx.amount || '0');
+  const meta = readMetadataRecord(tx.metadata);
+  const transferAmount = tx.transferDetails?.transferAmount ?? meta?.transferAmount;
+
+  if (
+    (type === 'WITHDRAWAL' || type === 'TRANSFER')
+    && transferAmount != null
+    && String(transferAmount).length > 0
+  ) {
+    return String(transferAmount);
+  }
+
+  return storedAmount;
+}
+
+function resolveFeeKobo(tx: Transaction): string {
+  if (tx.fee && BigInt(tx.fee) > 0n) return tx.fee;
+
+  const meta = readMetadataRecord(tx.metadata);
+  if (meta?.fee != null && String(meta.fee).length > 0) {
+    return String(meta.fee);
+  }
+
+  if (tx.transferDetails?.fee && BigInt(tx.transferDetails.fee) > 0n) {
+    return tx.transferDetails.fee;
+  }
+
+  return '0';
+}
+
+export function getTransactionDisplayAmountKobo(tx: Transaction): string {
+  return resolveDisplayAmountKobo(tx);
+}
+
+export function getTransactionFeeKobo(tx: Transaction): string {
+  return resolveFeeKobo(tx);
+}
+
+/** Mirror backend: hide internal operational-wallet admin credits from user history. */
+export function isCustomerVisibleTransaction(type: string, metadata?: unknown): boolean {
+  const normalized = String(type || '').toUpperCase();
+  if (normalized === 'ADMIN_DEBIT') return false;
+  if (normalized !== 'ADMIN_CREDIT') return true;
+
+  const meta = readMetadataRecord(metadata);
+  if (!meta) return true;
+  if (meta.customerVisible === true) return true;
+  if (meta.customerVisible === false) return false;
+
+  const walletType = String(meta.walletType || '');
+  const targetWalletType = String(meta.targetWalletType || '');
+  return walletType !== 'OPERATIONAL' && targetWalletType !== 'OPERATIONAL';
 }
 
 function normalizeCategory(type: string): string {
@@ -132,6 +196,7 @@ export function enrichTransaction(tx: Transaction): EnrichedTransaction {
   }
 
   const isCredit = txType === 'WALLET_FUND' || txType === 'ADMIN_CREDIT' || Boolean(tx.isCredit);
+  const displayAmountKobo = resolveDisplayAmountKobo(tx);
 
   return {
     ...tx,
@@ -144,6 +209,7 @@ export function enrichTransaction(tx: Transaction): EnrichedTransaction {
     logoType,
     logoKey,
     isCredit,
+    displayAmountKobo,
   };
 }
 
@@ -199,7 +265,7 @@ export function getAmountPresentation(tx: EnrichedTransaction): { prefix: '+' | 
   return { prefix, color: Colors.dark };
 }
 
-export function dedupeTransactionsForDisplay<T extends { id: string; type: string; reference: string }>(
+export function dedupeTransactionsForDisplay<T extends { id: string; type: string; reference: string; metadata?: unknown }>(
   rows: T[],
 ): T[] {
   const withdrawalRefs = new Set(
@@ -208,6 +274,7 @@ export function dedupeTransactionsForDisplay<T extends { id: string; type: strin
   const seen = new Set<string>();
 
   return rows.filter((row) => {
+    if (!isCustomerVisibleTransaction(row.type, row.metadata)) return false;
     if (row.type === 'TRANSFER' && withdrawalRefs.has(row.reference)) return false;
     if (seen.has(row.id)) return false;
     seen.add(row.id);
