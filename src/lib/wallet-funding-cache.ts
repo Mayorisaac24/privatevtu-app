@@ -42,6 +42,8 @@ let memoryCache: WalletFundingSnapshot | null = null;
 let inflight: Promise<WalletFundingSnapshot> | null = null;
 let accountsInflight: Promise<VirtualAccount[]> | null = null;
 let accountsHydrated = false;
+/** True only after a full `/wallet/funding-methods` + banks + KYC snapshot has completed. */
+let fullSnapshotHydrated = false;
 let preloadStarted = false;
 let accountsPreloadStarted = false;
 
@@ -66,7 +68,6 @@ function mergeAccountsIntoCache(accounts: VirtualAccount[]) {
   memoryCache = {
     ...(memoryCache ?? emptySnapshot()),
     virtualAccounts: accounts,
-    fetchedAt: Date.now(),
   };
   accountsHydrated = true;
 }
@@ -138,6 +139,8 @@ async function fetchSnapshotFromApi(): Promise<WalletFundingSnapshot> {
   }
 
   memoryCache = snapshot;
+  accountsHydrated = true;
+  fullSnapshotHydrated = true;
   return snapshot;
 }
 
@@ -146,7 +149,11 @@ export function peekWalletFundingCache(): WalletFundingSnapshot | null {
 }
 
 export function hasWalletFundingCache(): boolean {
-  return memoryCache !== null;
+  return fullSnapshotHydrated && memoryCache !== null;
+}
+
+export function hasFullWalletFundingSnapshot(): boolean {
+  return fullSnapshotHydrated;
 }
 
 export function hasWalletFundingAccountsReady(): boolean {
@@ -174,7 +181,9 @@ export async function preloadWalletFundingAccounts(): Promise<void> {
 }
 
 export async function getWalletFundingData(options?: { force?: boolean }): Promise<WalletFundingSnapshot> {
-  if (!options?.force && memoryCache) {
+  const force = options?.force === true;
+
+  if (!force && fullSnapshotHydrated && memoryCache) {
     if (isFresh(memoryCache.fetchedAt)) {
       return memoryCache;
     }
@@ -185,15 +194,20 @@ export async function getWalletFundingData(options?: { force?: boolean }): Promi
   if (inflight) return inflight;
 
   inflight = fetchSnapshotFromApi()
-    .catch(() => memoryCache ?? {
-      methods: EMPTY_FUNDING_METHODS,
-      virtualAccounts: [],
-      staticBanks: [],
-      dynamicBanks: [],
-      hasBvn: false,
-      kycTier: null,
-      tierLimits: null,
-      fetchedAt: Date.now(),
+    .catch(() => {
+      if (fullSnapshotHydrated && memoryCache) {
+        return memoryCache;
+      }
+      return {
+        methods: EMPTY_FUNDING_METHODS,
+        virtualAccounts: memoryCache?.virtualAccounts ?? [],
+        staticBanks: memoryCache?.staticBanks ?? [],
+        dynamicBanks: memoryCache?.dynamicBanks ?? [],
+        hasBvn: memoryCache?.hasBvn ?? false,
+        kycTier: memoryCache?.kycTier ?? null,
+        tierLimits: memoryCache?.tierLimits ?? null,
+        fetchedAt: Date.now(),
+      };
     })
     .finally(() => {
       inflight = null;
@@ -209,7 +223,7 @@ export async function pullToRefreshWalletFunding(): Promise<WalletFundingSnapsho
 
 export function refreshWalletFundingSilently(): void {
   if (inflight) return;
-  if (memoryCache && isFresh(memoryCache.fetchedAt)) return;
+  if (fullSnapshotHydrated && memoryCache && isFresh(memoryCache.fetchedAt)) return;
   inflight = fetchSnapshotFromApi()
     .catch(() => memoryCache)
     .finally(() => {
@@ -240,6 +254,7 @@ export function resetWalletFundingCache(): void {
   inflight = null;
   accountsInflight = null;
   accountsHydrated = false;
+  fullSnapshotHydrated = false;
   preloadStarted = false;
   accountsPreloadStarted = false;
 }

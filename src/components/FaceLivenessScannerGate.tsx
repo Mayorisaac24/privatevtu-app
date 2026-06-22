@@ -3,16 +3,19 @@ import { ActivityIndicator, Modal, Platform, StyleSheet, Text, TouchableOpacity,
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { FaceLivenessResult } from '../lib/face-liveness-types';
-import { isVisionCameraNativeAvailable } from '../lib/vision-camera-available';
+import { isVisionCameraNativeAvailable, resetVisionCameraAvailabilityCache } from '../lib/vision-camera-available';
 import { Colors, Radius } from '../theme';
 
 const LazyFaceLivenessScanner = lazy(async () => {
-  const mod = await import('./FaceLivenessScanner');
-  return { default: mod.FaceLivenessScanner };
+  const mod = await import('./SpokenFaceLivenessScanner');
+  return { default: mod.SpokenFaceLivenessScanner };
 });
 
 type Props = {
   visible: boolean;
+  sessionId: string;
+  spokenPhrase: string;
+  expiresAt: string;
   onClose: () => void;
   onComplete: (result: FaceLivenessResult) => void;
 };
@@ -29,9 +32,9 @@ function RebuildRequiredModal({ visible, onClose }: { visible: boolean; onClose:
           </View>
           <Text style={styles.title}>Native rebuild required</Text>
           <Text style={styles.body}>
-            Live face scan now uses on-device face detection. Rebuild the app once, then try again.
+            Live face scan needs a fresh native build with face detection enabled. Close the app completely, rebuild, then open the new build — not Expo Go.
           </Text>
-          <Text style={styles.code}>npx expo prebuild --clean{'\n'}npx expo run:ios{'\n'}npx expo run:android</Text>
+          <Text style={styles.code}>npx expo prebuild --clean{'\n'}npx expo run:ios{'\n'}# or npx expo run:android</Text>
           <TouchableOpacity style={styles.btn} onPress={onClose} activeOpacity={0.85}>
             <Text style={styles.btnText}>Got it</Text>
           </TouchableOpacity>
@@ -41,9 +44,22 @@ function RebuildRequiredModal({ visible, onClose }: { visible: boolean; onClose:
   );
 }
 
-export function FaceLivenessScannerGate({ visible, onClose, onComplete }: Props) {
-  const [nativeReady] = useState(() => isVisionCameraNativeAvailable());
+export function FaceLivenessScannerGate({
+  visible,
+  sessionId,
+  spokenPhrase,
+  expiresAt,
+  onClose,
+  onComplete,
+}: Props) {
+  const [nativeReady, setNativeReady] = useState(() => isVisionCameraNativeAvailable());
   const [shouldMountScanner, setShouldMountScanner] = useState(false);
+
+  useEffect(() => {
+    if (!visible) return;
+    resetVisionCameraAvailabilityCache();
+    setNativeReady(isVisionCameraNativeAvailable());
+  }, [visible]);
 
   useEffect(() => {
     if (visible && nativeReady) {
@@ -77,7 +93,14 @@ export function FaceLivenessScannerGate({ visible, onClose, onComplete }: Props)
         </Modal>
       )}
     >
-      <LazyFaceLivenessScanner visible={visible} onClose={onClose} onComplete={onComplete} />
+      <LazyFaceLivenessScanner
+        visible={visible}
+        sessionId={sessionId}
+        spokenPhrase={spokenPhrase}
+        expiresAt={expiresAt}
+        onClose={onClose}
+        onComplete={onComplete}
+      />
     </Suspense>
   );
 }

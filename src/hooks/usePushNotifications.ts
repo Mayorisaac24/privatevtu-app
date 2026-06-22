@@ -3,6 +3,7 @@ import * as Notifications from 'expo-notifications';
 import { useAuthStore } from '../stores';
 import { addNotificationListeners, registerPushNotifications } from '../lib/push-notifications';
 import { navigateFromNotificationData } from '../lib/notification-navigation';
+import { isKycReviewNotification, refreshKycStatusFromReviewUpdate } from '../lib/kyc-status-cache';
 import { useNotificationsStore } from '../stores/notifications-store';
 
 export function usePushNotifications() {
@@ -22,12 +23,19 @@ export function usePushNotifications() {
     void fetchUnreadCount();
 
     return addNotificationListeners(
-      () => {
+      (notification) => {
         void fetchUnreadCount();
+        const data = notification.request.content.data as Record<string, unknown> | undefined;
+        if (isKycReviewNotification(data)) {
+          void refreshKycStatusFromReviewUpdate();
+        }
       },
       (response) => {
         void fetchUnreadCount();
         const data = response.notification.request.content.data as Record<string, unknown> | undefined;
+        if (isKycReviewNotification(data)) {
+          void refreshKycStatusFromReviewUpdate();
+        }
         navigateFromNotificationData(data);
       },
     );

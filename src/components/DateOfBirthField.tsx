@@ -342,7 +342,6 @@ export function DateOfBirthField({
                   onPress={confirmDate}
                   size="compact"
                   style={styles.confirmWrap}
-                  gradientStyle={styles.confirmBtn}
                 />
               </View>
             </GlassSurface>
@@ -609,14 +608,5 @@ const styles = StyleSheet.create({
     flex: 1,
     flexBasis: 0,
     minWidth: 0,
-  },
-  confirmBtn: {
-    minHeight: CTA_BUTTON_HEIGHT,
-    borderRadius: 14,
-  },
-  confirmText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.white,
   },
 });

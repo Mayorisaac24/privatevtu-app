@@ -13,6 +13,7 @@ import {
   type TokenRefreshOutcome,
 } from './session';
 import { tryNormalizePhone } from './phone';
+import { videoToDataUri } from './face-liveness-media-utils';
 
 // Set in .env — switch local/live by commenting/uncommenting EXPO_PUBLIC_API_BASE_URL
 const API_URL =
@@ -533,6 +534,7 @@ class ApiClient {
       endpoint.includes('/auth/logout') ||
       endpoint.includes('/auth/login') ||
       endpoint.includes('/auth/2fa/login') ||
+      endpoint.includes('/auth/2fa/login/context') ||
       endpoint.includes('/auth/2fa/send-code') ||
       endpoint.includes('/auth/register/') ||
       endpoint.includes('/auth/forgot-password') ||
@@ -549,6 +551,7 @@ class ApiClient {
     return (
       endpoint.includes('/auth/login') ||
       endpoint.includes('/auth/2fa/login') ||
+      endpoint.includes('/auth/2fa/login/context') ||
       endpoint.includes('/auth/2fa/send-code') ||
       endpoint.includes('/auth/register/') ||
       endpoint.includes('/auth/forgot-password') ||
@@ -1064,7 +1067,14 @@ class ApiClient {
       body: JSON.stringify(data),
     });
     if (isResponseSuccess(res) && res.data) {
-      await this.persistLoginSession(res.data);
+      if (res.data.requiresTwoFactor) {
+        await this.clearTokens();
+        return res;
+      }
+      const sessionUser = await this.persistLoginSession(res.data);
+      if (sessionUser) {
+        res.data.user = sessionUser;
+      }
     }
     return res;
   }
@@ -1116,6 +1126,17 @@ class ApiClient {
     return this.request('/auth/2fa/send-code', {
       method: 'POST',
       body: JSON.stringify({ action, ...options }),
+    });
+  }
+
+  async getLoginTwoFactorContext(userId: string): Promise<ApiResponse<{
+    userId: string;
+    twoFactorMethod: TwoFactorMethodType;
+    destination?: string;
+  }>> {
+    return this.request('/auth/2fa/login/context', {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
     });
   }
 
@@ -1725,6 +1746,123 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(data),
     });
+  }
+
+  async createLivenessSession(): Promise<ApiResponse<{
+    sessionId: string;
+    spokenPhrase: string;
+    flowType: 'spoken_v6';
+    expiresAt: string;
+    expiresInSeconds: number;
+  }>> {
+    return this.request('/kyc/liveness/session', { method: 'POST' });
+  }
+
+  async submitLivenessStep(
+    sessionId: string,
+    stepKey: string,
+    frames: Array<{
+      phase: string;
+      capturedAt: string;
+      metadata: Record<string, unknown>;
+      imageBase64?: string;
+    }>,
+  ): Promise<ApiResponse> {
+    return this.request(`/kyc/liveness/session/${sessionId}/steps`, {
+      method: 'POST',
+      body: JSON.stringify({ stepKey, frames }),
+    });
+  }
+
+  async completeLivenessSession(
+    sessionId: string,
+    recordingUrl?: string,
+  ): Promise<ApiResponse<{
+    sessionId: string;
+    decision: 'PASS' | 'FAIL' | 'NEEDS_REVIEW';
+    reasons: string[];
+    passed: boolean;
+    spokenPhrase?: string;
+    recordingUrl?: string;
+  }>> {
+    return this.request(`/kyc/liveness/session/${sessionId}/complete`, {
+      method: 'POST',
+      body: JSON.stringify(recordingUrl ? { recordingUrl } : {}),
+    });
+  }
+
+  async uploadLivenessRecording(
+    video: string,
+    sessionId?: string,
+  ): Promise<ApiResponse<{ url: string; publicId: string }>> {
+    return this.request('/upload/liveness-recording', {
+      method: 'POST',
+      body: JSON.stringify({ video, sessionId }),
+      timeoutMs: 120000,
+    });
+  }
+
+  async uploadLivenessRecordingFile(
+    fileUri: string,
+    sessionId?: string,
+  ): Promise<ApiResponse<{ url: string; publicId: string }>> {
+    const uri = fileUri.startsWith('file://') ? fileUri : `file://${fileUri}`;
+    const accessToken = await this.getValidToken();
+    if (!accessToken) {
+      throw new ApiError('Session expired. Please sign in again.', 401, null);
+    }
+
+    try {
+      return await this.uploadLivenessRecordingMultipart(uri, sessionId, accessToken);
+    } catch {
+      const videoDataUri = await videoToDataUri(uri);
+      return this.uploadLivenessRecording(videoDataUri, sessionId);
+    }
+  }
+
+  private async uploadLivenessRecordingMultipart(
+    uri: string,
+    sessionId: string | undefined,
+    accessToken: string,
+  ): Promise<ApiResponse<{ url: string; publicId: string }>> {
+    const lowerUri = uri.toLowerCase();
+    const isMov = lowerUri.endsWith('.mov') || lowerUri.includes('.mov?');
+    const form = new FormData();
+    form.append('video', {
+      uri,
+      name: isMov ? 'liveness.mov' : 'liveness.mp4',
+      type: isMov ? 'video/quicktime' : 'video/mp4',
+    } as unknown as Blob);
+    if (sessionId) {
+      form.append('sessionId', sessionId);
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120000);
+
+    try {
+      const res = await fetch(`${this.baseUrl}/upload/liveness-recording-file`, {
+        method: 'POST',
+        headers: {
+          'X-Channel': 'app',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: form,
+        signal: controller.signal,
+      });
+
+      const data = await res.json() as ApiResponse<{ url: string; publicId: string }>;
+      if (!res.ok) {
+        throw new ApiError(
+          getApiErrorMessage(data) || 'Could not upload video recording',
+          res.status,
+          data,
+        );
+      }
+      return data;
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 
   async uploadDocument(

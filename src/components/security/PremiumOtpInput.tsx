@@ -24,6 +24,7 @@ export const PremiumOtpInput = React.forwardRef<TextInput, PremiumOtpInputProps>
   function PremiumOtpInput({ value, onChange, onComplete, autoFocus = true }, ref) {
     const inputRef = useRef<TextInput>(null);
     const digits = value.padEnd(6, ' ').split('').slice(0, 6);
+    const activeIndex = Math.min(value.length, 5);
 
     useImperativeHandle(ref, () => inputRef.current as TextInput);
 
@@ -56,8 +57,12 @@ export const PremiumOtpInput = React.forwardRef<TextInput, PremiumOtpInputProps>
     };
 
     return (
-      <View style={styles.wrap}>
-        <View style={styles.row} pointerEvents="none">
+      <TouchableOpacity
+        style={styles.wrap}
+        onPress={() => inputRef.current?.focus()}
+        activeOpacity={1}
+      >
+        <View style={styles.row}>
           {digits.map((digit, index) => (
             <View
               key={index}
@@ -78,50 +83,49 @@ export const PremiumOtpInput = React.forwardRef<TextInput, PremiumOtpInputProps>
           style={styles.overlay}
         />
 
-        {!value ? (
-          <View pointerEvents="none">
-            <Text style={styles.tapHint}>Tap the boxes to enter your code</Text>
-          </View>
-        ) : null}
-      </View>
+        <Text style={styles.tapHint}>
+          {value ? `Digit ${activeIndex + 1} of 6` : 'Tap to enter · 6-digit code'}
+        </Text>
+      </TouchableOpacity>
     );
   },
 );
 
 const styles = StyleSheet.create({
   wrap: {
-    marginBottom: 8,
-    minHeight: 62,
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
     position: 'relative',
   },
   row: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 10,
+    justifyContent: 'center',
+    gap: 8,
+    position: 'relative',
   },
   box: {
-    flex: 1,
-    maxWidth: 54,
-    height: 62,
-    borderRadius: Radius.lg,
+    width: 46,
+    height: 54,
+    borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surface,
+    borderColor: Colors.borderSubtle,
+    backgroundColor: '#FAFBFC',
     alignItems: 'center',
     justifyContent: 'center',
   },
   boxActive: {
     borderColor: Colors.primary,
-    backgroundColor: Colors.white,
+    backgroundColor: '#FAF5FF',
     borderWidth: 2,
   },
   boxFilled: {
-    borderColor: 'rgba(124, 58, 237, 0.35)',
+    borderColor: Colors.primary,
     backgroundColor: Colors.primaryMuted,
   },
   digit: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '800',
     color: Colors.dark,
     letterSpacing: -0.5,
   },
@@ -133,9 +137,8 @@ const styles = StyleSheet.create({
     zIndex: 2,
   }),
   tapHint: {
-    marginTop: 10,
     fontSize: 12,
-    color: Colors.muted,
+    color: Colors.mutedLight,
     textAlign: 'center',
   },
 });

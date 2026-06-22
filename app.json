@@ -24,6 +24,7 @@
       "infoPlist": {
         "CFBundleDisplayName": "Datamart",
         "NSCameraUsageDescription": "Allow camera for KYC live face scan and document capture",
+        "NSMicrophoneUsageDescription": "Allow microphone so you can say a verification word during live face scan",
         "NSPhotoLibraryUsageDescription": "Allow photo library access to scan bank account details",
         "NSContactsUsageDescription": "Allow access to contacts to fill in phone numbers for airtime and data purchases",
         "ITSAppUsesNonExemptEncryption": false,
@@ -82,15 +83,17 @@
         "expo-camera",
         {
           "cameraPermission": "Allow $(PRODUCT_NAME) to use your camera for live face scan during KYC verification.",
-          "microphonePermission": false,
-          "recordAudioAndroid": false
+          "microphonePermission": "Allow $(PRODUCT_NAME) to record audio while you say a verification word during live face scan.",
+          "recordAudioAndroid": true
         }
       ],
       [
         "react-native-vision-camera",
         {
           "cameraPermissionText": "Allow $(PRODUCT_NAME) to use your camera for live face scan during KYC verification.",
-          "enableMicrophonePermission": false
+          "microphonePermissionText": "Allow $(PRODUCT_NAME) to record audio while you say a verification word during live face scan.",
+          "enableMicrophonePermission": true,
+          "enableFrameProcessors": true
         }
       ],
       "expo-secure-store",
@@ -99,6 +102,14 @@
         {
           "icon": "./assets/icon.png",
           "color": "#7C3AED"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "15.5"
+          }
         }
       ]
     ],

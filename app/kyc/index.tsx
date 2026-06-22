@@ -1,6 +1,6 @@
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, BackHandler,
+  ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, BackHandler, RefreshControl,
 } from 'react-native';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { router, useFocusEffect } from 'expo-router';
@@ -28,6 +28,7 @@ import {
   peekKycStatusCache,
   pullToRefreshKycStatus,
   setKycStatusCache,
+  subscribeKycStatusInvalidation,
 } from '../../src/lib/kyc-status-cache';
 import { DateOfBirthField } from '../../src/components/DateOfBirthField';
 import { ThemedScreen } from '../../src/components/ui/ThemedScreen';
@@ -37,7 +38,7 @@ import { gradientStops } from '../../src/theme/gradient-utils';
 import { GlassCard } from '../../src/components/ui/GlassCard';
 import { LocationPickerModal } from '../../src/components/LocationPickerModal';
 import { FaceLivenessScannerGate } from '../../src/components/FaceLivenessScannerGate';
-import type { FaceLivenessResult } from '../../src/lib/face-liveness-types';
+import type { FaceLivenessResult, LivenessSessionResponse } from '../../src/lib/face-liveness-types';
 import {
   formatStateLabel,
   getCitiesForState,
@@ -50,9 +51,16 @@ import {
 
 import {
   enrichKycStatusData,
+  formatKycDocumentStatus,
+  getKycDocumentStatusStyle,
   getTier3ActionLabel,
   getTier3DocumentSummary,
+  getTier3SubmissionHeadline,
   hasSavedKycAddress,
+  isKycDocumentLocked,
+  isTier3AwaitingReview,
+  isTier3SubmissionActive,
+  kycDocumentNeedsUpload,
   KYC_ID_TYPE_LABELS,
   KYC_ID_TYPES,
   KYC_ID_TYPE_VALUES,
@@ -61,6 +69,14 @@ import {
 type Step = 'status' | 'tier2' | 'phone-verify' | 'phone-otp' | 'tier3' | 'tier3-docs';
 
 const MAX_KYC_IMAGE_BYTES = 5 * 1024 * 1024;
+
+function docReviewStatusStyle(status?: string) {
+  const tone = getKycDocumentStatusStyle(status);
+  if (tone === 'approved') return styles.docReviewStatusApproved;
+  if (tone === 'rejected') return styles.docReviewStatusRejected;
+  if (tone === 'pending') return styles.docReviewStatusPending;
+  return styles.docReviewStatusMuted;
+}
 
 const TIER_META: Record<string, {
   icon: keyof typeof Ionicons.glyphMap;
@@ -351,17 +367,14 @@ function TierStep({
         )}
 
         {isCurrent && actionLabel && onAction ? (
-          <TouchableOpacity onPress={onAction} disabled={disabled} activeOpacity={0.88}>
-            <LinearGradient
-              colors={gradientStops([Gradients.button[0], Gradients.button[1]])}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={[styles.ctaBtn, disabled && styles.ctaBtnDisabled, Shadow.sm]}
-            >
-              <Text style={styles.ctaBtnText}>{actionLabel}</Text>
-              <Ionicons name="arrow-forward" size={18} color={Colors.white} />
-            </LinearGradient>
-          </TouchableOpacity>
+          <GradientButton
+            title={actionLabel}
+            onPress={onAction}
+            disabled={disabled}
+            inactive={disabled}
+            size="compact"
+            rightIcon={<Ionicons name="arrow-forward" size={17} color={Colors.white} />}
+          />
         ) : null}
       </GlassCard>
     </View>
@@ -682,10 +695,13 @@ export default function KycScreen() {
   const [proofOfAddressUrl, setProofOfAddressUrl] = useState('');
   const [selfieUrl, setSelfieUrl] = useState('');
   const [selfieLivenessMeta, setSelfieLivenessMeta] = useState<FaceLivenessResult['metadata'] | null>(null);
+  const [livenessSession, setLivenessSession] = useState<LivenessSessionResponse | null>(null);
   const [uploadingDocument, setUploadingDocument] = useState(false);
   const [uploadingProof, setUploadingProof] = useState(false);
   const [uploadingSelfie, setUploadingSelfie] = useState(false);
+  const [startingFaceScan, setStartingFaceScan] = useState(false);
   const [showFaceScan, setShowFaceScan] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const currentTier = kycData?.currentTier ?? 'PENDING';
   const tiers = kycData?.tierRequirements ?? {};
@@ -792,9 +808,24 @@ export default function KycScreen() {
     }
   }, [applyKycData]);
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await fetchStatus({ silent: true, force: true });
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchStatus]);
+
   useFocusEffect(useCallback(() => {
-    void fetchStatus({ silent: hasKycStatusCache() });
+    void fetchStatus({ silent: hasKycStatusCache(), force: true });
   }, [fetchStatus]));
+
+  useEffect(() => {
+    return subscribeKycStatusInvalidation((data) => {
+      if (data) applyKycData(data);
+    });
+  }, [applyKycData]);
 
   useEffect(() => {
     if (resendCooldown <= 0) return;
@@ -1000,6 +1031,39 @@ export default function KycScreen() {
     }
   }, [uploadKycImage]);
 
+  const handleStartFaceScan = useCallback(async () => {
+    setStartingFaceScan(true);
+    try {
+      if (
+        livenessSession
+        && new Date(livenessSession.expiresAt).getTime() > Date.now()
+      ) {
+        setShowFaceScan(true);
+        return;
+      }
+
+      const sessionRes = await api.createLivenessSession();
+      if (!isResponseSuccess(sessionRes) || !sessionRes.data) {
+        throw new Error(sessionRes.message || 'Could not start live face scan');
+      }
+      setLivenessSession({
+        sessionId: sessionRes.data.sessionId,
+        spokenPhrase: sessionRes.data.spokenPhrase,
+        flowType: sessionRes.data.flowType,
+        expiresAt: sessionRes.data.expiresAt,
+        expiresInSeconds: sessionRes.data.expiresInSeconds,
+      });
+      setShowFaceScan(true);
+    } catch (err: unknown) {
+      showToast({
+        type: 'error',
+        text1: err instanceof Error ? err.message : 'Could not start live face scan',
+      });
+    } finally {
+      setStartingFaceScan(false);
+    }
+  }, [livenessSession]);
+
   const handleFaceScanComplete = useCallback(async (result: FaceLivenessResult) => {
     setUploadingSelfie(true);
     try {
@@ -1009,6 +1073,7 @@ export default function KycScreen() {
       }
       setSelfieUrl(uploadRes.data.url);
       setSelfieLivenessMeta(result.metadata);
+      setLivenessSession(null);
       showToast({ type: 'success', text1: 'Live face scan captured' });
     } catch (err: any) {
       showToast({ type: 'error', text1: err?.message || 'Could not save face scan' });
@@ -1052,48 +1117,66 @@ export default function KycScreen() {
   };
 
   const handleSubmitDocuments = async () => {
-    if (!documentUrl) {
+    if (isTier3AwaitingReview(tier3DocSummary)) {
+      showToast({ type: 'error', text1: 'Your documents are already under review' });
+      return;
+    }
+
+    const needsId = kycDocumentNeedsUpload(tier3DocSummary.idDoc?.status);
+    const needsProof = kycDocumentNeedsUpload(tier3DocSummary.proofDoc?.status);
+    const needsSelfie = kycDocumentNeedsUpload(tier3DocSummary.selfieDoc?.status);
+
+    if (needsId && !documentUrl) {
       showToast({ type: 'error', text1: 'Upload your government ID' });
       return;
     }
-    if (!proofOfAddressUrl) {
+    if (needsProof && !proofOfAddressUrl) {
       showToast({ type: 'error', text1: 'Upload proof of address' });
       return;
     }
-    if (!documentNumber.trim()) {
+    if (needsId && !documentNumber.trim()) {
       showToast({ type: 'error', text1: 'Document number is required' });
       return;
     }
-    if (!selfieUrl || !selfieLivenessMeta) {
+    if (needsSelfie && (!selfieUrl || !selfieLivenessMeta)) {
       showToast({ type: 'error', text1: 'Complete the live face scan' });
       return;
     }
     setSubmitting(true);
     try {
-      const idRes = await api.submitKycDocument({
-        documentType,
-        documentUrl,
-        documentNumber: documentNumber.trim(),
-      });
-      if (!isResponseSuccess(idRes)) {
-        throw new Error(idRes.message || 'Could not submit ID document');
+      if (needsId) {
+        const idRes = await api.submitKycDocument({
+          documentType,
+          documentUrl,
+          documentNumber: documentNumber.trim(),
+        });
+        if (!isResponseSuccess(idRes)) {
+          throw new Error(idRes.message || 'Could not submit ID document');
+        }
       }
 
-      const proofRes = await api.submitKycDocument({
-        documentType: 'PROOF_OF_ADDRESS',
-        documentUrl: proofOfAddressUrl,
-      });
-      if (!isResponseSuccess(proofRes)) {
-        throw new Error(proofRes.message || 'Could not submit proof of address');
+      if (needsProof) {
+        const proofRes = await api.submitKycDocument({
+          documentType: 'PROOF_OF_ADDRESS',
+          documentUrl: proofOfAddressUrl,
+        });
+        if (!isResponseSuccess(proofRes)) {
+          throw new Error(proofRes.message || 'Could not submit proof of address');
+        }
       }
 
-      const selfieRes = await api.submitKycDocument({
-        documentType: 'SELFIE',
-        documentUrl: selfieUrl,
-        metadata: selfieLivenessMeta,
-      });
-      if (!isResponseSuccess(selfieRes)) {
-        throw new Error(selfieRes.message || 'Could not submit selfie');
+      if (needsSelfie) {
+        if (!selfieUrl || !selfieLivenessMeta) {
+          throw new Error('Complete the live face scan');
+        }
+        const selfieRes = await api.submitKycDocument({
+          documentType: 'SELFIE',
+          documentUrl: selfieUrl,
+          metadata: selfieLivenessMeta,
+        });
+        if (!isResponseSuccess(selfieRes)) {
+          throw new Error(selfieRes.message || 'Could not submit selfie');
+        }
       }
 
       showToast({
@@ -1101,6 +1184,11 @@ export default function KycScreen() {
         text1: 'Documents submitted',
         text2: 'Our team will review them shortly.',
       });
+      setDocumentUrl('');
+      setDocumentNumber('');
+      setProofOfAddressUrl('');
+      setSelfieUrl('');
+      setSelfieLivenessMeta(null);
       setStep('status');
       await fetchStatus({ silent: true, force: true });
     } catch (err: any) {
@@ -1125,23 +1213,16 @@ export default function KycScreen() {
   }, []);
 
   const renderPrimaryBtn = (label: string, onPress: () => void, disabled?: boolean) => (
-    <TouchableOpacity onPress={onPress} disabled={disabled || submitting} activeOpacity={0.88}>
-      <LinearGradient
-        colors={gradientStops([Gradients.button[0], Gradients.button[1]])}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={[styles.primaryBtn, (disabled || submitting) && styles.primaryBtnDisabled, Shadow.sm]}
-      >
-        {submitting ? (
-          <ActivityIndicator color={Colors.white} />
-        ) : (
-          <>
-            <Text style={styles.primaryBtnText}>{label}</Text>
-            <Ionicons name="arrow-forward" size={18} color={Colors.white} />
-          </>
-        )}
-      </LinearGradient>
-    </TouchableOpacity>
+    <GradientButton
+      title={label}
+      onPress={onPress}
+      disabled={disabled || submitting}
+      inactive={Boolean(disabled || submitting)}
+      isLoading={submitting}
+      size="compact"
+      style={styles.primaryBtn}
+      rightIcon={<Ionicons name="arrow-forward" size={17} color={Colors.white} />}
+    />
   );
 
   const renderStepContent = () => {
@@ -1266,21 +1347,26 @@ export default function KycScreen() {
     }
 
     if (step === 'tier3-docs') {
-      const awaitingReview = tier3DocSummary.allSubmitted
-        && tier3DocSummary.anyPending
-        && !tier3DocSummary.anyRejected
-        && !documentUrl
-        && !proofOfAddressUrl
-        && !selfieUrl;
-      const showUploadForm = tier3DocSummary.needsUpload || !!documentUrl || !!proofOfAddressUrl || !!selfieUrl;
+      const submissionActive = isTier3SubmissionActive(tier3DocSummary);
+      const submissionHeadline = getTier3SubmissionHeadline(tier3DocSummary);
+      const awaitingReview = isTier3AwaitingReview(tier3DocSummary);
+      const needsId = kycDocumentNeedsUpload(tier3DocSummary.idDoc?.status);
+      const needsProof = kycDocumentNeedsUpload(tier3DocSummary.proofDoc?.status);
+      const needsSelfie = kycDocumentNeedsUpload(tier3DocSummary.selfieDoc?.status);
+      const showUploadForm = !awaitingReview && (needsId || needsProof || needsSelfie);
+      const canSubmit = showUploadForm && (
+        (!needsId || (documentUrl && documentNumber.trim()))
+        && (!needsProof || proofOfAddressUrl)
+        && (!needsSelfie || (selfieUrl && selfieLivenessMeta))
+      );
 
       return (
         <FormShell
           icon="id-card-outline"
-          title={awaitingReview ? 'Submission received' : 'Upload documents'}
+          title={submissionActive ? submissionHeadline.title : 'Upload documents'}
           subtitle={
-            awaitingReview
-              ? 'Your documents and face scan are being reviewed.'
+            submissionActive
+              ? submissionHeadline.subtitle
               : 'Government ID, proof of address, and a live face scan for Tier 3.'
           }
           stepBadge="Tier 3 · Step 2 of 2"
@@ -1288,134 +1374,171 @@ export default function KycScreen() {
         >
           <Tier3Progress currentStep="documents" />
 
-          {awaitingReview ? (
+          {submissionActive ? (
             <>
               <DocStatusBanner
-                tone="pending"
-                title="Under review"
-                subtitle="We usually review submissions within 1–2 business days. Tier 3 unlocks after admin approves all documents and your live face scan."
+                tone={submissionHeadline.tone === 'rejected' ? 'rejected' : submissionHeadline.tone === 'progress' ? 'pending' : 'pending'}
+                title={submissionHeadline.title}
+                subtitle={submissionHeadline.subtitle}
               />
               <View style={styles.docReviewList}>
                 <View style={styles.docReviewRow}>
                   <Text style={styles.docReviewLabel}>Government ID</Text>
-                  <Text style={styles.docReviewStatus}>{tier3DocSummary.idDoc?.status ?? 'Pending'}</Text>
+                  <Text style={[styles.docReviewStatus, docReviewStatusStyle(tier3DocSummary.idDoc?.status)]}>
+                    {formatKycDocumentStatus(tier3DocSummary.idDoc?.status)}
+                  </Text>
                 </View>
                 <View style={styles.docReviewRow}>
                   <Text style={styles.docReviewLabel}>Proof of address</Text>
-                  <Text style={styles.docReviewStatus}>{tier3DocSummary.proofDoc?.status ?? 'Pending'}</Text>
+                  <Text style={[styles.docReviewStatus, docReviewStatusStyle(tier3DocSummary.proofDoc?.status)]}>
+                    {formatKycDocumentStatus(tier3DocSummary.proofDoc?.status)}
+                  </Text>
                 </View>
-                <View style={[styles.docReviewRow, styles.docReviewRowLast]}>
+                <View style={[styles.docReviewRow, !showUploadForm && styles.docReviewRowLast]}>
                   <Text style={styles.docReviewLabel}>Live face scan</Text>
-                  <Text style={styles.docReviewStatus}>{tier3DocSummary.selfieDoc?.status ?? 'Pending'}</Text>
+                  <Text style={[styles.docReviewStatus, docReviewStatusStyle(tier3DocSummary.selfieDoc?.status)]}>
+                    {formatKycDocumentStatus(tier3DocSummary.selfieDoc?.status)}
+                  </Text>
                 </View>
+                {tier3DocSummary.idDoc?.status === 'REJECTED' && tier3DocSummary.idDoc.rejectionReason ? (
+                  <Text style={styles.docReviewNote}>ID: {tier3DocSummary.idDoc.rejectionReason}</Text>
+                ) : null}
+                {tier3DocSummary.proofDoc?.status === 'REJECTED' && tier3DocSummary.proofDoc.rejectionReason ? (
+                  <Text style={styles.docReviewNote}>Proof: {tier3DocSummary.proofDoc.rejectionReason}</Text>
+                ) : null}
+                {tier3DocSummary.selfieDoc?.status === 'REJECTED' && tier3DocSummary.selfieDoc.rejectionReason ? (
+                  <Text style={[styles.docReviewNote, styles.docReviewRowLast]}>Face scan: {tier3DocSummary.selfieDoc.rejectionReason}</Text>
+                ) : null}
               </View>
-              {renderPrimaryBtn('Back to overview', () => setStep('status'))}
+              {!showUploadForm ? (
+                renderPrimaryBtn('Back to overview', () => setStep('status'))
+              ) : null}
             </>
-          ) : null}
-
-          {tier3DocSummary.anyRejected ? (
-            <DocStatusBanner
-              tone="rejected"
-              title="Resubmission required"
-              subtitle={[
-                tier3DocSummary.idDoc?.status === 'REJECTED' ? tier3DocSummary.idDoc.rejectionReason : null,
-                tier3DocSummary.proofDoc?.status === 'REJECTED' ? tier3DocSummary.proofDoc.rejectionReason : null,
-                tier3DocSummary.selfieDoc?.status === 'REJECTED' ? tier3DocSummary.selfieDoc.rejectionReason : null,
-              ].filter(Boolean).join(' · ') || 'One or more documents were rejected. Please upload again.'}
-            />
           ) : null}
 
           {showUploadForm ? (
             <>
-              <FormSelectField
-                label="Document type"
-                icon="card-outline"
-                value={KYC_ID_TYPE_LABELS[documentType] ?? documentType}
-                placeholder="Choose document type"
-                onPress={() => setShowDocTypePicker(true)}
-              />
-              <FormField label="Document number" icon="keypad-outline">
-                <TextInput
-                  style={styles.inputField}
-                  value={documentNumber}
-                  onChangeText={setDocumentNumber}
-                  placeholder="Enter ID number"
-                  placeholderTextColor={Colors.mutedLight}
-                  autoCapitalize="characters"
-                />
-              </FormField>
-              <KycUploadTile
-                label="Government ID"
-                hint="Add a clear photo of your ID"
-                imageUrl={documentUrl}
-                uploading={uploadingDocument}
-                statusLabel={
-                  !documentUrl && tier3DocSummary.idDoc?.status === 'REJECTED' ? 'Rejected' : undefined
-                }
-                onCamera={() => { void captureKycImage('document', 'camera'); }}
-                onGallery={() => { void captureKycImage('document', 'library'); }}
-                onClear={() => setDocumentUrl('')}
-              />
-              <KycUploadTile
-                label="Proof of address"
-                hint="Utility bill, tenancy, or bank statement"
-                imageUrl={proofOfAddressUrl}
-                uploading={uploadingProof}
-                statusLabel={
-                  !proofOfAddressUrl && tier3DocSummary.proofDoc?.status === 'REJECTED' ? 'Rejected' : undefined
-                }
-                onCamera={() => { void captureKycImage('proof_of_address', 'camera'); }}
-                onGallery={() => { void captureKycImage('proof_of_address', 'library'); }}
-                onClear={() => setProofOfAddressUrl('')}
-              />
-              <View style={styles.uploadWrap}>
-                <View style={styles.uploadLabelRow}>
-                  <Text style={styles.fieldLabel}>Live face scan</Text>
-                  {selfieUrl ? (
-                    <View style={[styles.uploadStatusPill, styles.uploadStatusPillSuccess]}>
-                      <Text style={[styles.uploadStatusText, styles.uploadStatusTextSuccess]}>Verified live</Text>
-                    </View>
-                  ) : tier3DocSummary.selfieDoc?.status === 'REJECTED' ? (
-                    <View style={styles.uploadStatusPill}>
-                      <Text style={styles.uploadStatusText}>Rejected</Text>
-                    </View>
-                  ) : null}
+              {needsId ? (
+                <>
+                  <FormSelectField
+                    label="Document type"
+                    icon="card-outline"
+                    value={KYC_ID_TYPE_LABELS[documentType] ?? documentType}
+                    placeholder="Choose document type"
+                    onPress={() => setShowDocTypePicker(true)}
+                  />
+                  <FormField label="Document number" icon="keypad-outline">
+                    <TextInput
+                      style={styles.inputField}
+                      value={documentNumber}
+                      onChangeText={setDocumentNumber}
+                      placeholder="Enter ID number"
+                      placeholderTextColor={Colors.mutedLight}
+                      autoCapitalize="characters"
+                    />
+                  </FormField>
+                  <KycUploadTile
+                    label="Government ID"
+                    hint="Add a clear photo of your ID"
+                    imageUrl={documentUrl}
+                    uploading={uploadingDocument}
+                    statusLabel={
+                      !documentUrl && tier3DocSummary.idDoc?.status === 'REJECTED' ? 'Rejected' : undefined
+                    }
+                    onCamera={() => { void captureKycImage('document', 'camera'); }}
+                    onGallery={() => { void captureKycImage('document', 'library'); }}
+                    onClear={() => setDocumentUrl('')}
+                  />
+                </>
+              ) : isKycDocumentLocked(tier3DocSummary.idDoc?.status) ? (
+                <View style={styles.docReviewRow}>
+                  <Text style={styles.docReviewLabel}>Government ID</Text>
+                  <Text style={[styles.docReviewStatus, docReviewStatusStyle(tier3DocSummary.idDoc?.status)]}>
+                    {formatKycDocumentStatus(tier3DocSummary.idDoc?.status)}
+                  </Text>
                 </View>
-                {selfieUrl ? (
-                  <View style={styles.uploadPreviewWrap}>
-                    <Image source={{ uri: selfieUrl }} style={styles.uploadPreview} contentFit="cover" />
+              ) : null}
+
+              {needsProof ? (
+                <KycUploadTile
+                  label="Proof of address"
+                  hint="Utility bill, tenancy, or bank statement"
+                  imageUrl={proofOfAddressUrl}
+                  uploading={uploadingProof}
+                  statusLabel={
+                    !proofOfAddressUrl && tier3DocSummary.proofDoc?.status === 'REJECTED' ? 'Rejected' : undefined
+                  }
+                  onCamera={() => { void captureKycImage('proof_of_address', 'camera'); }}
+                  onGallery={() => { void captureKycImage('proof_of_address', 'library'); }}
+                  onClear={() => setProofOfAddressUrl('')}
+                />
+              ) : isKycDocumentLocked(tier3DocSummary.proofDoc?.status) ? (
+                <View style={styles.docReviewRow}>
+                  <Text style={styles.docReviewLabel}>Proof of address</Text>
+                  <Text style={[styles.docReviewStatus, docReviewStatusStyle(tier3DocSummary.proofDoc?.status)]}>
+                    {formatKycDocumentStatus(tier3DocSummary.proofDoc?.status)}
+                  </Text>
+                </View>
+              ) : null}
+
+              {needsSelfie ? (
+                <View style={styles.uploadWrap}>
+                  <View style={styles.uploadLabelRow}>
+                    <Text style={styles.fieldLabel}>Live face scan</Text>
+                    {selfieUrl ? (
+                      <View style={[styles.uploadStatusPill, styles.uploadStatusPillSuccess]}>
+                        <Text style={[styles.uploadStatusText, styles.uploadStatusTextSuccess]}>Verified live</Text>
+                      </View>
+                    ) : tier3DocSummary.selfieDoc?.status === 'REJECTED' ? (
+                      <View style={styles.uploadStatusPill}>
+                        <Text style={styles.uploadStatusText}>Rejected</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  {selfieUrl ? (
+                    <View style={styles.uploadPreviewWrap}>
+                      <Image source={{ uri: selfieUrl }} style={styles.uploadPreview} contentFit="cover" />
+                      <TouchableOpacity
+                        style={styles.uploadClearBtn}
+                        onPress={() => {
+                          setSelfieUrl('');
+                          setSelfieLivenessMeta(null);
+                          setLivenessSession(null);
+                        }}
+                        activeOpacity={0.85}
+                      >
+                        <Ionicons name="close" size={16} color={Colors.white} />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
                     <TouchableOpacity
-                      style={styles.uploadClearBtn}
-                      onPress={() => {
-                        setSelfieUrl('');
-                        setSelfieLivenessMeta(null);
-                      }}
+                      style={styles.faceScanBtn}
+                      onPress={() => void handleStartFaceScan()}
+                      disabled={uploadingSelfie || startingFaceScan}
                       activeOpacity={0.85}
                     >
-                      <Ionicons name="close" size={16} color={Colors.white} />
+                      {uploadingSelfie || startingFaceScan ? (
+                        <ActivityIndicator color={Colors.primary} />
+                      ) : (
+                        <>
+                          <View style={styles.uploadDropIcon}>
+                            <Ionicons name="scan-outline" size={22} color={Colors.primary} />
+                          </View>
+                          <Text style={styles.uploadDropTitle}>Start live face scan</Text>
+                          <Text style={styles.uploadDropSub}>Camera + mic · say a short word on screen</Text>
+                        </>
+                      )}
                     </TouchableOpacity>
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.faceScanBtn}
-                    onPress={() => setShowFaceScan(true)}
-                    disabled={uploadingSelfie}
-                    activeOpacity={0.85}
-                  >
-                    {uploadingSelfie ? (
-                      <ActivityIndicator color={Colors.primary} />
-                    ) : (
-                      <>
-                        <View style={styles.uploadDropIcon}>
-                          <Ionicons name="scan-outline" size={22} color={Colors.primary} />
-                        </View>
-                        <Text style={styles.uploadDropTitle}>Start live face scan</Text>
-                        <Text style={styles.uploadDropSub}>Camera only · guided blink and head-turn checks</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                )}
-              </View>
+                  )}
+                </View>
+              ) : isKycDocumentLocked(tier3DocSummary.selfieDoc?.status) ? (
+                <View style={styles.docReviewRow}>
+                  <Text style={styles.docReviewLabel}>Live face scan</Text>
+                  <Text style={[styles.docReviewStatus, docReviewStatusStyle(tier3DocSummary.selfieDoc?.status)]}>
+                    {formatKycDocumentStatus(tier3DocSummary.selfieDoc?.status)}
+                  </Text>
+                </View>
+              ) : null}
               <View style={styles.secureNote}>
                 <View style={styles.secureNoteIcon}>
                   <Ionicons name="shield-checkmark" size={16} color={Colors.primary} />
@@ -1427,7 +1550,7 @@ export default function KycScreen() {
               {renderPrimaryBtn(
                 tier3DocSummary.anyRejected ? 'Resubmit for review' : 'Submit for review',
                 handleSubmitDocuments,
-                !documentUrl || !documentNumber.trim() || !proofOfAddressUrl || !selfieUrl || !selfieLivenessMeta,
+                !canSubmit,
               )}
             </>
           ) : null}
@@ -1483,14 +1606,18 @@ export default function KycScreen() {
           isLast
         />
 
-        {currentTier === 'TIER_2' && tier3DocSummary.allSubmitted && tier3DocSummary.anyPending ? (
+        {currentTier === 'TIER_2' && isTier3SubmissionActive(tier3DocSummary) ? (
           <GlassCard borderRadius={Radius.lg} padding={14} variant="tinted" contentStyle={styles.reviewBanner}>
             <View style={styles.perkIcon}>
-              <Ionicons name="time-outline" size={18} color={Colors.warning} />
+              <Ionicons
+                name={tier3DocSummary.anyRejected ? 'alert-circle-outline' : 'time-outline'}
+                size={18}
+                color={tier3DocSummary.anyRejected ? Colors.error : Colors.warning}
+              />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.perkTitle}>Documents under review</Text>
-              <Text style={styles.perkSub}>Tier 3 unlocks after admin approves your documents and live face scan</Text>
+              <Text style={styles.perkTitle}>{getTier3SubmissionHeadline(tier3DocSummary).title}</Text>
+              <Text style={styles.perkSub}>{getTier3SubmissionHeadline(tier3DocSummary).subtitle}</Text>
             </View>
           </GlassCard>
         ) : null}
@@ -1557,6 +1684,14 @@ export default function KycScreen() {
             contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 32 }]}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            refreshControl={(
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={() => { void onRefresh(); }}
+                tintColor={Colors.primary}
+                colors={[Colors.primary]}
+              />
+            )}
           >
             {renderStepContent()}
           </ScrollView>
@@ -1601,14 +1736,21 @@ export default function KycScreen() {
         }}
       />
 
-      <FaceLivenessScannerGate
-        visible={showFaceScan}
-        onClose={() => setShowFaceScan(false)}
-        onComplete={(result) => {
-          setShowFaceScan(false);
-          void handleFaceScanComplete(result);
-        }}
-      />
+      {livenessSession ? (
+        <FaceLivenessScannerGate
+          visible={showFaceScan}
+          sessionId={livenessSession.sessionId}
+          spokenPhrase={livenessSession.spokenPhrase}
+          expiresAt={livenessSession.expiresAt}
+          onClose={() => {
+            setShowFaceScan(false);
+          }}
+          onComplete={(result) => {
+            setShowFaceScan(false);
+            void handleFaceScanComplete(result);
+          }}
+        />
+      ) : null}
     </ThemedScreen>
   );
 }
@@ -1886,17 +2028,6 @@ const styles = StyleSheet.create({
   limitValueDimmed: { color: Colors.mutedLight },
   limitDivider: { width: 1, height: 28, backgroundColor: 'rgba(124, 58, 237, 0.12)' },
   limitDividerDimmed: { backgroundColor: '#E2E8F0' },
-
-  ctaBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 15,
-    borderRadius: Radius.lg,
-  },
-  ctaBtnDisabled: { opacity: 0.45 },
-  ctaBtnText: { fontSize: 15, fontWeight: '700', color: Colors.white },
 
   formShell: { gap: 0 },
   formHero: {
@@ -2238,8 +2369,25 @@ const styles = StyleSheet.create({
   docReviewStatus: {
     fontSize: 12,
     fontWeight: '700',
+  },
+  docReviewStatusPending: {
     color: Colors.warning,
-    textTransform: 'capitalize',
+  },
+  docReviewStatusApproved: {
+    color: '#059669',
+  },
+  docReviewStatusRejected: {
+    color: Colors.error,
+  },
+  docReviewStatusMuted: {
+    color: Colors.muted,
+  },
+  docReviewNote: {
+    fontSize: 12,
+    color: Colors.error,
+    lineHeight: 17,
+    paddingHorizontal: 14,
+    paddingBottom: 10,
   },
   reviewBanner: {
     flexDirection: 'row',
@@ -2293,16 +2441,8 @@ const styles = StyleSheet.create({
   },
   secureNoteText: { fontSize: 12, color: Colors.muted, flex: 1, lineHeight: 18 },
   primaryBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    borderRadius: 14,
-    paddingVertical: 16,
     marginTop: 8,
   },
-  primaryBtnDisabled: { opacity: 0.45 },
-  primaryBtnText: { fontSize: 15, fontWeight: '700', color: Colors.white },
   phoneCard: {
     backgroundColor: '#FAF5FF',
     borderRadius: 16,

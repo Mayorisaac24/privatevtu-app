@@ -37,7 +37,7 @@ import { GlassSurface } from '../../src/components/ui/GlassSurface';
 import {
   EMPTY_FUNDING_METHODS,
   getWalletFundingData,
-  hasWalletFundingCache,
+  hasFullWalletFundingSnapshot,
   peekWalletFundingCache,
   pullToRefreshWalletFunding,
 } from '../../src/lib/wallet-funding-cache';
@@ -107,14 +107,15 @@ function FundWalletScreen() {
   const gradients = useGradients();
   const { balance, balanceVisible } = useWalletStore();
   const fundingCache = peekWalletFundingCache();
+  const snapshotReady = hasFullWalletFundingSnapshot();
 
   const [methods, setMethods] = useState<WalletFundingMethods>(
-    () => fundingCache?.methods ?? EMPTY_FUNDING_METHODS,
+    () => (snapshotReady && fundingCache ? fundingCache.methods : EMPTY_FUNDING_METHODS),
   );
   const [activeMethod, setActiveMethod] = useState<FundMethod>('static');
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
-  const [initializing, setInitializing] = useState(() => !hasWalletFundingCache());
+  const [initializing, setInitializing] = useState(() => !hasFullWalletFundingSnapshot());
   const [virtualAccounts, setVirtualAccounts] = useState<VirtualAccount[]>(
     () => fundingCache?.virtualAccounts ?? [],
   );
@@ -122,10 +123,16 @@ function FundWalletScreen() {
   const [selectedBanks, setSelectedBanks] = useState<Set<string>>(new Set());
   const [pendingCheckoutRef, setPendingCheckoutRef] = useState<string | null>(null);
   const [pendingCheckoutGateway, setPendingCheckoutGateway] = useState<'payvessel' | 'paystack' | null>(null);
-  const [staticBanks, setStaticBanks] = useState<FundingBank[]>(() => fundingCache?.staticBanks ?? []);
-  const [dynamicBanks, setDynamicBanks] = useState<FundingBank[]>(() => fundingCache?.dynamicBanks ?? []);
+  const [staticBanks, setStaticBanks] = useState<FundingBank[]>(
+    () => (snapshotReady && fundingCache ? fundingCache.staticBanks : []),
+  );
+  const [dynamicBanks, setDynamicBanks] = useState<FundingBank[]>(
+    () => (snapshotReady && fundingCache ? fundingCache.dynamicBanks : []),
+  );
   const [expiryLabel, setExpiryLabel] = useState('');
-  const [hasBvn, setHasBvn] = useState<boolean | null>(() => (fundingCache ? fundingCache.hasBvn : null));
+  const [hasBvn, setHasBvn] = useState<boolean | null>(
+    () => (snapshotReady && fundingCache ? fundingCache.hasBvn : null),
+  );
   const [showDynamicBankPicker, setShowDynamicBankPicker] = useState(false);
   const [pickerBanks, setPickerBanks] = useState<FundingBank[]>([]);
   const [pendingDynamicForceCreate, setPendingDynamicForceCreate] = useState(false);
@@ -236,6 +243,9 @@ function FundWalletScreen() {
   }, []);
 
   const loadInitial = useCallback(async (options?: { force?: boolean }) => {
+    if (!hasFullWalletFundingSnapshot()) {
+      setInitializing(true);
+    }
     try {
       const snapshot = await getWalletFundingData(options);
       applyFundingSnapshot(snapshot);
@@ -265,7 +275,7 @@ function FundWalletScreen() {
         skipFocusRefresh.current = false;
         return;
       }
-      void loadInitial();
+      void loadInitial({ force: !hasFullWalletFundingSnapshot() });
     }, [loadInitial])
   );
 

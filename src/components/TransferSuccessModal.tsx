@@ -238,9 +238,9 @@ export function TransferSuccessModal({
           <GradientButton
             title="Done"
             onPress={onDone}
-            rightIcon={<Ionicons name="arrow-forward" size={18} color={Colors.white} />}
+            size="compact"
+            rightIcon={<Ionicons name="arrow-forward" size={17} color={Colors.white} />}
             style={styles.doneWrap}
-            gradientStyle={styles.doneBtn}
           />
         </Animated.View>
       </ThemedScreen>
@@ -469,9 +469,5 @@ const styles = StyleSheet.create({
   },
   doneWrap: {
     marginTop: 'auto',
-  },
-  doneBtn: {
-    minHeight: 54,
-    borderRadius: Radius.lg,
   },
 });

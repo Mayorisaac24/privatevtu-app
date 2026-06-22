@@ -18,6 +18,11 @@ export function navigateFromNotificationData(data?: Record<string, unknown> | nu
   const reference = typeof data.reference === 'string' ? data.reference : '';
   const type = typeof data.type === 'string' ? data.type : '';
 
+  if (screen === 'kyc' || type === 'kyc_document_review') {
+    router.push('/kyc');
+    return;
+  }
+
   if (screen === 'transaction-details' || category === 'transaction' || reference) {
     router.push('/(tabs)/history');
     return;

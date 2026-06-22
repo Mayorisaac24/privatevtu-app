@@ -2,12 +2,18 @@ import React, { useEffect, useRef, useState } from 'react';
 import { TextInput } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { api, isResponseSuccess, type User } from '../../src/lib/api';
+import { api, isResponseSuccess, type TwoFactorMethodType, type User } from '../../src/lib/api';
 import { useAuthStore } from '../../src/stores';
 import { showToast } from '../../src/components/ui/Toast';
 import { LoadingOverlay } from '../../src/components/ui/LoadingOverlay';
 import { registerPushNotifications } from '../../src/lib/push-notifications';
 import { getLoginDeviceId } from '../../src/lib/login-context';
+import {
+  clearTwoFactorLoginChallenge,
+  readRouteParam,
+  resolveLoginTwoFactorChallenge,
+  stashTwoFactorLoginChallenge,
+} from '../../src/lib/two-factor-login';
 import { Colors } from '../../src/theme';
 import { AuthShell, AuthCardHeader, AuthHeroIcon, AuthMethodPill } from '../../src/components/auth/AuthShell';
 import { AuthGradientButton } from '../../src/components/auth/AuthControls';
@@ -18,14 +24,6 @@ const METHOD_META = {
   EMAIL: { icon: 'mail-outline' as const, label: 'Email' },
   SMS: { icon: 'chatbubble-ellipses-outline' as const, label: 'SMS' },
 };
-
-type TwoFactorMethodKey = keyof typeof METHOD_META;
-
-function normalizeMethod(raw?: string): TwoFactorMethodKey {
-  const upper = String(raw || 'AUTHENTICATOR').toUpperCase();
-  if (upper in METHOD_META) return upper as TwoFactorMethodKey;
-  return 'AUTHENTICATOR';
-}
 
 function normalizeLoginUser(raw: Partial<User> & { id: string; firstName: string; lastName: string }): User {
   return {
@@ -42,12 +40,15 @@ function normalizeLoginUser(raw: Partial<User> & { id: string; firstName: string
 }
 
 export default function Verify2FAScreen() {
-  const { userId, method = 'AUTHENTICATOR', destination = '' } = useLocalSearchParams<{
+  const params = useLocalSearchParams<{
     userId: string;
     method?: string;
     destination?: string;
   }>();
-  const twoFactorMethod = normalizeMethod(method);
+  const userId = readRouteParam(params.userId);
+  const [twoFactorMethod, setTwoFactorMethod] = useState<TwoFactorMethodType>('EMAIL');
+  const [destination, setDestination] = useState(readRouteParam(params.destination));
+  const [contextLoading, setContextLoading] = useState(true);
   const meta = METHOD_META[twoFactorMethod];
   const { setUser } = useAuthStore();
   const [otp, setOtp] = useState('');
@@ -55,9 +56,36 @@ export default function Verify2FAScreen() {
   const otpInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
+    let active = true;
+    void (async () => {
+      if (!userId) {
+        setContextLoading(false);
+        return;
+      }
+      try {
+        const challenge = await resolveLoginTwoFactorChallenge(
+          userId,
+          readRouteParam(params.method),
+          readRouteParam(params.destination),
+        );
+        if (!active) return;
+        setTwoFactorMethod(challenge.twoFactorMethod);
+        setDestination(challenge.destination || '');
+        stashTwoFactorLoginChallenge(challenge);
+      } finally {
+        if (active) setContextLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [params.destination, params.method, userId]);
+
+  useEffect(() => {
+    if (contextLoading) return;
     const timer = setTimeout(() => otpInputRef.current?.focus(), 400);
     return () => clearTimeout(timer);
-  }, []);
+  }, [contextLoading]);
 
   const handleVerify = async (code?: string) => {
     const c = (code ?? otp).replace(/\D/g, '');
@@ -72,11 +100,12 @@ export default function Verify2FAScreen() {
     let verified = false;
     try {
       const deviceId = await getLoginDeviceId();
-      const res = await api.verify2FALogin(userId!, c, deviceId);
+      const res = await api.verify2FALogin(userId, c, deviceId);
       const payload = res.data;
 
       if (isResponseSuccess(res) && payload?.user && payload.accessToken) {
         verified = true;
+        clearTwoFactorLoginChallenge();
         setUser(normalizeLoginUser(payload.user));
         void registerPushNotifications().catch(() => {});
         showToast({
@@ -110,7 +139,7 @@ export default function Verify2FAScreen() {
 
   const handleResend = async () => {
     try {
-      const res = await api.send2FACode('login', { userId: userId!, method: twoFactorMethod });
+      const res = await api.send2FACode('login', { userId, method: twoFactorMethod });
       if (res.success) {
         showToast({
           type: 'success',
@@ -139,41 +168,47 @@ export default function Verify2FAScreen() {
           eyebrow="Two-factor auth"
           title="Verification code"
           subtitle={
-            twoFactorMethod === 'AUTHENTICATOR'
-              ? 'Open your authenticator app and enter the latest code'
-              : `We sent a code to ${destination || 'your contact'}`
+            contextLoading
+              ? 'Loading verification method…'
+              : twoFactorMethod === 'AUTHENTICATOR'
+                ? 'Open your authenticator app and enter the latest code'
+                : `We sent a code to ${destination || 'your contact'}`
           }
         />
 
-        <AuthMethodPill icon={meta.icon} label={meta.label} />
+        {!contextLoading ? (
+          <>
+            <AuthMethodPill icon={meta.icon} label={meta.label} />
 
-        <PremiumOtpInput
-          ref={otpInputRef}
-          value={otp}
-          onChange={setOtp}
-          onComplete={(code) => void handleVerify(code)}
-        />
+            <PremiumOtpInput
+              ref={otpInputRef}
+              value={otp}
+              onChange={setOtp}
+              onComplete={(code) => void handleVerify(code)}
+            />
 
-        <AuthGradientButton
-          title="Verify & continue"
-          onPress={() => void handleVerify()}
-          isLoading={isSubmitting}
-          disabled={otp.length < 6}
-          icon={<Ionicons name="shield-checkmark-outline" size={18} color={Colors.white} />}
-          style={{ marginTop: 8 }}
-        />
+            <AuthGradientButton
+              title="Verify & continue"
+              onPress={() => void handleVerify()}
+              isLoading={isSubmitting}
+              disabled={otp.length < 6}
+              icon={<Ionicons name="shield-checkmark-outline" size={18} color={Colors.white} />}
+              style={{ marginTop: 8 }}
+            />
 
-        {twoFactorMethod !== 'AUTHENTICATOR' ? (
-          <OtpResendButton onPress={() => void handleResend()} />
-        ) : (
-          <OtpHelperTip text="Use the latest code from your authenticator — older codes will not work." />
-        )}
+            {twoFactorMethod !== 'AUTHENTICATOR' ? (
+              <OtpResendButton onPress={() => void handleResend()} />
+            ) : (
+              <OtpHelperTip text="Use the latest code from your authenticator — older codes will not work." />
+            )}
+          </>
+        ) : null}
       </AuthShell>
 
       <LoadingOverlay
-        visible={isSubmitting}
-        message="Verifying your code…"
-        submessage="Signing you in securely"
+        visible={isSubmitting || contextLoading}
+        message={contextLoading ? 'Preparing verification…' : 'Verifying your code…'}
+        submessage={contextLoading ? 'Checking your 2FA method' : 'Signing you in securely'}
         icon="shield-checkmark"
       />
     </>

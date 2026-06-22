@@ -294,8 +294,8 @@ export default function ChangePinScreen() {
           inactive={!canSubmit || saving}
           disabled={!canSubmit || saving}
           isLoading={saving}
-          leftIcon={<Ionicons name="shield-checkmark" size={18} color={Colors.white} />}
-          gradientStyle={styles.saveBtn}
+          size="compact"
+          leftIcon={<Ionicons name="shield-checkmark" size={17} color={Colors.white} />}
         />
       ) : undefined}
     >
@@ -706,13 +706,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tipText: { flex: 1, fontSize: 13, color: Colors.muted, lineHeight: 18 },
-  saveBtn: {
-    borderRadius: Radius.lg,
-    paddingVertical: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 8,
-  },
-  saveText: { color: Colors.white, fontWeight: '700', fontSize: 15 },
 });

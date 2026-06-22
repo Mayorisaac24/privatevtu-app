@@ -151,8 +151,8 @@ export default function ChangePasswordScreen() {
             onPress={handleContinue}
             inactive={!canContinue}
             disabled={!canContinue}
-            rightIcon={<Ionicons name={footerIcon} size={18} color={Colors.white} />}
-            gradientStyle={styles.saveBtn}
+            size="compact"
+            rightIcon={<Ionicons name={footerIcon} size={17} color={Colors.white} />}
           />
         )}
       >
@@ -602,13 +602,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tipText: { flex: 1, fontSize: 13, color: Colors.muted, lineHeight: 18 },
-  saveBtn: {
-    borderRadius: Radius.lg,
-    paddingVertical: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 8,
-  },
-  saveText: { color: Colors.white, fontWeight: '700', fontSize: 15 },
 });

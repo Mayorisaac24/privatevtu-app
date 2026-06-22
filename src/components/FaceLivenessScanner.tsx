@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal,
   View,
@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  useWindowDimensions,
+  type LayoutChangeEvent,
 } from 'react-native';
 import {
   useCameraDevice,
@@ -17,6 +17,7 @@ import {
   Camera as FaceDetectionCamera,
   type Face,
 } from 'react-native-vision-camera-face-detector';
+import { Image } from 'expo-image';
 import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,94 +25,177 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Radius } from '../theme';
 import {
   createBlinkTracker,
-  FACE_HOLD_MS,
-  isAlignedFace,
+  getPositionIssue,
   isHeadTurnedLeft,
   isHeadTurnedRight,
+  isPositionedFace,
   pickPrimaryFace,
+  scoreCaptureQuality,
   updateBlinkTracker,
+  type AlignmentIssue,
 } from '../lib/face-liveness-engine';
 import {
-  LIVENESS_CAPTURE_COUNTDOWN_SEC,
+  faceToFrameMetadata,
+  phaseForIndex,
+  type LivenessFramePayload,
+} from '../lib/face-liveness-frame-utils';
+import {
+  LIVENESS_FRAME_SAMPLE_MS,
+  LIVENESS_MAX_FRAMES_PER_STEP,
+  LIVENESS_MIN_FRAMES_PER_STEP,
+  LIVENESS_MIN_STEP_FRAMES_BEFORE_COMPLETE,
+  LIVENESS_REVIEW_DISPLAY_MS,
+  SILENT_CAPTURE_MIN_INTERVAL_MS,
+  SILENT_CAPTURE_MIN_SCORE,
   type FaceLivenessResult,
+  type LivenessSessionChallenge,
   type LivenessStep,
 } from '../lib/face-liveness-types';
+import { api, isResponseSuccess } from '../lib/api';
 
 export type { FaceLivenessResult } from '../lib/face-liveness-types';
 
 type StepConfig = {
   key: LivenessStep;
+  holdMs: number;
   title: string;
   subtitle: string;
   waitingSubtitle: string;
   icon: keyof typeof Ionicons.glyphMap;
 };
 
-const STEPS: StepConfig[] = [
-  {
-    key: 'align',
+type ScanPhase = 'scanning' | 'review' | 'processing';
+
+type StoredCapture = {
+  dataUri: string;
+  score: number;
+  capturedAt: string;
+};
+
+const STEP_LABELS: Record<LivenessStep, {
+  title: string;
+  subtitle: string;
+  waitingSubtitle: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}> = {
+  align: {
     title: 'Position your face',
     subtitle: 'Face detected — hold still',
     waitingSubtitle: 'Center your face inside the oval',
     icon: 'scan-outline',
   },
-  {
-    key: 'blink',
+  blink: {
     title: 'Blink slowly',
     subtitle: 'Blink detected',
     waitingSubtitle: 'Open your eyes, then blink naturally',
     icon: 'eye-outline',
   },
-  {
-    key: 'turn_left',
+  turn_left: {
     title: 'Turn head left',
     subtitle: 'Left turn detected',
     waitingSubtitle: 'Turn your head to the left',
     icon: 'arrow-back-outline',
   },
-  {
-    key: 'turn_right',
+  turn_right: {
     title: 'Turn head right',
     subtitle: 'Right turn detected',
     waitingSubtitle: 'Turn your head to the right',
     icon: 'arrow-forward-outline',
   },
-  {
-    key: 'capture',
-    title: 'Hold still',
-    subtitle: 'Capturing automatically…',
-    waitingSubtitle: 'Look at the camera and hold still',
-    icon: 'camera-outline',
-  },
-];
+};
+
+function buildSteps(challenges: LivenessSessionChallenge[]): StepConfig[] {
+  return challenges.map((challenge) => ({
+    key: challenge.step,
+    holdMs: challenge.holdMs,
+    ...STEP_LABELS[challenge.step],
+  }));
+}
+
+function alignmentHint(issue: AlignmentIssue): string | null {
+  switch (issue) {
+    case 'too_small':
+      return 'Move a little closer to the camera';
+    case 'too_large':
+      return 'Move back slightly';
+    case 'off_center':
+      return 'Center your face inside the oval';
+    case 'not_forward':
+      return 'Look straight at the camera';
+    default:
+      return null;
+  }
+}
+
+const SILENT_PHOTO_OPTIONS = { flash: 'off' as const, enableShutterSound: false };
+
+async function photoToDataUri(photoPath: string): Promise<string> {
+  const uri = photoPath.startsWith('file://') ? photoPath : `file://${photoPath}`;
+  const manipulated = await ImageManipulator.manipulateAsync(
+    uri,
+    [{ resize: { width: 1200 } }],
+    { compress: 0.75, format: ImageManipulator.SaveFormat.JPEG, base64: true },
+  );
+
+  let base64 = manipulated.base64;
+  if (!base64) {
+    base64 = await FileSystem.readAsStringAsync(manipulated.uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+  }
+
+  if (!base64) {
+    throw new Error('Could not process face scan. Please try again.');
+  }
+
+  return `data:image/jpeg;base64,${base64}`;
+}
 
 type Props = {
   visible: boolean;
+  sessionId: string;
+  challenges: LivenessSessionChallenge[];
+  expiresAt: string;
   onClose: () => void;
   onComplete: (result: FaceLivenessResult) => void;
 };
 
-export function FaceLivenessScanner({ visible, onClose, onComplete }: Props) {
+export function FaceLivenessScanner({
+  visible,
+  sessionId,
+  challenges,
+  expiresAt,
+  onClose,
+  onComplete,
+}: Props) {
+  const steps = useMemo(() => buildSteps(challenges), [challenges]);
   const insets = useSafeAreaInsets();
-  const { width, height } = useWindowDimensions();
   const cameraRef = useRef<VisionCameraType>(null);
+  const cameraSizeRef = useRef({ width: 0, height: 0 });
   const device = useCameraDevice('front');
   const { hasPermission, requestPermission } = useCameraPermission();
 
-  const captureStartedRef = useRef(false);
+  const sessionFinishedRef = useRef(false);
   const sessionStartedAt = useRef(Date.now());
   const completedChallengesRef = useRef<LivenessStep[]>([]);
   const stepIndexRef = useRef(0);
   const holdStartedAtRef = useRef<number | null>(null);
   const blinkTrackerRef = useRef(createBlinkTracker());
-  const captureCountdownStartedRef = useRef(false);
+  const bestCaptureRef = useRef<StoredCapture | null>(null);
+  const lastCaptureAttemptRef = useRef(0);
+  const silentCaptureInFlightRef = useRef(false);
+  const stepFramesRef = useRef<LivenessFramePayload[]>([]);
+  const lastSampleAtRef = useRef(0);
+  const stepUploadingRef = useRef(false);
 
   const [stepIndex, setStepIndex] = useState(0);
-  const [phase, setPhase] = useState<'scanning' | 'capturing' | 'processing'>('scanning');
+  const [phase, setPhase] = useState<ScanPhase>('scanning');
   const [error, setError] = useState<string | null>(null);
-  const [captureCountdown, setCaptureCountdown] = useState<number | null>(null);
   const [stepSatisfied, setStepSatisfied] = useState(false);
   const [facePresent, setFacePresent] = useState(false);
+  const [alignmentIssue, setAlignmentIssue] = useState<AlignmentIssue>(null);
+  const [cameraLayout, setCameraLayout] = useState({ width: 0, height: 0 });
+  const [reviewImageUri, setReviewImageUri] = useState<string | null>(null);
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
 
@@ -120,16 +204,31 @@ export function FaceLivenessScanner({ visible, onClose, onComplete }: Props) {
     setStepIndex(0);
     setPhase('scanning');
     setError(null);
-    setCaptureCountdown(null);
     setStepSatisfied(false);
     setFacePresent(false);
-    captureStartedRef.current = false;
-    captureCountdownStartedRef.current = false;
+    setAlignmentIssue(null);
+    setReviewImageUri(null);
+    sessionFinishedRef.current = false;
     completedChallengesRef.current = [];
     holdStartedAtRef.current = null;
     blinkTrackerRef.current = createBlinkTracker();
+    bestCaptureRef.current = null;
+    lastCaptureAttemptRef.current = 0;
+    silentCaptureInFlightRef.current = false;
+    stepFramesRef.current = [];
+    lastSampleAtRef.current = 0;
+    stepUploadingRef.current = false;
     sessionStartedAt.current = Date.now();
   }, []);
+
+  const handleRetry = useCallback(() => {
+    const finishedAllSteps = completedChallengesRef.current.length >= steps.length;
+    if (finishedAllSteps) {
+      onClose();
+      return;
+    }
+    reset();
+  }, [onClose, reset, steps.length]);
 
   useEffect(() => {
     if (!visible) {
@@ -141,97 +240,207 @@ export function FaceLivenessScanner({ visible, onClose, onComplete }: Props) {
     }
   }, [visible, hasPermission, requestPermission, reset]);
 
-  const advanceStep = useCallback((completedKey: LivenessStep) => {
-    const current = STEPS[stepIndexRef.current];
-    if (!current || current.key !== completedKey) return;
-
-    completedChallengesRef.current = [...completedChallengesRef.current, completedKey];
-    holdStartedAtRef.current = null;
-    blinkTrackerRef.current = createBlinkTracker();
-    captureCountdownStartedRef.current = false;
-    setCaptureCountdown(null);
-    setStepSatisfied(false);
-
-    const nextIndex = stepIndexRef.current + 1;
-    if (nextIndex >= STEPS.length) return;
-
-    stepIndexRef.current = nextIndex;
-    setStepIndex(nextIndex);
+  const onCameraLayout = useCallback((event: LayoutChangeEvent) => {
+    const { width, height } = event.nativeEvent.layout;
+    if (width <= 0 || height <= 0) return;
+    cameraSizeRef.current = { width, height };
+    setCameraLayout((prev) => (
+      prev.width === width && prev.height === height ? prev : { width, height }
+    ));
   }, []);
 
-  const finishCapture = useCallback(async () => {
-    if (!cameraRef.current || captureStartedRef.current) return;
+  const getDetectionSpace = useCallback((frame: { width: number; height: number }) => {
+    const { width, height } = cameraSizeRef.current;
+    if (width > 0 && height > 0) {
+      return { width, height };
+    }
+    return { width: frame.width, height: frame.height };
+  }, []);
 
-    captureStartedRef.current = true;
-    setPhase('capturing');
+  const storeCapture = useCallback((dataUri: string, score: number) => {
+    const current = bestCaptureRef.current;
+    if (current && score <= current.score + 0.04) return;
+    bestCaptureRef.current = {
+      dataUri,
+      score,
+      capturedAt: new Date().toISOString(),
+    };
+  }, []);
+
+  const capturePhotoSilently = useCallback(async (score: number) => {
+    if (!cameraRef.current || silentCaptureInFlightRef.current || phaseRef.current !== 'scanning') {
+      return;
+    }
+
+    silentCaptureInFlightRef.current = true;
+    lastCaptureAttemptRef.current = Date.now();
+
+    try {
+      const photo = await cameraRef.current.takePhoto(SILENT_PHOTO_OPTIONS);
+      if (!photo?.path) return;
+      const dataUri = await photoToDataUri(photo.path);
+      storeCapture(dataUri, score);
+    } catch {
+      // Silent capture failures are expected occasionally — keep scanning.
+    } finally {
+      silentCaptureInFlightRef.current = false;
+    }
+  }, [storeCapture]);
+
+  const maybeCaptureSilently = useCallback((face: Face, space: { width: number; height: number }) => {
+    if (phaseRef.current !== 'scanning' || silentCaptureInFlightRef.current) return;
+
+    const score = scoreCaptureQuality(face, space.width, space.height);
+    if (score < SILENT_CAPTURE_MIN_SCORE) return;
+    if (Date.now() - lastCaptureAttemptRef.current < SILENT_CAPTURE_MIN_INTERVAL_MS) return;
+
+    const current = bestCaptureRef.current;
+    if (current && score <= current.score + 0.04) return;
+
+    void capturePhotoSilently(score);
+  }, [capturePhotoSilently]);
+
+  const sampleStepFrame = useCallback((
+    face: Face,
+    space: { width: number; height: number },
+    force = false,
+  ) => {
+    if (phaseRef.current !== 'scanning' || stepUploadingRef.current) return;
+    if (stepFramesRef.current.length >= LIVENESS_MAX_FRAMES_PER_STEP) return;
+    if (!force && Date.now() - lastSampleAtRef.current < LIVENESS_FRAME_SAMPLE_MS) return;
+
+    lastSampleAtRef.current = Date.now();
+    const index = stepFramesRef.current.length;
+    stepFramesRef.current.push({
+      phase: phaseForIndex(index, LIVENESS_MAX_FRAMES_PER_STEP),
+      capturedAt: new Date().toISOString(),
+      metadata: faceToFrameMetadata(face, space.width, space.height),
+    });
+  }, []);
+
+  const hasEnoughStepFrames = useCallback(() => (
+    stepFramesRef.current.length >= LIVENESS_MIN_STEP_FRAMES_BEFORE_COMPLETE
+  ), []);
+
+  const completeSession = useCallback(async (capture: StoredCapture) => {
+    setReviewImageUri(capture.dataUri);
+    setPhase('review');
+
+    try {
+      const completeRes = await api.completeLivenessSession(sessionId);
+      if (!isResponseSuccess(completeRes) || !completeRes.data) {
+        throw new Error(completeRes.message || 'Could not verify face scan');
+      }
+
+      if (!completeRes.data.passed) {
+        throw new Error(
+          'We could not confirm your live scan. Please try again in good lighting, facing the camera directly.',
+        );
+      }
+
+      setTimeout(() => {
+        setPhase('processing');
+        onComplete({
+          dataUri: capture.dataUri,
+          metadata: {
+            livenessSessionId: sessionId,
+            livenessVerified: true,
+            method: 'mlkit_live_scan_v5',
+            serverDecision: completeRes.data!.decision,
+            challengesCompleted: [...completedChallengesRef.current],
+            capturedAt: capture.capturedAt,
+            sessionDurationMs: Date.now() - sessionStartedAt.current,
+            decisionReasons: completeRes.data!.reasons,
+          },
+        });
+        onClose();
+      }, LIVENESS_REVIEW_DISPLAY_MS);
+    } catch (err) {
+      sessionFinishedRef.current = false;
+      setPhase('scanning');
+      setReviewImageUri(null);
+      setError(err instanceof Error ? err.message : 'Could not verify face scan');
+    }
+  }, [onClose, onComplete, sessionId]);
+
+  const finishSession = useCallback(async () => {
+    if (sessionFinishedRef.current) return;
+    sessionFinishedRef.current = true;
+    setError(null);
+
+    let capture = bestCaptureRef.current;
+
+    if (!capture && cameraRef.current) {
+      try {
+        const photo = await cameraRef.current.takePhoto(SILENT_PHOTO_OPTIONS);
+        if (photo?.path) {
+          const dataUri = await photoToDataUri(photo.path);
+          capture = {
+            dataUri,
+            score: 0.5,
+            capturedAt: new Date().toISOString(),
+          };
+          bestCaptureRef.current = capture;
+        }
+      } catch {
+        // Fall through to error below.
+      }
+    }
+
+    if (!capture) {
+      sessionFinishedRef.current = false;
+      setError('We could not get a clear face image. Please try again and keep your face centered.');
+      return;
+    }
+
+    completeSession(capture);
+  }, [completeSession]);
+
+  const advanceStep = useCallback(async (completedKey: LivenessStep) => {
+    const current = steps[stepIndexRef.current];
+    if (!current || current.key !== completedKey || stepUploadingRef.current) return;
+
+    if (stepFramesRef.current.length < LIVENESS_MIN_FRAMES_PER_STEP) {
+      setError('Hold still for a moment while we capture your face.');
+      holdStartedAtRef.current = null;
+      return;
+    }
+
+    stepUploadingRef.current = true;
     setError(null);
 
     try {
-      const photo = await cameraRef.current.takePhoto({ flash: 'off' });
-      if (!photo?.path) {
-        throw new Error('Could not capture face scan. Please try again.');
-      }
-
-      setPhase('processing');
-
-      const uri = photo.path.startsWith('file://') ? photo.path : `file://${photo.path}`;
-      const manipulated = await ImageManipulator.manipulateAsync(
-        uri,
-        [{ resize: { width: 1200 } }],
-        { compress: 0.75, format: ImageManipulator.SaveFormat.JPEG, base64: true },
+      const uploadRes = await api.submitLivenessStep(
+        sessionId,
+        completedKey,
+        stepFramesRef.current,
       );
-
-      let base64 = manipulated.base64;
-      if (!base64) {
-        base64 = await FileSystem.readAsStringAsync(manipulated.uri, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
+      if (!isResponseSuccess(uploadRes)) {
+        throw new Error(uploadRes.message || 'Could not upload step evidence');
       }
-
-      if (!base64) {
-        throw new Error('Could not process face scan. Please try again.');
-      }
-
-      onComplete({
-        dataUri: `data:image/jpeg;base64,${base64}`,
-        metadata: {
-          livenessVerified: true,
-          method: 'mlkit_live_scan_v4',
-          challengesCompleted: [...completedChallengesRef.current, 'capture'],
-          capturedAt: new Date().toISOString(),
-          sessionDurationMs: Date.now() - sessionStartedAt.current,
-        },
-      });
-      onClose();
-    } catch (err: unknown) {
-      captureStartedRef.current = false;
-      captureCountdownStartedRef.current = false;
-      setPhase('scanning');
-      setCaptureCountdown(null);
-      const message = err instanceof Error ? err.message : 'Face scan failed';
-      setError(message);
+    } catch (err) {
+      stepUploadingRef.current = false;
+      setError(err instanceof Error ? err.message : 'Could not upload step evidence');
+      return;
     }
-  }, [onClose, onComplete]);
 
-  const startCaptureCountdown = useCallback(() => {
-    if (captureCountdownStartedRef.current) return;
-    captureCountdownStartedRef.current = true;
-    setCaptureCountdown(LIVENESS_CAPTURE_COUNTDOWN_SEC);
+    stepUploadingRef.current = false;
+    completedChallengesRef.current = [...completedChallengesRef.current, completedKey];
+    holdStartedAtRef.current = null;
+    blinkTrackerRef.current = createBlinkTracker();
+    stepFramesRef.current = [];
+    lastSampleAtRef.current = 0;
+    setStepSatisfied(false);
 
-    const interval = setInterval(() => {
-      setCaptureCountdown((prev) => {
-        if (prev == null || prev <= 1) {
-          clearInterval(interval);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    const nextIndex = stepIndexRef.current + 1;
+    if (nextIndex >= steps.length) {
+      void finishSession();
+      return;
+    }
 
-    setTimeout(() => {
-      void finishCapture();
-    }, LIVENESS_CAPTURE_COUNTDOWN_SEC * 1000);
-  }, [finishCapture]);
+    stepIndexRef.current = nextIndex;
+    setStepIndex(nextIndex);
+  }, [finishSession, sessionId, steps]);
 
   const onFacesDetected = useCallback((faces: Face[], frame: { width: number; height: number }) => {
     if (phaseRef.current !== 'scanning') return;
@@ -239,23 +448,38 @@ export function FaceLivenessScanner({ visible, onClose, onComplete }: Props) {
     const face = pickPrimaryFace(faces);
     setFacePresent(!!face);
 
-    const step = STEPS[stepIndexRef.current];
+    const step = steps[stepIndexRef.current];
     if (!step) return;
+
+    const space = getDetectionSpace(frame);
 
     if (!face) {
       holdStartedAtRef.current = null;
       setStepSatisfied(false);
+      setAlignmentIssue(null);
       return;
     }
 
+    sampleStepFrame(face, space);
+    maybeCaptureSilently(face, space);
+
+    const holdMs = step.holdMs;
+    const readyToAdvance = (key: LivenessStep) => {
+      if (!hasEnoughStepFrames()) return;
+      setStepSatisfied(true);
+      void advanceStep(key);
+    };
+
     if (step.key === 'align') {
-      if (isAlignedFace(face, frame.width, frame.height)) {
+      const issue = getPositionIssue(face, space.width, space.height);
+      setAlignmentIssue(issue);
+
+      if (isPositionedFace(face, space.width, space.height)) {
         if (holdStartedAtRef.current == null) {
           holdStartedAtRef.current = Date.now();
         }
-        if (Date.now() - holdStartedAtRef.current >= FACE_HOLD_MS) {
-          setStepSatisfied(true);
-          advanceStep('align');
+        if (Date.now() - holdStartedAtRef.current >= holdMs) {
+          readyToAdvance('align');
         }
       } else {
         holdStartedAtRef.current = null;
@@ -264,11 +488,19 @@ export function FaceLivenessScanner({ visible, onClose, onComplete }: Props) {
       return;
     }
 
+    setAlignmentIssue(null);
+
     if (step.key === 'blink') {
       const blinkDone = updateBlinkTracker(blinkTrackerRef.current, face);
+      if (blinkTrackerRef.current.phase === 'waiting_close') {
+        sampleStepFrame(face, space, true);
+      }
+      if (blinkTrackerRef.current.phase === 'waiting_reopen') {
+        sampleStepFrame(face, space, true);
+      }
       if (blinkDone) {
-        setStepSatisfied(true);
-        advanceStep('blink');
+        sampleStepFrame(face, space, true);
+        readyToAdvance('blink');
       } else {
         setStepSatisfied(blinkTrackerRef.current.phase !== 'waiting_open');
       }
@@ -280,9 +512,9 @@ export function FaceLivenessScanner({ visible, onClose, onComplete }: Props) {
         if (holdStartedAtRef.current == null) {
           holdStartedAtRef.current = Date.now();
         }
-        if (Date.now() - holdStartedAtRef.current >= FACE_HOLD_MS) {
-          setStepSatisfied(true);
-          advanceStep('turn_left');
+        sampleStepFrame(face, space, true);
+        if (Date.now() - holdStartedAtRef.current >= holdMs) {
+          readyToAdvance('turn_left');
         }
       } else {
         holdStartedAtRef.current = null;
@@ -296,39 +528,45 @@ export function FaceLivenessScanner({ visible, onClose, onComplete }: Props) {
         if (holdStartedAtRef.current == null) {
           holdStartedAtRef.current = Date.now();
         }
-        if (Date.now() - holdStartedAtRef.current >= FACE_HOLD_MS) {
-          setStepSatisfied(true);
-          advanceStep('turn_right');
+        sampleStepFrame(face, space, true);
+        if (Date.now() - holdStartedAtRef.current >= holdMs) {
+          readyToAdvance('turn_right');
         }
       } else {
         holdStartedAtRef.current = null;
         setStepSatisfied(false);
       }
-      return;
     }
+  }, [advanceStep, getDetectionSpace, hasEnoughStepFrames, maybeCaptureSilently, sampleStepFrame, steps]);
 
-    if (step.key === 'capture') {
-      if (isAlignedFace(face, frame.width, frame.height)) {
-        if (holdStartedAtRef.current == null) {
-          holdStartedAtRef.current = Date.now();
-        }
-        if (Date.now() - holdStartedAtRef.current >= FACE_HOLD_MS) {
-          setStepSatisfied(true);
-          startCaptureCountdown();
-        }
-      } else {
-        holdStartedAtRef.current = null;
-        captureCountdownStartedRef.current = false;
-        setCaptureCountdown(null);
-        setStepSatisfied(false);
-      }
-    }
-  }, [advanceStep, startCaptureCountdown]);
-
-  const currentStep = STEPS[stepIndex] ?? STEPS[0];
-  const progress = ((stepIndex + 1) / STEPS.length) * 100;
-  const isBusy = phase === 'capturing' || phase === 'processing';
-  const subtitle = stepSatisfied ? currentStep.subtitle : currentStep.waitingSubtitle;
+  const currentStep = steps[stepIndex] ?? steps[0];
+  const progress = phase === 'review' || phase === 'processing'
+    ? 100
+    : steps.length
+      ? ((stepIndex + 1) / steps.length) * 100
+      : 0;
+  const isReviewing = phase === 'review' || phase === 'processing';
+  const subtitle = phase === 'review'
+    ? 'Verification complete'
+    : phase === 'processing'
+      ? 'Saving your verified photo…'
+      : stepSatisfied
+        ? currentStep.subtitle
+        : (alignmentHint(alignmentIssue) ?? currentStep.waitingSubtitle);
+  const detectionReady = cameraLayout.width > 0 && cameraLayout.height > 0;
+  const faceDetectionOptions = useMemo(
+    () => ({
+      performanceMode: 'fast' as const,
+      classificationMode: 'all' as const,
+      landmarkMode: 'none' as const,
+      contourMode: 'none' as const,
+      minFaceSize: 0.1,
+      autoScale: true,
+      windowWidth: cameraLayout.width,
+      windowHeight: cameraLayout.height,
+    }),
+    [cameraLayout.width, cameraLayout.height],
+  );
 
   if (!device) {
     return (
@@ -347,7 +585,12 @@ export function FaceLivenessScanner({ visible, onClose, onComplete }: Props) {
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom + 12 }]}>
         <View style={styles.header}>
-          <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.85} disabled={isBusy}>
+          <TouchableOpacity
+            style={styles.closeBtn}
+            onPress={onClose}
+            activeOpacity={0.85}
+            disabled={isReviewing}
+          >
             <Ionicons name="close" size={22} color={Colors.white} />
           </TouchableOpacity>
           <View style={styles.headerText}>
@@ -367,42 +610,39 @@ export function FaceLivenessScanner({ visible, onClose, onComplete }: Props) {
           </View>
         ) : (
           <>
-            <View style={styles.cameraWrap}>
-              <FaceDetectionCamera
-                ref={cameraRef}
-                style={styles.camera}
-                device={device}
-                isActive={visible && !isBusy}
-                photo
-                faceDetectionOptions={{
-                  performanceMode: 'fast',
-                  classificationMode: 'all',
-                  landmarkMode: 'none',
-                  contourMode: 'none',
-                  minFaceSize: 0.12,
-                  autoScale: true,
-                  windowWidth: width,
-                  windowHeight: height,
-                }}
-                faceDetectionCallback={onFacesDetected}
-              />
+            <View style={styles.cameraWrap} onLayout={onCameraLayout}>
+              {isReviewing && reviewImageUri ? (
+                <Image source={{ uri: reviewImageUri }} style={styles.camera} contentFit="cover" />
+              ) : detectionReady ? (
+                <FaceDetectionCamera
+                  ref={cameraRef}
+                  style={styles.camera}
+                  device={device}
+                  isActive={visible && phase === 'scanning'}
+                  photo
+                  faceDetectionOptions={faceDetectionOptions}
+                  faceDetectionCallback={onFacesDetected}
+                />
+              ) : (
+                <View style={styles.camera} />
+              )}
 
-              <View style={styles.overlay} pointerEvents="none">
-                <View style={[styles.faceOval, facePresent && styles.faceOvalActive]} />
-              </View>
-
-              {isBusy ? (
-                <View style={styles.captureOverlay}>
-                  <ActivityIndicator color={Colors.white} size="large" />
-                  <Text style={styles.overlayText}>
-                    {phase === 'capturing' ? 'Capturing photo…' : 'Processing face scan…'}
-                  </Text>
+              {!isReviewing ? (
+                <View style={styles.overlay} pointerEvents="none">
+                  <View style={[styles.faceOval, facePresent && styles.faceOvalActive]} />
                 </View>
               ) : null}
 
-              {captureCountdown != null && captureCountdown > 0 && phase === 'scanning' ? (
-                <View style={styles.countdownBadge}>
-                  <Text style={styles.countdownText}>{captureCountdown}</Text>
+              {phase === 'processing' ? (
+                <View style={styles.captureOverlay}>
+                  <ActivityIndicator color={Colors.white} size="large" />
+                </View>
+              ) : null}
+
+              {phase === 'review' ? (
+                <View style={styles.reviewBadge}>
+                  <Ionicons name="checkmark-circle" size={18} color={Colors.white} />
+                  <Text style={styles.reviewBadgeText}>Verified</Text>
                 </View>
               ) : null}
             </View>
@@ -412,29 +652,44 @@ export function FaceLivenessScanner({ visible, onClose, onComplete }: Props) {
             </View>
 
             <View style={styles.instructionCard}>
-              <View style={styles.stepHeading}>
-                <View style={styles.stepIconWrap}>
-                  <Ionicons name={currentStep.icon} size={18} color={Colors.primaryLight} />
+              {phase === 'scanning' ? (
+                <View style={styles.stepHeading}>
+                  <View style={styles.stepIconWrap}>
+                    <Ionicons name={currentStep.icon} size={18} color={Colors.primaryLight} />
+                  </View>
+                  <Text style={styles.stepLabel}>Step {stepIndex + 1} of {steps.length}</Text>
                 </View>
-                <Text style={styles.stepLabel}>Step {stepIndex + 1} of {STEPS.length}</Text>
-              </View>
-              <Text style={styles.stepTitle}>{currentStep.title}</Text>
+              ) : (
+                <View style={styles.stepHeading}>
+                  <View style={[styles.stepIconWrap, styles.stepIconWrapSuccess]}>
+                    <Ionicons name="shield-checkmark" size={18} color="#86EFAC" />
+                  </View>
+                  <Text style={styles.stepLabel}>Complete</Text>
+                </View>
+              )}
+              <Text style={styles.stepTitle}>
+                {phase === 'review' || phase === 'processing' ? 'Face verified' : currentStep.title}
+              </Text>
               <Text style={styles.stepSub}>{subtitle}</Text>
 
               {error ? (
                 <>
                   <Text style={styles.errorText}>{error}</Text>
-                  <TouchableOpacity style={styles.retryBtn} onPress={reset} activeOpacity={0.88}>
+                  <TouchableOpacity style={styles.retryBtn} onPress={handleRetry} activeOpacity={0.88}>
                     <Text style={styles.retryBtnText}>Try again</Text>
                   </TouchableOpacity>
                 </>
-              ) : (
+              ) : phase === 'scanning' ? (
                 <Text style={styles.autoHint}>
-                  {facePresent
-                    ? 'Detecting your face — stay on this step until verified'
-                    : 'No face detected yet — move closer and face the camera'}
+                  {!detectionReady
+                    ? 'Starting camera…'
+                    : facePresent
+                      ? (stepSatisfied
+                        ? 'Verified — moving to next step…'
+                        : 'Hold still while we verify your position')
+                      : 'No face detected yet — move closer and face the camera'}
                 </Text>
-              )}
+              ) : null}
             </View>
           </>
         )}
@@ -516,35 +771,28 @@ const styles = StyleSheet.create({
   },
   captureOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    backgroundColor: 'rgba(15, 23, 42, 0.35)',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
-    paddingHorizontal: 24,
   },
-  overlayText: {
-    color: Colors.white,
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  countdownBadge: {
+  reviewBadge: {
     position: 'absolute',
     top: 20,
     alignSelf: 'center',
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(124, 58, 237, 0.92)',
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.35)',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: Radius.full,
+    backgroundColor: 'rgba(22, 163, 74, 0.92)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
   },
-  countdownText: {
+  reviewBadgeText: {
     color: Colors.white,
-    fontSize: 24,
-    fontWeight: '800',
+    fontSize: 13,
+    fontWeight: '700',
   },
   progressTrack: {
     height: 6,
@@ -581,6 +829,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(124, 58, 237, 0.22)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  stepIconWrapSuccess: {
+    backgroundColor: 'rgba(22, 163, 74, 0.22)',
   },
   stepLabel: {
     fontSize: 11,

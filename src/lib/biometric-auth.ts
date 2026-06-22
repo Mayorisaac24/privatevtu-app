@@ -1,6 +1,7 @@
 import * as LocalAuthentication from 'expo-local-authentication';
-import { api, isResponseSuccess, type User } from './api';
+import { api, isResponseSuccess, type TwoFactorMethodType, type User } from './api';
 import { getStableDeviceId } from './device-id';
+import { prepareTwoFactorLoginChallenge } from './two-factor-login';
 import {
   BiometricCredentials,
   clearBiometricCredentials,
@@ -81,7 +82,15 @@ export async function disableBiometricSignIn(): Promise<void> {
 }
 
 export async function biometricQuickSignIn(): Promise<
-  { ok: true; user: User } | { ok: false; message: string }
+  | { ok: true; user: User }
+  | {
+      ok: true;
+      requiresTwoFactor: true;
+      userId: string;
+      twoFactorMethod: TwoFactorMethodType;
+      destination?: string;
+    }
+  | { ok: false; message: string }
 > {
   try {
     const creds = await getBiometricCredentials();
@@ -103,14 +112,29 @@ export async function biometricQuickSignIn(): Promise<
       return { ok: false, message: res.message || 'Biometric sign-in failed' };
     }
 
-    const { useAuthStore } = require('../stores/auth-store');
-    const user = useAuthStore.getState().user;
+    if (res.data.requiresTwoFactor && res.data.userId) {
+      const challenge = await prepareTwoFactorLoginChallenge({
+        userId: res.data.userId,
+        twoFactorMethod: res.data.twoFactorMethod,
+        destination: res.data.destination,
+      });
+      return {
+        ok: true,
+        requiresTwoFactor: true,
+        userId: challenge.userId,
+        twoFactorMethod: challenge.twoFactorMethod,
+        destination: challenge.destination,
+      };
+    }
+
+    const user = res.data.user;
     if (!user) {
       return { ok: false, message: 'Sign-in incomplete — please use your password' };
     }
 
     void api.getProfile().then((profile) => {
       if (isResponseSuccess(profile) && profile.data) {
+        const { useAuthStore } = require('../stores/auth-store');
         useAuthStore.getState().setUser(profile.data);
       }
     }).catch(() => {});

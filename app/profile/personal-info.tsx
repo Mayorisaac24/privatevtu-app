@@ -1,29 +1,18 @@
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import * as ImageManipulator from 'expo-image-manipulator';
 import { useFocusEffect } from '@react-navigation/native';
-import * as ImagePicker from 'expo-image-picker';
 import { ProfileSubScreen } from '../../src/components/profile/ProfileSubScreen';
 import { GlassCard } from '../../src/components/ui/GlassCard';
 import { GlassSurface } from '../../src/components/ui/GlassSurface';
-import { UserAvatar } from '../../src/components/ui/UserAvatar';
-import { api, isResponseSuccess } from '../../src/lib/api';
 import { refreshUserProfile } from '../../src/lib/profile-sync';
 import { useAuthStore } from '../../src/stores';
 import { Colors, Radius, Spacing } from '../../src/theme';
-import { useGradients } from '../../src/theme/hooks';
-import { gradientStops } from '../../src/theme/gradient-utils';
-import { showToast } from '../../src/components/ui/Toast';
-
 
 function DetailRow({
   icon,
@@ -64,13 +53,10 @@ function DetailRow({
 }
 
 export default function PersonalInfoScreen() {
-  const gradients = useGradients();
-  const { user, setUser } = useAuthStore();
-  const [uploading, setUploading] = useState(false);
+  const { user } = useAuthStore();
 
   const firstName = user?.firstName || '';
   const lastName = user?.lastName || '';
-  const fullName = `${firstName} ${lastName}`.trim() || 'DataMartNG User';
 
   useFocusEffect(
     useCallback(() => {
@@ -78,117 +64,8 @@ export default function PersonalInfoScreen() {
     }, []),
   );
 
-  const pickAvatar = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      showToast({ type: 'error', text1: 'Permission needed', text2: 'Allow photo access to update your photo' });
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.7,
-      base64: true,
-    });
-    if (result.canceled || !result.assets[0]?.base64) return;
-
-    setUploading(true);
-    try {
-      const asset = result.assets[0];
-
-      // Extra safety: downscale very large photos before upload to avoid backend body-size limits.
-      let finalBase64 = asset.base64;
-      let mime = asset.mimeType || 'image/jpeg';
-
-      if (!finalBase64 || (asset.width ?? 0) > 1600 || (asset.height ?? 0) > 1600) {
-        const manipulated = await ImageManipulator.manipulateAsync(
-          asset.uri,
-          [{ resize: { width: 1200 } }],
-          { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true },
-        );
-        finalBase64 = manipulated.base64 ?? finalBase64;
-        mime = 'image/jpeg';
-      }
-
-      if (!finalBase64) {
-        throw new Error('Could not process selected photo. Please try another image.');
-      }
-
-      const dataUri = `data:${mime};base64,${finalBase64}`;
-      const uploadRes = await api.uploadAvatar(dataUri);
-      if (!isResponseSuccess(uploadRes) || !uploadRes.data?.url) {
-        throw new Error(uploadRes.message || 'Upload failed');
-      }
-
-      const newAvatarUrl = uploadRes.data.url;
-      const profileRes = await api.updateProfile({ avatar: newAvatarUrl });
-      if (!isResponseSuccess(profileRes) || !profileRes.data) {
-        throw new Error(profileRes.message || 'Could not save photo');
-      }
-
-      setUser(profileRes.data);
-      showToast({ type: 'success', text1: 'Photo updated', text2: 'Your profile photo is now synced across devices' });
-    } catch (error: unknown) {
-      let message = error instanceof Error ? error.message : 'Could not update photo';
-      const lower = message.toLowerCase();
-      if (lower.includes('body') && (lower.includes('too big') || lower.includes('too large'))) {
-        message = 'Photo is too large. Please pick a smaller image or screenshot and try again.';
-      }
-      showToast({ type: 'error', text1: 'Update failed', text2: message });
-    } finally {
-      setUploading(false);
-    }
-  };
-
   return (
     <ProfileSubScreen title="Personal Info" subtitle="Your account details">
-      <GlassCard variant="solid" borderRadius={24} padding={0} contentStyle={styles.profileCard}>
-        <LinearGradient
-          colors={gradientStops(gradients.cardSoft)}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.profileHero}
-        >
-          <View style={styles.heroBlobA} />
-          <View style={styles.heroBlobB} />
-        </LinearGradient>
-
-        <View style={styles.profileBody}>
-          <TouchableOpacity
-            style={styles.avatarTap}
-            onPress={() => void pickAvatar()}
-            activeOpacity={0.88}
-            disabled={uploading}
-          >
-            <UserAvatar
-              uri={user?.avatar}
-              firstName={firstName}
-              lastName={lastName}
-              size="xl"
-              variant="light"
-              style={styles.avatarLift}
-            />
-            <View style={styles.cameraBadge}>
-              {uploading ? (
-                <ActivityIndicator size="small" color={Colors.white} />
-              ) : (
-                <Ionicons name="camera" size={16} color={Colors.white} />
-              )}
-            </View>
-          </TouchableOpacity>
-
-          <Text style={styles.fullName}>{fullName}</Text>
-          <Text style={styles.avatarHint}>Tap photo to update</Text>
-
-          <View style={styles.memberPill}>
-            <Ionicons name="person-circle-outline" size={14} color={Colors.primary} />
-            <Text style={styles.memberPillText}>Account member</Text>
-          </View>
-        </View>
-      </GlassCard>
-
       <GlassCard variant="solid" borderRadius={Radius.lg} padding={0} contentStyle={styles.detailsCard}>
         <View style={styles.sectionHead}>
           <Text style={styles.sectionTitle}>Account details</Text>
@@ -228,105 +105,6 @@ export default function PersonalInfoScreen() {
 }
 
 const styles = StyleSheet.create({
-  profileCard: {
-    overflow: 'hidden',
-    backgroundColor: Colors.white,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#4C1D95',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.12,
-        shadowRadius: 18,
-      },
-      android: { elevation: 4 },
-      default: {},
-    }),
-  },
-  profileHero: {
-    height: 96,
-    overflow: 'hidden',
-  },
-  heroBlobA: {
-    position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    top: -30,
-    right: -20,
-  },
-  heroBlobB: {
-    position: 'absolute',
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    bottom: -24,
-    left: 18,
-  },
-  profileBody: {
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 24,
-    marginTop: -54,
-  },
-  avatarTap: {
-    position: 'relative',
-    marginBottom: 14,
-  },
-  avatarLift: {
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.16,
-        shadowRadius: 14,
-      },
-      android: { elevation: 6 },
-      default: {},
-    }),
-  },
-  cameraBadge: {
-    position: 'absolute',
-    right: 4,
-    bottom: 4,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: Colors.white,
-  },
-  fullName: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: Colors.dark,
-    letterSpacing: -0.4,
-    textAlign: 'center',
-  },
-  avatarHint: {
-    marginTop: 6,
-    fontSize: 13,
-    color: Colors.mutedLight,
-    fontWeight: '500',
-  },
-  memberPill: {
-    marginTop: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 999,
-    backgroundColor: Colors.primaryMuted,
-  },
-  memberPillText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
   detailsCard: {
     backgroundColor: Colors.white,
     paddingHorizontal: 4,

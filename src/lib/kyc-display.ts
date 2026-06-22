@@ -1,6 +1,7 @@
 import { Colors } from '../theme';
-import type { User } from './api';
+import type { KycStatusData, User } from './api';
 import { getKycTierLabel } from './api';
+import { getTier3DocumentSummary, isTier3AwaitingReview } from './kyc-status-utils';
 
 type KycBadge = {
   label: string;
@@ -8,108 +9,121 @@ type KycBadge = {
   icon: 'shield-checkmark' | 'shield-half-outline' | 'shield-outline' | 'time-outline' | 'close-circle-outline' | 'arrow-up-circle-outline';
 };
 
-type KycPrompt = {
-  title: string;
-  subtitle: string;
-};
-
 export type ProfileKycDisplay = {
   badge: KycBadge;
-  prompt: KycPrompt | null;
   menuSubtitle: string;
   showMenuBadge: boolean;
 };
 
 export function getProfileKycDisplay(
   kycStatus: User['kycStatus'] = 'NOT_VERIFIED',
-  currentTier?: string | null,
+  kycData?: KycStatusData | null,
 ): ProfileKycDisplay {
-  const tier = currentTier?.toUpperCase();
+  const currentTier = (kycData?.currentTier ?? kycStatus).toUpperCase();
+  const summary = getTier3DocumentSummary(kycData);
 
-  if (tier === 'TIER_3') {
+  if (currentTier === 'TIER_3') {
     return {
       badge: {
         label: 'Tier 3 · Verified',
         color: Colors.success,
         icon: 'shield-checkmark',
       },
-      prompt: null,
       menuSubtitle: 'Fully verified · highest limits',
       showMenuBadge: false,
     };
   }
 
-  if (tier === 'TIER_2') {
+  if (currentTier === 'TIER_2') {
+    if (summary.allApproved) {
+      return {
+        badge: {
+          label: 'Tier 2 · Complete',
+          color: Colors.success,
+          icon: 'shield-checkmark',
+        },
+        menuSubtitle: 'All documents approved',
+        showMenuBadge: false,
+      };
+    }
+
+    if (summary.anyRejected) {
+      return {
+        badge: {
+          label: 'Tier 2',
+          color: Colors.error,
+          icon: 'close-circle-outline',
+        },
+        menuSubtitle: 'Action required · resubmit documents',
+        showMenuBadge: true,
+      };
+    }
+
+    if (isTier3AwaitingReview(summary) || (summary.anyApproved && summary.anyPending)) {
+      return {
+        badge: {
+          label: 'Tier 2',
+          color: Colors.warning,
+          icon: 'time-outline',
+        },
+        menuSubtitle: 'Under review · we will notify you',
+        showMenuBadge: false,
+      };
+    }
+
     return {
       badge: {
         label: 'Tier 2',
         color: Colors.primaryLight,
         icon: 'shield-half-outline',
       },
-      prompt: {
-        title: 'Upgrade to Tier 3',
-        subtitle: 'Add your address to unlock full limits',
-      },
-      menuSubtitle: `${getKycTierLabel(tier)} · Continue verification`,
+      menuSubtitle: `${getKycTierLabel('TIER_2')} · Continue verification`,
       showMenuBadge: true,
     };
   }
 
-  if (tier === 'TIER_1') {
+  if (currentTier === 'TIER_1') {
     return {
       badge: {
         label: 'Tier 1',
         color: Colors.primaryLight,
         icon: 'shield-outline',
       },
-      prompt: {
-        title: 'Upgrade to Tier 2',
-        subtitle: 'Verify your BVN for higher transaction limits',
-      },
-      menuSubtitle: `${getKycTierLabel(tier)} · Verify BVN next`,
+      menuSubtitle: `${getKycTierLabel('TIER_1')} · Verify BVN next`,
       showMenuBadge: true,
     };
   }
 
-  if (kycStatus === 'VERIFIED') {
+  if (kycStatus === 'VERIFIED' || currentTier === 'VERIFIED') {
     return {
       badge: {
         label: 'Verified',
         color: Colors.success,
         icon: 'shield-checkmark',
       },
-      prompt: null,
       menuSubtitle: 'Identity verified',
       showMenuBadge: false,
     };
   }
 
-  if (kycStatus === 'PENDING') {
+  if (kycStatus === 'PENDING' || currentTier === 'PENDING') {
     return {
       badge: {
         label: 'Verification in progress',
         color: Colors.warning,
         icon: 'time-outline',
       },
-      prompt: {
-        title: 'Continue KYC verification',
-        subtitle: 'Pick up where you left off',
-      },
       menuSubtitle: 'Verification in progress',
       showMenuBadge: true,
     };
   }
 
-  if (kycStatus === 'REJECTED') {
+  if (kycStatus === 'REJECTED' || currentTier === 'REJECTED') {
     return {
       badge: {
         label: 'Verification rejected',
         color: Colors.error,
         icon: 'close-circle-outline',
-      },
-      prompt: {
-        title: 'Review your KYC submission',
-        subtitle: 'Update your details and try again',
       },
       menuSubtitle: 'Action required · resubmit verification',
       showMenuBadge: true,
@@ -121,10 +135,6 @@ export function getProfileKycDisplay(
       label: 'Start verification',
       color: Colors.primaryLight,
       icon: 'arrow-up-circle-outline',
-    },
-    prompt: {
-      title: 'Complete KYC verification',
-      subtitle: 'Unlock higher limits and permanent accounts',
     },
     menuSubtitle: 'Complete verification to unlock limits',
     showMenuBadge: true,

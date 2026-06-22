@@ -31,8 +31,38 @@ export type Tier3DocumentSummary = {
   allApproved: boolean;
   anyPending: boolean;
   anyRejected: boolean;
+  anyApproved: boolean;
   needsUpload: boolean;
+  approvedCount: number;
+  pendingCount: number;
+  rejectedCount: number;
 };
+
+export function formatKycDocumentStatus(status?: string): string {
+  switch (status) {
+    case 'APPROVED':
+      return 'Approved';
+    case 'REJECTED':
+      return 'Rejected';
+    case 'PENDING':
+      return 'Pending';
+    default:
+      return 'Not submitted';
+  }
+}
+
+export function getKycDocumentStatusStyle(status?: string): 'approved' | 'pending' | 'rejected' | 'muted' {
+  switch (status) {
+    case 'APPROVED':
+      return 'approved';
+    case 'REJECTED':
+      return 'rejected';
+    case 'PENDING':
+      return 'pending';
+    default:
+      return 'muted';
+  }
+}
 
 export function getTier3DocumentSummary(data?: KycStatusData | null): Tier3DocumentSummary {
   const docs = data?.documents ?? [];
@@ -54,6 +84,12 @@ export function getTier3DocumentSummary(data?: KycStatusData | null): Tier3Docum
   const anyRejected = idDoc?.status === 'REJECTED'
     || proofDoc?.status === 'REJECTED'
     || selfieDoc?.status === 'REJECTED';
+  const anyApproved = idDoc?.status === 'APPROVED'
+    || proofDoc?.status === 'APPROVED'
+    || selfieDoc?.status === 'APPROVED';
+  const approvedCount = [idDoc, proofDoc, selfieDoc].filter((doc) => doc?.status === 'APPROVED').length;
+  const pendingCount = [idDoc, proofDoc, selfieDoc].filter((doc) => doc?.status === 'PENDING').length;
+  const rejectedCount = [idDoc, proofDoc, selfieDoc].filter((doc) => doc?.status === 'REJECTED').length;
 
   return {
     idDoc,
@@ -66,15 +102,68 @@ export function getTier3DocumentSummary(data?: KycStatusData | null): Tier3Docum
     allApproved,
     anyPending,
     anyRejected,
+    anyApproved,
     needsUpload: !allSubmitted || anyRejected,
+    approvedCount,
+    pendingCount,
+    rejectedCount,
   };
+}
+
+export function isTier3AwaitingReview(summary: Tier3DocumentSummary): boolean {
+  return summary.allSubmitted && summary.anyPending && !summary.anyRejected;
+}
+
+export function isTier3SubmissionActive(summary: Tier3DocumentSummary): boolean {
+  return summary.allSubmitted && (summary.anyPending || summary.anyRejected || summary.anyApproved);
+}
+
+export function getTier3SubmissionHeadline(summary: Tier3DocumentSummary): {
+  title: string;
+  subtitle: string;
+  tone: 'pending' | 'rejected' | 'progress';
+} {
+  if (summary.anyRejected) {
+    return {
+      title: 'Resubmission required',
+      subtitle: 'One or more documents were rejected. Upload only the rejected items again.',
+      tone: 'rejected',
+    };
+  }
+  if (summary.allApproved) {
+    return {
+      title: 'Verification complete',
+      subtitle: 'All documents were approved.',
+      tone: 'progress',
+    };
+  }
+  if (summary.anyApproved && summary.anyPending) {
+    return {
+      title: 'Review in progress',
+      subtitle: `${summary.approvedCount} approved · ${summary.pendingCount} still pending review.`,
+      tone: 'progress',
+    };
+  }
+  return {
+    title: 'Under review',
+    subtitle: 'We usually review submissions within 1–2 business days.',
+    tone: 'pending',
+  };
+}
+
+export function isKycDocumentLocked(status?: string): boolean {
+  return status === 'PENDING' || status === 'APPROVED';
+}
+
+export function kycDocumentNeedsUpload(status?: string): boolean {
+  return !status || status === 'REJECTED';
 }
 
 export function getTier3ActionLabel(data?: KycStatusData | null): string {
   if (!hasSavedKycAddress(data)) return 'Start Tier 3';
   const summary = getTier3DocumentSummary(data);
   if (summary.anyRejected) return 'Resubmit documents';
-  if (summary.allSubmitted && summary.anyPending) return 'View submission';
+  if (summary.allSubmitted && (summary.anyPending || summary.anyApproved)) return 'View submission';
   if (summary.needsUpload) return 'Upload documents';
   return 'Continue Tier 3';
 }

@@ -6,16 +6,18 @@ import {
   ScrollView,
   Alert,
   Switch,
+  ActivityIndicator,
 } from 'react-native';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { router } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../stores';
 import { api } from '../lib/api';
 import { Colors, Spacing, Typography, Radius, Shadow } from '../theme';
-import { useColors, useGradients } from '../theme/hooks';
+import { useGradients } from '../theme/hooks';
 import { ThemedScreen } from '../components/ui/ThemedScreen';
 import { GlassCard } from '../components/ui/GlassCard';
 import { GlassSurface } from '../components/ui/GlassSurface';
@@ -25,10 +27,12 @@ import { useLayout } from '../lib/platform-ui';
 import { preloadTwoFactorMethods } from '../lib/two-factor-methods-cache';
 import { preloadBiometricSettings } from '../lib/biometric-settings-cache';
 import { getNotificationSettingsCached, hydrateNotificationSettingsCache } from '../lib/notification-settings-cache';
-import { getKycStatusData, peekKycStatusCache, preloadKycStatusData } from '../lib/kyc-status-cache';
+import { getKycStatusData, peekKycStatusCache } from '../lib/kyc-status-cache';
 import { preloadNigeriaLocations } from '../lib/nigeria-locations-cache';
 import { getProfileKycDisplay } from '../lib/kyc-display';
 import type { KycStatusData } from '../lib/api';
+import { refreshUserProfile } from '../lib/profile-sync';
+import { useAvatarPicker } from '../hooks/useAvatarPicker';
 
 const BRAND_ICON = { bg: Colors.primaryMuted, iconColor: Colors.primary };
 
@@ -53,20 +57,25 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { pagePadding } = useLayout();
   const { user, logout } = useAuthStore();
-  const colors = useColors();
   const gradients = useGradients();
+  const { pickAvatar, uploading } = useAvatarPicker();
   const [kycData, setKycData] = useState<KycStatusData | null>(() => peekKycStatusCache());
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshUserProfile();
+      void getKycStatusData({ force: true }).then((data) => {
+        if (data) setKycData(data);
+      });
+    }, []),
+  );
 
   useEffect(() => {
     preloadTwoFactorMethods();
     preloadBiometricSettings();
-    preloadKycStatusData();
     preloadNigeriaLocations();
     void hydrateNotificationSettingsCache();
     void getNotificationSettingsCached().catch(() => undefined);
-    void getKycStatusData().then((data) => {
-      if (data) setKycData(data);
-    });
   }, []);
 
   const handleLogout = () => {
@@ -90,8 +99,8 @@ export default function ProfileScreen() {
 
   const fullName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'User';
   const kycStatus = user?.kycStatus ?? 'NOT_VERIFIED';
-  const kycDisplay = getProfileKycDisplay(kycStatus, kycData?.currentTier);
-  const { badge: kycBadge, prompt: kycPrompt, menuSubtitle: kycMenuSubtitle, showMenuBadge } = kycDisplay;
+  const kycDisplay = getProfileKycDisplay(kycStatus, kycData);
+  const { badge: kycBadge, menuSubtitle: kycMenuSubtitle, showMenuBadge } = kycDisplay;
 
   const GROUPS: MenuGroup[] = [
     {
@@ -230,41 +239,62 @@ export default function ProfileScreen() {
           <View style={styles.blob2} />
           <View style={styles.cardShine} />
 
-          <UserAvatar
-            uri={user?.avatar}
-            firstName={user?.firstName}
-            lastName={user?.lastName}
-            size="lg"
-            variant="hero"
-          />
+          <TouchableOpacity
+            style={styles.avatarTap}
+            onPress={() => void pickAvatar()}
+            activeOpacity={0.88}
+            disabled={uploading}
+            accessibilityRole="button"
+            accessibilityLabel="Change profile photo"
+          >
+            <UserAvatar
+              uri={user?.avatar}
+              firstName={user?.firstName}
+              lastName={user?.lastName}
+              size="lg"
+              variant="hero"
+            />
+            <View style={styles.cameraBadge}>
+              {uploading ? (
+                <ActivityIndicator size="small" color={Colors.white} />
+              ) : (
+                <Ionicons name="camera" size={14} color={Colors.white} />
+              )}
+            </View>
+          </TouchableOpacity>
 
           <Text style={styles.heroName}>{fullName}</Text>
-          {user?.email ? <Text style={styles.heroMeta}>{user.email}</Text> : null}
-          {user?.phone ? <Text style={styles.heroMeta}>{user.phone}</Text> : null}
+          {user?.email ? (
+            <View style={styles.heroMetaRow}>
+              <Text style={styles.heroMeta}>{user.email}</Text>
+              {user.isEmailVerified ? (
+                <Ionicons name="checkmark-circle" size={13} color="rgba(255,255,255,0.75)" />
+              ) : null}
+            </View>
+          ) : null}
+          {user?.phone ? (
+            <View style={styles.heroMetaRow}>
+              <Text style={styles.heroMeta}>{user.phone}</Text>
+              {user.isPhoneVerified ? (
+                <Ionicons name="checkmark-circle" size={13} color="rgba(255,255,255,0.75)" />
+              ) : null}
+            </View>
+          ) : null}
 
-          <View style={styles.badgeRow}>
+          <TouchableOpacity
+            style={styles.badgeRow}
+            onPress={() => router.push('/kyc')}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Open KYC verification"
+          >
             <View style={styles.glassBadge}>
               <Ionicons name={kycBadge.icon} size={12} color={kycBadge.color} />
               <Text style={[styles.glassBadgeText, { color: kycBadge.color }]}>{kycBadge.label}</Text>
             </View>
-          </View>
+          </TouchableOpacity>
         </LinearGradient>
       </View>
-
-      {kycPrompt ? (
-        <TouchableOpacity onPress={() => router.push('/kyc')} activeOpacity={0.85}>
-          <GlassCard borderRadius={Radius.lg} contentStyle={styles.kycPrompt}>
-            <View style={styles.kycPromptIcon}>
-              <Ionicons name="shield-outline" size={18} color={colors.primary} />
-            </View>
-            <View style={styles.kycPromptBody}>
-              <Text style={styles.kycPromptTitle}>{kycPrompt.title}</Text>
-              <Text style={styles.kycPromptSub}>{kycPrompt.subtitle}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.primary} />
-          </GlassCard>
-        </TouchableOpacity>
-      ) : null}
 
       <View style={styles.settingsWrap}>
         {GROUPS.map((group, gi) => (
@@ -408,6 +438,23 @@ const styles = StyleSheet.create({
     borderRadius: 45,
     backgroundColor: 'rgba(99, 102, 241, 0.22)',
   },
+  avatarTap: {
+    position: 'relative',
+    marginBottom: 12,
+  },
+  cameraBadge: {
+    position: 'absolute',
+    right: 2,
+    bottom: 2,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2.5,
+    borderColor: 'rgba(255,255,255,0.95)',
+  },
   avatarRing: {
     width: 84,
     height: 84,
@@ -427,7 +474,13 @@ const styles = StyleSheet.create({
   },
   avatarText: { fontSize: 24, fontWeight: '800', color: Colors.white, letterSpacing: -0.5 },
   heroName: { fontSize: 20, fontWeight: '800', color: Colors.white, marginBottom: 4, letterSpacing: -0.3 },
-  heroMeta: { fontSize: 13, color: 'rgba(255,255,255,0.68)', marginBottom: 2 },
+  heroMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 2,
+  },
+  heroMeta: { fontSize: 13, color: 'rgba(255,255,255,0.68)' },
   badgeRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -452,25 +505,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.92)',
     letterSpacing: 0.2,
   },
-
-  kycPrompt: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 14,
-    marginBottom: 20,
-  },
-  kycPromptIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: Colors.primaryMuted,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  kycPromptBody: { flex: 1, gap: 2 },
-  kycPromptTitle: { fontSize: 14, fontWeight: '700', color: Colors.dark },
-  kycPromptSub: { fontSize: 12, color: Colors.muted, lineHeight: 16 },
 
   settingsWrap: { gap: 4 },
   groupTitle: {

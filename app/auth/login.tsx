@@ -10,6 +10,11 @@ import { isAndroid, AUTH_BUTTON_HEIGHT } from '../../src/lib/platform-ui';
 import { registerPushNotifications } from '../../src/lib/push-notifications';
 import { getLoginDeviceId } from '../../src/lib/login-context';
 import {
+  navigateToTwoFactorVerify,
+  prepareTwoFactorLoginChallenge,
+  type TwoFactorLoginChallenge,
+} from '../../src/lib/two-factor-login';
+import {
   biometricQuickSignIn,
   getBiometricCapability,
   getQuickSignInEmail,
@@ -86,6 +91,14 @@ export default function LoginScreen() {
     router.replace(signedInUser.hasPin === false ? '/dashboard/setup-pin' : '/(tabs)');
   };
 
+  const goToTwoFactor = (challenge: TwoFactorLoginChallenge) => {
+    const hint = challenge.twoFactorMethod === 'AUTHENTICATOR'
+      ? 'Enter your authenticator code'
+      : `Enter the code sent to ${challenge.destination || 'your contact'}`;
+    showToast({ type: 'info', text1: '2FA Required', text2: hint });
+    navigateToTwoFactorVerify(challenge);
+  };
+
   const handleLogin = async () => {
     if (!validate()) return;
     setIsLoading(true);
@@ -99,19 +112,12 @@ export default function LoginScreen() {
       });
       if (res.success && res.data) {
         if (res.data.requiresTwoFactor && res.data.userId) {
-          const twoFactorMethod = res.data.twoFactorMethod || 'AUTHENTICATOR';
-          const hint = twoFactorMethod === 'AUTHENTICATOR'
-            ? 'Enter your authenticator code'
-            : `Enter the code sent to ${res.data.destination || 'your contact'}`;
-          showToast({ type: 'info', text1: '2FA Required', text2: hint });
-          router.push({
-            pathname: '/auth/verify-2fa',
-            params: {
-              userId: res.data.userId,
-              method: twoFactorMethod,
-              destination: res.data.destination || '',
-            },
+          const challenge = await prepareTwoFactorLoginChallenge({
+            userId: res.data.userId,
+            twoFactorMethod: res.data.twoFactorMethod,
+            destination: res.data.destination,
           });
+          goToTwoFactor(challenge);
           return;
         }
         if (res.data.user) {
@@ -137,6 +143,16 @@ export default function LoginScreen() {
         if (result.message !== 'Biometric sign-in cancelled') {
           showToast({ type: 'error', text1: 'Sign-in failed', text2: result.message });
         }
+        return;
+      }
+
+      if ('requiresTwoFactor' in result && result.requiresTwoFactor) {
+        const challenge = await prepareTwoFactorLoginChallenge({
+          userId: result.userId,
+          twoFactorMethod: result.twoFactorMethod,
+          destination: result.destination,
+        });
+        goToTwoFactor(challenge);
         return;
       }
 

@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { GlassModal } from './GlassModal';
 import { GradientButton } from './GradientButton';
 import { Colors, Radius } from '../../theme';
+import { CTA_BUTTON_HEIGHT } from '../../lib/platform-ui';
 
 
 type ConfirmDialogProps = {
@@ -57,8 +58,8 @@ export function ConfirmDialog({
           onPress={onConfirm}
           disabled={loading}
           isLoading={loading}
+          size="compact"
           style={styles.confirmWrap}
-          gradientStyle={styles.confirmBtn}
         />
       </View>
     </GlassModal>
@@ -105,7 +106,7 @@ const styles = StyleSheet.create({
   },
   cancelBtn: {
     flex: 1,
-    minHeight: 48,
+    minHeight: CTA_BUTTON_HEIGHT,
     borderRadius: Radius.lg,
     borderWidth: 1.5,
     borderColor: 'rgba(15, 23, 42, 0.1)',
@@ -121,17 +122,5 @@ const styles = StyleSheet.create({
   },
   confirmWrap: {
     flex: 1,
-  },
-  confirmBtn: {
-    minHeight: 48,
-    borderRadius: Radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-  },
-  confirmText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.white,
   },
 });
