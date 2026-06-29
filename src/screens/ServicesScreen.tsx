@@ -1,13 +1,17 @@
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView, useWindowDimensions,
+  RefreshControl,
 } from 'react-native';
 import { router } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { useTabContext } from '../stores/tab-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, Typography, Radius, Shadow } from '../theme';
 import { useServiceAvailability } from '../hooks/useServiceAvailability';
 import { SERVICE_CATALOG_GROUPS, type ServiceCatalogItem } from '../lib/service-catalog-ui';
+import { refreshServiceCatalogState, syncCatalogRevision } from '../lib/catalog-revision-sync';
 import { showToast } from '../components/ui/Toast';
 import { ThemedScreen } from '../components/ui/ThemedScreen';
 import { GlassCard } from '../components/ui/GlassCard';
@@ -108,6 +112,22 @@ export default function ServicesScreen() {
   const { pagePadding, contentWidth } = useLayout();
   const { setTab } = useTabContext();
   const { isUsable } = useServiceAvailability();
+  const [refreshing, setRefreshing] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      void syncCatalogRevision({ force: true });
+    }, []),
+  );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refreshServiceCatalogState();
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
 
   const tileWidth = (
     contentWidth - pagePadding * 2 - GROUP_PAD * 2 - GRID_GAP * (GRID_COLS - 1)
@@ -160,6 +180,9 @@ export default function ServicesScreen() {
         style={styles.scroll}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 32 }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => { void onRefresh(); }} />
+        }
       >
         <ScreenBody>
         <BroadcastBanner screen="SERVICES" />

@@ -12,62 +12,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/lib/api';
 import { useAuthStore } from '../../src/stores';
 import { showToast } from '../../src/components/ui/Toast';
-import { Colors, Radius, Typography } from '../../src/theme';
+import { Colors, Typography } from '../../src/theme';
 import { AuthShell, AuthCardHeader, AuthHeroIcon } from '../../src/components/auth/AuthShell';
 import { AuthGradientButton } from '../../src/components/auth/AuthControls';
-
-
-function PremiumOtpInput({
-  value,
-  onChange,
-  onComplete,
-  inputRef,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  onComplete?: (value: string) => void;
-  inputRef: React.RefObject<TextInput | null>;
-}) {
-  const digits = value.padEnd(6, ' ').split('').slice(0, 6);
-
-  return (
-    <TouchableOpacity
-      style={styles.otpWrap}
-      onPress={() => inputRef.current?.focus()}
-      activeOpacity={1}
-    >
-      <View style={styles.otpRow}>
-        {digits.map((digit, index) => (
-          <View
-            key={index}
-            style={[
-              styles.otpBox,
-              value.length === index && styles.otpBoxActive,
-              digit.trim() && styles.otpBoxFilled,
-            ]}
-          >
-            <Text style={styles.otpDigit}>{digit.trim()}</Text>
-          </View>
-        ))}
-      </View>
-      <TextInput
-        ref={inputRef}
-        value={value}
-        onChangeText={(v) => {
-          const next = v.replace(/\D/g, '').slice(0, 6);
-          onChange(next);
-          if (next.length === 6) onComplete?.(next);
-        }}
-        keyboardType="number-pad"
-        maxLength={6}
-        autoFocus
-        caretHidden
-        selectionColor={Colors.primary}
-        style={styles.otpInputOverlay}
-      />
-    </TouchableOpacity>
-  );
-}
+import { PremiumOtpInput } from '../../src/components/security/PremiumOtpInput';
 
 export default function VerifyOTPScreen() {
   const { email, type } = useLocalSearchParams<{ email: string; type: string }>();
@@ -136,6 +84,7 @@ export default function VerifyOTPScreen() {
     <AuthShell
       onBack={() => router.back()}
       showLogo={false}
+      scrollable
       heroIcon={<AuthHeroIcon icon="mail-outline" size={52} />}
     >
       <AuthCardHeader
@@ -145,10 +94,10 @@ export default function VerifyOTPScreen() {
       />
 
       <PremiumOtpInput
+        ref={otpInputRef}
         value={otp}
         onChange={setOtp}
         onComplete={(code) => void handleVerify(code)}
-        inputRef={otpInputRef}
       />
 
       {loading ? (
@@ -183,46 +132,6 @@ export default function VerifyOTPScreen() {
 }
 
 const styles = StyleSheet.create({
-  otpWrap: {
-    marginBottom: 12,
-  },
-  otpRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  otpBox: {
-    flex: 1,
-    maxWidth: 54,
-    height: 62,
-    borderRadius: Radius.lg,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  otpBoxActive: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.white,
-    borderWidth: 2,
-  },
-  otpBoxFilled: {
-    borderColor: 'rgba(124, 58, 237, 0.35)',
-    backgroundColor: Colors.primaryMuted,
-  },
-  otpDigit: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: Colors.dark,
-    letterSpacing: -0.5,
-  },
-  otpInputOverlay: {
-    position: 'absolute',
-    opacity: 0,
-    width: 1,
-    height: 1,
-  },
   loadRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -240,7 +149,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 18,
+    paddingVertical: 12,
     marginTop: 4,
   },
   resendBtnDisabled: {

@@ -1,10 +1,9 @@
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode } from 'react';
 import {
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Image,
@@ -16,9 +15,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthCard } from '../ui/AuthCard';
 import { AppLogo } from '../ui/AppLogo';
+import { KeyboardDismissView } from '../ui/KeyboardDismissView';
 import { Colors, Spacing } from '../../theme';
 import { useGradients } from '../../theme/hooks';
 import { ThemedScreen } from '../ui/ThemedScreen';
+import { useKeyboardInsets } from '../../hooks/useKeyboardInsets';
 import { isAndroid, platformSpacing, useLayout } from '../../lib/platform-ui';
 
 const APP_ICON = require('../../../assets/icon.png');
@@ -204,7 +205,6 @@ function AuthBrandedHero({
 
 function AuthHeroSection({
   insetsTop,
-  onBack,
   heroTagline,
   heroIcon,
   heroTitle,
@@ -214,7 +214,6 @@ function AuthHeroSection({
   compact,
 }: {
   insetsTop: number;
-  onBack?: () => void;
   heroTagline?: string;
   heroIcon?: ReactNode;
   heroTitle?: string;
@@ -248,19 +247,6 @@ function AuthHeroSection({
       {!compact ? <View style={styles.heroMeshSecondary} /> : null}
       {!compact ? <View style={styles.heroMeshAccent} /> : null}
 
-      {onBack ? (
-        <TouchableOpacity
-          style={[styles.backBtn, compact && styles.backBtnCompact]}
-          onPress={onBack}
-          activeOpacity={0.85}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <View style={styles.backBtnInner}>
-            <Ionicons name="chevron-back" size={20} color={Colors.white} />
-          </View>
-        </TouchableOpacity>
-      ) : null}
-
       <AuthBrandedHero
         tagline={heroTagline}
         heroIcon={heroIcon}
@@ -291,51 +277,64 @@ export function AuthShell({
   cardFooter,
 }: AuthShellProps) {
   const insets = useSafeAreaInsets();
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
-
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-
-    const showSub = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
-    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
-
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
+  const { keyboardVisible, keyboardHeight } = useKeyboardInsets();
+  const scrollBottomInset = insets.bottom + (keyboardVisible ? 24 : (isAndroid ? 44 : 32));
 
   return (
     <ThemedScreen withAmbient={false}>
-      <View pointerEvents="box-none" style={styles.heroWrap}>
-        <AuthHeroSection
-          insetsTop={insets.top}
-          onBack={onBack}
-          heroTagline={heroTagline}
-          heroIcon={heroIcon}
-          heroTitle={heroTitle}
-          heroSubtitle={heroSubtitle}
-          showLogo={showLogo}
-          showBrandInline={showBrandInline}
-          compact={keyboardVisible}
-        />
-      </View>
       <KeyboardAvoidingView
-        style={[styles.body, heroIcon && !showLogo && styles.bodyIconHero]}
+        style={styles.root}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        keyboardVerticalOffset={0}
       >
-        <AuthCard
-          scrollable={scrollable}
-          fill
-          scrollBottomInset={insets.bottom + (isAndroid ? 44 : 32)}
-          style={[styles.card, cardStyle]}
-          contentStyle={cardContentStyle}
-          footer={cardFooter}
-        >
-          {children}
-        </AuthCard>
+        <KeyboardDismissView style={styles.flex}>
+          <View style={styles.heroWrap} pointerEvents="box-none">
+            <AuthHeroSection
+              insetsTop={insets.top}
+              heroTagline={heroTagline}
+              heroIcon={heroIcon}
+              heroTitle={heroTitle}
+              heroSubtitle={heroSubtitle}
+              showLogo={showLogo}
+              showBrandInline={showBrandInline}
+              compact={keyboardVisible}
+            />
+          </View>
+
+          <View
+            style={[
+              styles.body,
+              heroIcon && !showLogo ? styles.bodyIconHero : null,
+            ]}
+          >
+            <AuthCard
+              scrollable={scrollable}
+              fill={!keyboardVisible}
+              scrollBottomInset={scrollBottomInset}
+              keyboardPadding={keyboardVisible ? keyboardHeight : 0}
+              style={[styles.card, cardStyle]}
+              contentStyle={cardContentStyle}
+              footer={cardFooter}
+            >
+              {children}
+            </AuthCard>
+          </View>
+        </KeyboardDismissView>
+
+        {onBack ? (
+          <TouchableOpacity
+            style={[styles.floatingBackBtn, { top: insets.top + 6 }]}
+            onPress={() => {
+              onBack();
+            }}
+            activeOpacity={0.85}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <View style={styles.backBtnInner}>
+              <Ionicons name="chevron-back" size={20} color={Colors.white} />
+            </View>
+          </TouchableOpacity>
+        ) : null}
       </KeyboardAvoidingView>
     </ThemedScreen>
   );
@@ -363,9 +362,13 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
   },
+  flex: {
+    flex: 1,
+  },
   body: {
     flex: 1,
     marginTop: isAndroid ? -18 : -14,
+    minHeight: 0,
     zIndex: 1,
   },
   bodyIconHero: {
@@ -373,6 +376,12 @@ const styles = StyleSheet.create({
   },
   heroWrap: {
     zIndex: 0,
+  },
+  floatingBackBtn: {
+    position: 'absolute',
+    left: Spacing.page,
+    zIndex: 999,
+    elevation: 999,
   },
   hero: {
     paddingHorizontal: Spacing.page,

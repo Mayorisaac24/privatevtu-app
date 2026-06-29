@@ -37,6 +37,7 @@ export default function ResetPasswordScreen() {
 
   return (
     <AuthShell
+      scrollable
       showLogo={false}
       heroIcon={<AuthHeroIcon icon="key-outline" size={52} />}
     >

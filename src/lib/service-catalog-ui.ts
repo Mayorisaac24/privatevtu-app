@@ -33,7 +33,7 @@ export const SERVICE_CATALOG_GROUPS: Array<{ title: string; items: ServiceCatalo
     items: [
       catalogItem({
         label: 'Airtime',
-        subtitle: 'Top up MTN, Airtel, Glo & 9mobile',
+        subtitle: 'Top up MTN, Airtel, Glo & T2',
         icon: 'phone-portrait-outline',
         route: '/services/airtime',
         serviceCode: SERVICE_CODES.airtime,
@@ -65,6 +65,13 @@ export const SERVICE_CATALOG_GROUPS: Array<{ title: string; items: ServiceCatalo
         icon: 'school-outline',
         route: '/services/education',
         serviceCode: SERVICE_CODES.education,
+      }),
+      catalogItem({
+        label: 'Betting',
+        subtitle: 'Fund SportyBet, Bet9ja & more',
+        icon: 'trophy-outline',
+        route: '/services/betting',
+        serviceCode: SERVICE_CODES.betting,
       }),
     ],
   },
@@ -104,7 +111,6 @@ export const SERVICE_CATALOG_GROUPS: Array<{ title: string; items: ServiceCatalo
   {
     title: 'Coming Soon',
     items: [
-      { label: 'Betting', icon: 'trophy-outline', color: Colors.muted, bg: Colors.surfaceAlt, route: null },
       { label: 'Gift Cards', icon: 'gift-outline', color: Colors.muted, bg: Colors.surfaceAlt, route: null },
       { label: 'Insurance', icon: 'shield-checkmark-outline', color: Colors.muted, bg: Colors.surfaceAlt, route: null },
       { label: 'Savings', icon: 'trending-up-outline', color: Colors.muted, bg: Colors.surfaceAlt, route: null },

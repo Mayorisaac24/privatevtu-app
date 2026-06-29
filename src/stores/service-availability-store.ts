@@ -28,7 +28,10 @@ export const useServiceAvailabilityStore = create<ServiceAvailabilityState>((set
     const { loadedAt, isRefreshing } = get();
     const isStale = !loadedAt || Date.now() - loadedAt > STALE_MS;
     if (!options?.force && !isStale && loadedAt) return;
-    if (inflight) return inflight;
+    if (inflight) {
+      if (!options?.force) return inflight;
+      await inflight;
+    }
 
     if (!loadedAt) {
       set({ isRefreshing: true });

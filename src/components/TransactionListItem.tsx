@@ -5,6 +5,8 @@ import { formatCurrencyVisible } from '../lib/api';
 import { BankLogo } from './BankLogo';
 import { resolveTransferBankForDisplay } from '../lib/transfer-banks';
 import { getProviderLogo } from '../lib/providers';
+import { getEducationProviderLogo, hasEducationProviderLogo } from '../lib/education-providers';
+import { getBettingPlatformLogo, hasBettingPlatformLogo } from '../lib/betting-platforms';
 import { Colors, Radius } from '../theme';
 import { GlassCard } from './ui/GlassCard';
 import {
@@ -46,10 +48,55 @@ function TransactionAvatar({ tx }: { tx: EnrichedTransaction }) {
   }
 
   if (visual.logoType === 'provider' && visual.providerCode) {
-    const logo = getProviderLogo({ code: visual.providerCode, id: visual.providerCode, imageUrl: '' });
+    const providerImageUrl = readMetaString(tx.metadata, 'providerImageUrl')
+      || readMetaString(tx.metadata, 'platformImageUrl');
+
+    if (tx.type === 'BETTING') {
+      const bettingLogo = getBettingPlatformLogo({
+        code: visual.providerCode,
+        imageUrl: providerImageUrl,
+      });
+      if (bettingLogo && hasBettingPlatformLogo({ imageUrl: providerImageUrl })) {
+        return (
+          <View style={styles.avatarWrap}>
+            <Image source={bettingLogo as ImageSourcePropType} style={styles.providerLogo} resizeMode="contain" />
+          </View>
+        );
+      }
+      return (
+        <View style={[styles.avatarWrap, { backgroundColor: Colors.primaryMuted }]}>
+          <Ionicons name="trophy-outline" size={18} color={Colors.primary} />
+        </View>
+      );
+    }
+
+    if (tx.type === 'EDUCATION') {
+      const eduLogo = getEducationProviderLogo({
+        code: visual.providerCode,
+        id: visual.providerCode,
+        imageUrl: providerImageUrl,
+      });
+      if (eduLogo && hasEducationProviderLogo({ imageUrl: providerImageUrl })) {
+        return (
+          <View style={styles.avatarWrap}>
+            <Image source={eduLogo as ImageSourcePropType} style={styles.providerLogo} resizeMode="contain" />
+          </View>
+        );
+      }
+    }
+
+    if (tx.type === 'AIRTIME' || tx.type === 'DATA') {
+      const logo = getProviderLogo({ code: visual.providerCode, id: visual.providerCode, imageUrl: providerImageUrl });
+      return (
+        <View style={styles.avatarWrap}>
+          <Image source={logo as ImageSourcePropType} style={styles.providerLogo} resizeMode="contain" />
+        </View>
+      );
+    }
+
     return (
-      <View style={styles.avatarWrap}>
-        <Image source={logo as ImageSourcePropType} style={styles.providerLogo} resizeMode="contain" />
+      <View style={[styles.avatarWrap, { backgroundColor: visual.bgColor }]}>
+        <Ionicons name={visual.icon as any} size={18} color={visual.iconColor} />
       </View>
     );
   }

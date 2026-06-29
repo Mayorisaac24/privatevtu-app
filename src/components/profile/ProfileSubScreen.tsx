@@ -1,13 +1,22 @@
 import { ReactNode } from 'react';
-import { View, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import {
+  View,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Typography } from '../../theme';
 import { useGradients } from '../../theme/hooks';
 import { ThemedScreen } from '../ui/ThemedScreen';
+import { KeyboardDismissView } from '../ui/KeyboardDismissView';
 import { navigateBack } from '../../lib/navigation';
 import { useStatusBarStyle } from '../../hooks/useStatusBarStyle';
+import { useKeyboardInsets } from '../../hooks/useKeyboardInsets';
 import { isAndroid, useLayout } from '../../lib/platform-ui';
 import { AppText } from '../ui/AppText';
 import { ScreenContent } from '../ui/ScreenContent';
@@ -33,54 +42,62 @@ export function ProfileSubScreen({
   const insets = useSafeAreaInsets();
   const { pagePadding } = useLayout();
   const gradients = useGradients();
+  const { keyboardVisible, keyboardHeight } = useKeyboardInsets();
+  const scrollBottomPadding = insets.bottom
+    + (footer ? (isAndroid ? 112 : 100) : (isAndroid ? 28 : 24))
+    + (keyboardVisible ? keyboardHeight + 12 : 0);
 
   return (
     <ThemedScreen>
-      <LinearGradient
-        colors={[...gradients.hero]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.header, { paddingTop: insets.top + 10, paddingHorizontal: pagePadding }]}
-      >
-        <View style={styles.headerBlobPrimary} />
-        <View style={styles.headerBlobSecondary} />
-        <View style={styles.headerRow}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigateBack()} activeOpacity={0.8}>
-            <Ionicons name="chevron-back" size={22} color={Colors.white} />
-          </TouchableOpacity>
-          <View style={styles.headerText}>
-            <AppText weight="800" style={styles.headerTitle}>{title}</AppText>
-            {subtitle ? <AppText style={styles.headerSub}>{subtitle}</AppText> : null}
-            {headerAccessory}
-          </View>
-          {headerIcon ? (
-            <View style={styles.headerIconWrap}>
-              <Ionicons name={headerIcon} size={22} color={Colors.white} />
-            </View>
-          ) : null}
-        </View>
-      </LinearGradient>
-
-      <View style={styles.curve} />
-
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={8}
+        keyboardVerticalOffset={0}
       >
-        <ScrollView
-          contentContainerStyle={[
-            styles.scroll,
-            {
-              paddingHorizontal: pagePadding,
-              paddingBottom: insets.bottom + (footer ? (isAndroid ? 112 : 100) : (isAndroid ? 28 : 24)),
-            },
-          ]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          <ScreenContent centered>{children}</ScreenContent>
-        </ScrollView>
+        <KeyboardDismissView style={styles.flex}>
+          <LinearGradient
+            colors={[...gradients.hero]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.header, { paddingTop: insets.top + 10, paddingHorizontal: pagePadding }]}
+          >
+            <View style={styles.headerBlobPrimary} />
+            <View style={styles.headerBlobSecondary} />
+            <View style={styles.headerRow}>
+              <TouchableOpacity style={styles.backBtn} onPress={() => navigateBack()} activeOpacity={0.8}>
+                <Ionicons name="chevron-back" size={22} color={Colors.white} />
+              </TouchableOpacity>
+              <View style={styles.headerText}>
+                <AppText weight="800" style={styles.headerTitle}>{title}</AppText>
+                {subtitle ? <AppText style={styles.headerSub}>{subtitle}</AppText> : null}
+                {headerAccessory}
+              </View>
+              {headerIcon ? (
+                <View style={styles.headerIconWrap}>
+                  <Ionicons name={headerIcon} size={22} color={Colors.white} />
+                </View>
+              ) : null}
+            </View>
+          </LinearGradient>
+
+          <View style={styles.curve} />
+
+          <ScrollView
+            contentContainerStyle={[
+              styles.scroll,
+              {
+                paddingHorizontal: pagePadding,
+                paddingBottom: scrollBottomPadding,
+              },
+            ]}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          >
+            <ScreenContent centered>{children}</ScreenContent>
+          </ScrollView>
+        </KeyboardDismissView>
+
         {footer ? (
           <View style={[styles.footer, { paddingHorizontal: pagePadding, paddingBottom: insets.bottom + 12 }]}>
             <ScreenContent centered>{footer}</ScreenContent>

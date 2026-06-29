@@ -95,6 +95,16 @@ export function mergeInputStyle(style?: TextStyle): TextStyle {
   return { ...platformInputText, ...style };
 }
 
+/** Invisible TextInput used with custom OTP/PIN boxes — avoids blocking scroll/taps. */
+export const hiddenNumericInputStyle: TextStyle = {
+  position: 'absolute',
+  opacity: 0,
+  width: 1,
+  height: 1,
+  left: 0,
+  top: 0,
+};
+
 export type LayoutMetrics = {
   width: number;
   height: number;

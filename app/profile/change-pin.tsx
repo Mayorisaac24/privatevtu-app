@@ -18,6 +18,7 @@ import { ConfirmDialog } from '../../src/components/ui/ConfirmDialog';
 import { LoadingOverlay } from '../../src/components/ui/LoadingOverlay';
 import { showToast } from '../../src/components/ui/Toast';
 import { navigateBack } from '../../src/lib/navigation';
+import { hiddenNumericInputStyle } from '../../src/lib/platform-ui';
 
 
 type Mode = 'change' | 'reset';
@@ -387,6 +388,7 @@ export default function ChangePinScreen() {
               secureTextEntry
               autoFocus
               caretHidden
+              pointerEvents="none"
             />
           </TouchableOpacity>
         )}
@@ -511,6 +513,7 @@ function OtpBoxes({
         style={styles.pinInputOverlay}
         autoFocus
         caretHidden
+        pointerEvents="none"
       />
       <Text style={styles.otpHint}>Digit {activeIndex + 1} of 6</Text>
     </TouchableOpacity>
@@ -647,10 +650,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: Colors.primary,
   },
-  pinInputOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0,
-  },
+  pinInputOverlay: hiddenNumericInputStyle,
   otpWrap: { alignItems: 'center', paddingVertical: 8, gap: 10 },
   otpRow: { flexDirection: 'row', justifyContent: 'center', gap: 8, position: 'relative' },
   otpBox: {

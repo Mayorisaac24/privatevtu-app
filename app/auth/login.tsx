@@ -1,5 +1,5 @@
 import { ActivityIndicator, View, TouchableOpacity, StyleSheet } from 'react-native';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/lib/api';
@@ -46,6 +46,7 @@ export default function LoginScreen() {
   const [bioLoading, setBioLoading] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [quickSignInEmail, setQuickSignInEmail] = useState<string | null>(null);
+  const loginInFlight = useRef(false);
   const { setUser } = useAuthStore();
 
   useEffect(() => {
@@ -100,7 +101,8 @@ export default function LoginScreen() {
   };
 
   const handleLogin = async () => {
-    if (!validate()) return;
+    if (!validate() || isLoading || loginInFlight.current) return;
+    loginInFlight.current = true;
     setIsLoading(true);
     try {
       const deviceId = await getLoginDeviceId();
@@ -131,11 +133,13 @@ export default function LoginScreen() {
       const msg = err?.data?.message || err?.message || 'Something went wrong. Try again.';
       showToast({ type: 'error', text1: 'Login Failed', text2: msg });
     } finally {
+      loginInFlight.current = false;
       setIsLoading(false);
     }
   };
 
   const handleBiometricSignIn = async () => {
+    if (bioLoading || isLoading) return;
     setBioLoading(true);
     try {
       const result = await biometricQuickSignIn();
@@ -269,6 +273,7 @@ export default function LoginScreen() {
           loadingLabel="Signing in..."
           onPress={handleLogin}
           isLoading={isLoading}
+          disabled={isLoading}
           icon={<Ionicons name="log-in-outline" size={18} color={Colors.white} />}
           style={{ marginTop: isAndroid ? 16 : 20 }}
         />

@@ -97,3 +97,9 @@ export function resetCatalogRevisionSync(): void {
   syncInFlight = null;
   void SecureStore.deleteItemAsync(STORAGE_KEY).catch(() => undefined);
 }
+
+/** Re-check server catalog revision and always refresh service availability. */
+export async function refreshServiceCatalogState(): Promise<void> {
+  await syncCatalogRevision({ force: true });
+  await useServiceAvailabilityStore.getState().refresh({ force: true });
+}

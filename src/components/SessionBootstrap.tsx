@@ -62,8 +62,8 @@ export function SessionBootstrap() {
         void api.getValidToken({ logoutOnAuthFailure: true });
         void fetchUnreadCount();
         void refreshUserProfile();
-        void syncCatalogRevision();
-        void useServiceAvailabilityStore.getState().refresh();
+        void syncCatalogRevision({ force: true });
+        void useServiceAvailabilityStore.getState().refresh({ force: true });
         refreshServiceCatalogSilently();
       }
     });

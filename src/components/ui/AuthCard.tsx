@@ -14,29 +14,35 @@ import { ScreenContent } from './ScreenContent';
 type AuthCardProps = {
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
+  cardStyle?: StyleProp<ViewStyle>;
   contentStyle?: StyleProp<ViewStyle>;
   footer?: ReactNode;
   fill?: boolean;
   /** Keeps the white shell fixed; only inner content scrolls. */
   scrollable?: boolean;
   scrollBottomInset?: number;
+  keyboardPadding?: number;
 };
 
 export function AuthCard({
   children,
   style,
+  cardStyle,
   contentStyle,
   footer,
   fill = false,
   scrollable = false,
   scrollBottomInset = 32,
+  keyboardPadding = 0,
 }: AuthCardProps) {
   const { pagePadding } = useLayout();
   const contentPadding = {
     paddingHorizontal: pagePadding,
     paddingTop: isAndroid ? 12 : 16,
-    paddingBottom: isAndroid ? 48 : 40,
+    paddingBottom: isAndroid ? 24 : 20,
   };
+
+  const shellStyle = [styles.card, fill && styles.cardFill, style, cardStyle];
 
   const body = (
     <ScreenContent centered>
@@ -45,24 +51,24 @@ export function AuthCard({
     </ScreenContent>
   );
 
+  const bottomPad = Math.max(scrollBottomInset, keyboardPadding, isAndroid ? 24 : 20);
+
   if (scrollable) {
     return (
-      <View style={[styles.card, styles.cardScrollShell, fill && styles.cardFill, style]}>
+      <View style={[shellStyle, styles.cardScrollShell]}>
         <View style={styles.handle} />
         <ScrollView
-          style={styles.scrollInner}
+          style={fill ? styles.scrollFill : styles.scrollInner}
           contentContainerStyle={[
             contentPadding,
             styles.scrollContent,
-            { paddingBottom: Math.max(scrollBottomInset, isAndroid ? 48 : 32) },
+            { paddingBottom: bottomPad },
             contentStyle,
           ]}
           keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
           showsVerticalScrollIndicator={false}
-          bounces={false}
-          overScrollMode="never"
+          bounces
           nestedScrollEnabled
         >
           {body}
@@ -72,7 +78,7 @@ export function AuthCard({
   }
 
   return (
-    <View style={[styles.card, fill && styles.cardFill, style]}>
+    <View style={shellStyle} pointerEvents="auto">
       <View style={styles.handle} />
       <View style={[contentPadding, contentStyle]}>
         {body}
@@ -97,9 +103,13 @@ const styles = StyleSheet.create({
   },
   cardScrollShell: {
     flex: 1,
+    minHeight: 0,
+  },
+  scrollFill: {
+    flex: 1,
   },
   scrollInner: {
-    flex: 1,
+    flexGrow: 0,
   },
   handle: {
     width: 44,
@@ -112,7 +122,6 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   scrollContent: {
-    flexGrow: 1,
-    minHeight: isAndroid ? '100%' : undefined,
+    flexGrow: 0,
   },
 });

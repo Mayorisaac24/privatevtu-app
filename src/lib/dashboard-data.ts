@@ -13,6 +13,7 @@ import { preloadServiceCatalog } from './service-catalog-cache';
 import { preloadVtuProviders } from './vtu-providers-cache';
 import { getKycStatusData } from './kyc-status-cache';
 import { preloadTwoFactorMethods, getTwoFactorMethods } from './two-factor-methods-cache';
+import { refreshServiceCatalogState } from './catalog-revision-sync';
 import { useServiceAvailabilityStore } from '../stores/service-availability-store';
 import { useWalletStore } from '../stores/wallet-store';
 import { refreshUserProfile } from './profile-sync';
@@ -238,6 +239,7 @@ export async function pullToRefreshHome(): Promise<void> {
     fetchHomeSnapshot(),
     refreshHomeInsights({ force: true }),
     refreshWalletFundingData({ force: true }),
+    refreshServiceCatalogState(),
   ]);
 }
 

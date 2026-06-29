@@ -12,6 +12,7 @@ const LOCAL_LOGOS: Record<string, ImageSourcePropType> = {
   airtel: require('../../assets/images/providers/airtellogo.png'),
   glo: require('../../assets/images/providers/glologo.png'),
   '9mobile': require('../../assets/images/providers/9mobilelogo.png'),
+  t2: require('../../assets/images/providers/9mobilelogo.png'),
 };
 
 const PROVIDER_STYLES: Record<string, ProviderStyle> = {
@@ -30,13 +31,13 @@ export function getProviderCode(provider: Pick<AirtimeProvider, 'code' | 'id'>):
 }
 
 export function getProviderLogo(provider: Pick<AirtimeProvider, 'code' | 'id' | 'imageUrl'>): ImageSourcePropType {
-  const code = getProviderCode(provider);
-  if (LOCAL_LOGOS[code]) return LOCAL_LOGOS[code];
-
   const imageUrl = String(provider.imageUrl || '').trim();
-  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://') || imageUrl.startsWith('data:image/')) {
     return { uri: imageUrl };
   }
+
+  const code = getProviderCode(provider);
+  if (LOCAL_LOGOS[code]) return LOCAL_LOGOS[code];
 
   return LOCAL_LOGOS.mtn;
 }
@@ -54,11 +55,14 @@ const SHORT_NAMES: Record<string, string> = {
   airtel: 'Airtel',
   glo: 'Glo',
   '9mobile': '9mobile',
+  t2: 'T2',
 };
 
 export function getProviderShortName(
   provider: Pick<AirtimeProvider, 'code' | 'name' | 'id'>,
 ): string {
   const code = getProviderCode(provider);
-  return SHORT_NAMES[code] || provider.name?.split(' ')[0] || code.toUpperCase();
+  const apiName = String(provider.name || '').trim();
+  if (apiName) return apiName;
+  return SHORT_NAMES[code] || code.toUpperCase();
 }

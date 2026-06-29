@@ -108,6 +108,71 @@ export type AppNotificationType = 'info' | 'warning' | 'success' | 'error';
 export type AppNotificationChannel = 'IN_APP' | 'PUSH' | 'EMAIL' | 'SMS';
 export type AppNotificationCategory = 'TRANSACTIONAL' | 'MARKETING' | 'SECURITY' | 'SYSTEM';
 
+export interface UserTypeSnapshot {
+  id: string;
+  code: string;
+  name?: string;
+  description?: string | null;
+  isDefault?: boolean;
+  isActive?: boolean;
+  isProgram?: boolean;
+}
+
+export interface UpgradeProgram {
+  pathId: string;
+  fromUserTypeId: string;
+  toUserType: {
+    id: string;
+    code: string;
+    name: string;
+    description: string | null;
+    isProgram: boolean;
+  };
+  upgradePrice: string;
+  upgradePriceNaira: number;
+}
+
+export interface UserTypeUpgradeRecord {
+  id: string;
+  status: string;
+  amountPaid: string;
+  createdAt: string;
+  completedAt?: string | null;
+  failureReason?: string | null;
+  toUserType?: { name: string; code: string };
+  fromUserType?: { name: string; code: string };
+}
+
+export interface ApiAccessRequestRecord {
+  id: string;
+  clientName: string;
+  requestedResponseFormat: 'PLATFORM' | 'MSORG';
+  requestedAllowedServices: string[];
+  requestedWebhookUrl?: string | null;
+  userNote?: string | null;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+  reviewNote?: string | null;
+  createdAt: string;
+}
+
+export interface ApiClientSnapshot {
+  id: string;
+  name: string;
+  isActive: boolean;
+  responseFormat: 'PLATFORM' | 'MSORG';
+  allowedServices: string[];
+  webhookUrl?: string | null;
+  testPublicKey: string;
+  livePublicKey: string;
+  lastUsedAt?: string | null;
+}
+
+export interface ApiAccessSnapshot {
+  pending: ApiAccessRequestRecord | null;
+  latest: (ApiAccessRequestRecord & { apiClient?: ApiClientSnapshot | null }) | null;
+  activeClient: ApiClientSnapshot | null;
+}
+
 export interface AppNotification {
   id: string;
   userId: string;
@@ -380,6 +445,17 @@ export interface ElectricityProvider {
   updatedAt?: string | null;
 }
 
+export interface BettingPlatform {
+  id: string;
+  name: string;
+  code: string;
+  imageUrl?: string | null;
+  minAmount: number;
+  maxAmount: number;
+  itemName?: string | null;
+  updatedAt?: string | null;
+}
+
 export interface CableProvider {
   id: string;
   name: string;
@@ -396,6 +472,24 @@ export interface CablePlan {
   price: number;
   platformPrice?: number;
   validityDays?: number;
+}
+
+export interface EducationProvider {
+  id: string;
+  name: string;
+  code: string;
+  displayName?: string;
+  isActive?: boolean;
+  imageUrl?: string | null;
+  requiresProfile?: boolean;
+}
+
+export interface EducationPlan {
+  id: string;
+  name: string;
+  price: number;
+  platformPrice?: number;
+  description?: string | null;
 }
 
 export interface Bank {
@@ -1609,6 +1703,88 @@ class ApiClient {
     });
   }
 
+  // ============ EDUCATION ============
+
+  async getEducationProviders(): Promise<ApiResponse<EducationProvider[]>> {
+    return this.request('/education/providers');
+  }
+
+  async getEducationPlans(provider?: string): Promise<ApiResponse<EducationPlan[]>> {
+    const qs = provider ? `?provider=${encodeURIComponent(provider)}` : '';
+    return this.request(`/vtu/education/plans${qs}`);
+  }
+
+  async verifyJambProfile(data: {
+    provider: string;
+    profileId: string;
+    profileType?: string;
+  }): Promise<ApiResponse<{ customerName: string; profileId: string; profileType?: string }>> {
+    return this.request('/vtu/education/validate', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async purchaseEducation(data: {
+    provider: string;
+    planId: string;
+    phone: string;
+    profileId?: string;
+    profileType?: string;
+    pin?: string;
+    biometricToken?: string;
+    deviceId?: string;
+  }): Promise<ApiResponse<{
+    transactionId: string;
+    status: string;
+    message?: string;
+  }>> {
+    return this.request('/vtu/education', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // ============ BETTING ============
+
+  async getBettingPlatforms(): Promise<ApiResponse<BettingPlatform[]>> {
+    return this.request('/vtu/betting/platforms');
+  }
+
+  async verifyBettingAccount(data: {
+    platform: string;
+    accountNumber: string;
+  }): Promise<ApiResponse<{ accountNumber: string; platform: string; platformName: string; message: string }>> {
+    return this.request('/vtu/betting/validate', {
+      method: 'POST',
+      body: JSON.stringify({
+        platform: data.platform,
+        accountNumber: data.accountNumber,
+      }),
+    });
+  }
+
+  async fundBettingAccount(data: {
+    platform: string;
+    accountNumber: string;
+    amount: number;
+    pin?: string;
+    biometricToken?: string;
+    deviceId?: string;
+  }): Promise<ApiResponse<{ transactionId: string; reference: string; status: string; message: string }>> {
+    return this.request('/vtu/betting', {
+      method: 'POST',
+      body: JSON.stringify({
+        platform: data.platform,
+        accountNumber: data.accountNumber,
+        amount: Math.round(data.amount * 100),
+        pin: data.pin,
+        biometricToken: data.biometricToken,
+        deviceId: data.deviceId,
+      }),
+    });
+  }
+
   // ============ SERVICE AVAILABILITY ============
 
   async getServiceAvailability(): Promise<ApiResponse<ServiceAvailabilityMap>> {
@@ -1888,6 +2064,79 @@ class ApiClient {
 
   async resendPhoneVerificationOtp(): Promise<ApiResponse> {
     return this.request('/kyc/phone/resend', { method: 'POST' });
+  }
+
+  async getMyUserType(): Promise<ApiResponse<UserTypeSnapshot>> {
+    return this.request('/user-type/me');
+  }
+
+  async getUpgradePrograms(): Promise<ApiResponse<UpgradeProgram[]>> {
+    return this.request('/user-type/programs');
+  }
+
+  async getUserTypeUpgrades(): Promise<ApiResponse<UserTypeUpgradeRecord[]>> {
+    return this.request('/user-type/upgrades');
+  }
+
+  async purchaseUserTypeUpgrade(data: {
+    pathId: string;
+    pin?: string;
+    biometricToken?: string;
+    deviceId?: string;
+  }): Promise<ApiResponse<{ message: string; upgradeId: string }>> {
+    return this.request('/user-type/upgrade', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getMyApiAccess(): Promise<ApiResponse<ApiAccessSnapshot>> {
+    return this.request('/api-access/me');
+  }
+
+  async submitApiAccessRequest(data: {
+    clientName: string;
+    requestedResponseFormat?: 'PLATFORM' | 'MSORG';
+    requestedAllowedServices?: string[];
+    requestedWebhookUrl?: string;
+    userNote?: string;
+  }): Promise<ApiResponse<ApiAccessRequestRecord>> {
+    return this.request('/api-access/request', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async cancelApiAccessRequest(requestId: string): Promise<ApiResponse<ApiAccessRequestRecord>> {
+    return this.request(`/api-access/request/${requestId}/cancel`, { method: 'POST' });
+  }
+
+  async updateMyApiAccessSettings(data: {
+    clientName?: string;
+    responseFormat?: 'PLATFORM' | 'MSORG';
+    allowedServices?: string[];
+    webhookUrl?: string | null;
+  }): Promise<ApiResponse<ApiClientSnapshot>> {
+    return this.request('/api-access/settings', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateApiAccessRequest(
+    requestId: string,
+    data: {
+      clientName?: string;
+      requestedResponseFormat?: 'PLATFORM' | 'MSORG';
+      requestedAllowedServices?: string[];
+      requestedWebhookUrl?: string;
+      userNote?: string;
+    },
+  ): Promise<ApiResponse<ApiAccessRequestRecord>> {
+    return this.request(`/api-access/request/${requestId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
   }
 }
 

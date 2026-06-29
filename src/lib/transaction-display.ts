@@ -1,6 +1,7 @@
 import { Colors } from '../theme';
 import type { Transaction } from './api';
 import { formatAccountNumberDisplay } from './transfer-banks';
+import { formatBettingPlatformLabel } from './betting-platforms';
 
 export type DisplayStatus = 'pending' | 'processing' | 'successful' | 'failed';
 
@@ -45,6 +46,7 @@ const TYPE_META: Record<string, Omit<TxDisplayMeta, 'isCredit'>> = {
   WALLET_FUND: { icon: 'wallet-outline', label: 'Wallet Funding', ...BRAND_TX_ICON },
   ADMIN_CREDIT: { icon: 'wallet-outline', label: 'Wallet Funding', ...BRAND_TX_ICON },
   EDUCATION: { icon: 'school-outline', label: 'Education', ...BRAND_TX_ICON },
+  BETTING: { icon: 'trophy-outline', label: 'Betting', ...BRAND_TX_ICON },
 };
 
 function normalizeStatus(status?: string): DisplayStatus {
@@ -120,7 +122,7 @@ export function isCustomerVisibleTransaction(type: string, metadata?: unknown): 
 
 function normalizeCategory(type: string): string {
   const normalized = String(type || '').toUpperCase();
-  if (['AIRTIME', 'DATA', 'ELECTRICITY', 'CABLE'].includes(normalized)) return 'services';
+  if (['AIRTIME', 'DATA', 'ELECTRICITY', 'CABLE', 'EDUCATION', 'BETTING'].includes(normalized)) return 'services';
   if (normalized === 'WALLET_FUND' || normalized === 'ADMIN_CREDIT') return 'wallet_funding';
   if (['WITHDRAWAL', 'TRANSFER'].includes(normalized)) return 'transfer';
   return 'other';
@@ -155,6 +157,17 @@ export function enrichTransaction(tx: Transaction): EnrichedTransaction {
       displayTitle = 'Electricity payment';
     } else if (txType === 'CABLE') {
       displayTitle = network ? `${network} Cable TV` : 'Cable TV payment';
+    } else if (txType === 'EDUCATION') {
+      const examBody = readMetaString(metadata, 'providerDisplayName')
+        || readMetaString(metadata, 'provider')
+        || network;
+      displayTitle = examBody ? `${examBody.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())} PIN` : 'Education PIN';
+    } else if (txType === 'BETTING') {
+      const platformName = readMetaString(metadata, 'platformName')
+        || formatBettingPlatformLabel({
+          code: readMetaString(metadata, 'platform') || network,
+        });
+      displayTitle = platformName ? `${platformName} funding` : 'Betting funding';
     } else if (txType === 'WALLET_FUND' || txType === 'ADMIN_CREDIT') {
       displayTitle = 'Wallet funding';
     } else {
@@ -173,7 +186,16 @@ export function enrichTransaction(tx: Transaction): EnrichedTransaction {
       subtitle = tx.reference;
     }
   } else if (!subtitle) {
-    if (phone && network) {
+    if (txType === 'BETTING') {
+      const platformName = readMetaString(metadata, 'platformName')
+        || formatBettingPlatformLabel({
+          code: readMetaString(metadata, 'platform') || network,
+        });
+      const account = readMetaString(metadata, 'accountNumber') || phone;
+      subtitle = account && platformName
+        ? `${account} · ${platformName}`
+        : account || platformName || tx.reference;
+    } else if (phone && network) {
       subtitle = `${phone} · ${network}`;
     } else {
       subtitle = phone || network || tx.reference;
@@ -186,9 +208,9 @@ export function enrichTransaction(tx: Transaction): EnrichedTransaction {
     if (txType === 'WITHDRAWAL' || txType === 'TRANSFER') {
       logoType = 'bank';
       logoKey = readMetaString(metadata, 'bankCode');
-    } else if (['AIRTIME', 'DATA'].includes(txType)) {
+    } else if (['AIRTIME', 'DATA', 'EDUCATION', 'BETTING'].includes(txType)) {
       logoType = 'provider';
-      logoKey = network.toLowerCase();
+      logoKey = (readMetaString(metadata, 'provider') || readMetaString(metadata, 'platform') || network).toLowerCase();
     } else {
       logoType = 'service';
       logoKey = network.toLowerCase() || txType.toLowerCase();

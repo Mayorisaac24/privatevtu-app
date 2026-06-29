@@ -10,8 +10,12 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Radius, Typography } from '../../theme';
-import { mergeInputStyle } from '../../lib/platform-ui';
 
+const BOX_SIZE = 46;
+const BOX_GAP = 8;
+const BOX_COUNT = 6;
+const ROW_WIDTH = BOX_COUNT * BOX_SIZE + (BOX_COUNT - 1) * BOX_GAP;
+const ROW_HEIGHT = 54;
 
 type PremiumOtpInputProps = {
   value: string;
@@ -30,7 +34,7 @@ export const PremiumOtpInput = React.forwardRef<TextInput, PremiumOtpInputProps>
 
     useEffect(() => {
       if (!autoFocus) return;
-      const timer = setTimeout(() => inputRef.current?.focus(), 320);
+      const timer = setTimeout(() => inputRef.current?.focus(), 400);
       return () => clearTimeout(timer);
     }, [autoFocus]);
 
@@ -43,50 +47,51 @@ export const PremiumOtpInput = React.forwardRef<TextInput, PremiumOtpInputProps>
     const inputProps: TextInputProps = {
       value,
       onChangeText: handleChange,
-      keyboardType: 'number-pad',
+      // iOS number-pad blocks the native Paste menu — use default keyboard, digits only in handler.
+      keyboardType: Platform.OS === 'ios' ? 'default' : 'number-pad',
       inputMode: 'numeric',
       maxLength: 6,
       caretHidden: true,
       selectionColor: Colors.primary,
-      autoFocus: false,
-      showSoftInputOnFocus: true,
+      autoCorrect: false,
+      autoCapitalize: 'none',
+      spellCheck: false,
       textContentType: 'oneTimeCode',
       autoComplete: Platform.OS === 'android' ? 'sms-otp' : 'one-time-code',
       importantForAutofill: 'yes',
       underlineColorAndroid: 'transparent',
+      contextMenuHidden: false,
     };
 
     return (
-      <TouchableOpacity
-        style={styles.wrap}
-        onPress={() => inputRef.current?.focus()}
-        activeOpacity={1}
-      >
-        <View style={styles.row}>
-          {digits.map((digit, index) => (
-            <View
-              key={index}
-              style={[
-                styles.box,
-                value.length === index && styles.boxActive,
-                digit.trim() && styles.boxFilled,
-              ]}
-            >
-              <Text style={styles.digit}>{digit.trim()}</Text>
-            </View>
-          ))}
+      <View style={styles.wrap}>
+        <View style={styles.inputSlot}>
+          <View style={styles.row} pointerEvents="none">
+            {digits.map((digit, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.box,
+                  value.length === index && styles.boxActive,
+                  digit.trim() && styles.boxFilled,
+                ]}
+              >
+                <Text style={styles.digit}>{digit.trim()}</Text>
+              </View>
+            ))}
+          </View>
+
+          <TextInput
+            ref={inputRef}
+            {...inputProps}
+            style={styles.overlayInput}
+          />
         </View>
 
-        <TextInput
-          ref={inputRef}
-          {...inputProps}
-          style={styles.overlay}
-        />
-
         <Text style={styles.tapHint}>
-          {value ? `Digit ${activeIndex + 1} of 6` : 'Tap to enter · 6-digit code'}
+          {value ? `Digit ${activeIndex + 1} of 6` : 'Tap to enter · hold to paste'}
         </Text>
-      </TouchableOpacity>
+      </View>
     );
   },
 );
@@ -94,19 +99,23 @@ export const PremiumOtpInput = React.forwardRef<TextInput, PremiumOtpInputProps>
 const styles = StyleSheet.create({
   wrap: {
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
     paddingVertical: 8,
-    position: 'relative',
+  },
+  inputSlot: {
+    width: ROW_WIDTH,
+    height: ROW_HEIGHT,
+    alignSelf: 'center',
   },
   row: {
+    ...StyleSheet.absoluteFillObject,
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 8,
-    position: 'relative',
+    gap: BOX_GAP,
   },
   box: {
-    width: 46,
-    height: 54,
+    width: BOX_SIZE,
+    height: ROW_HEIGHT,
     borderRadius: 14,
     borderWidth: 1.5,
     borderColor: Colors.borderSubtle,
@@ -129,13 +138,16 @@ const styles = StyleSheet.create({
     color: Colors.dark,
     letterSpacing: -0.5,
   },
-  overlay: mergeInputStyle({
+  overlayInput: {
     ...StyleSheet.absoluteFillObject,
     color: 'transparent',
     backgroundColor: 'transparent',
-    fontSize: 16,
-    zIndex: 2,
-  }),
+    fontSize: 20,
+    padding: 0,
+    margin: 0,
+    textAlign: 'center',
+    ...(Platform.OS === 'ios' ? { opacity: 0.02 } : {}),
+  },
   tapHint: {
     fontSize: 12,
     color: Colors.mutedLight,
@@ -168,7 +180,7 @@ export function OtpResendButton({
       style={helperStyles.resendBtn}
       onPress={onPress}
       disabled={disabled}
-      activeOpacity={0.8}
+      activeOpacity={0.7}
     >
       <Ionicons name="refresh-outline" size={16} color={disabled ? Colors.mutedLight : Colors.primary} />
       <Text style={[helperStyles.resendText, disabled && helperStyles.resendTextDisabled]}>{label}</Text>
@@ -182,7 +194,8 @@ const helperStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 18,
+    minHeight: 48,
+    paddingVertical: 12,
     marginTop: 4,
   },
   resendText: {

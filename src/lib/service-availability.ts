@@ -10,6 +10,7 @@ export const SERVICE_CODES = {
   data: 'data',
   electricity: 'electricity',
   cable: 'cable',
+  betting: 'betting',
   localTransfer: 'local_transfer',
   education: 'education',
   walletFund: 'wallet_fund',

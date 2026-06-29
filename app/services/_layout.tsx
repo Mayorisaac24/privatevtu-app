@@ -11,6 +11,7 @@ export default function ServicesLayout() {
       <Stack.Screen name="data" />
       <Stack.Screen name="electricity" />
       <Stack.Screen name="cable" />
+      <Stack.Screen name="betting" />
       <Stack.Screen name="education" />
       </Stack>
     </>

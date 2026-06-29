@@ -77,7 +77,7 @@ export async function resolveLoginTwoFactorChallenge(
 
 export function navigateToTwoFactorVerify(challenge: TwoFactorLoginChallenge) {
   stashTwoFactorLoginChallenge(challenge);
-  router.push({
+  router.replace({
     pathname: '/auth/verify-2fa',
     params: {
       userId: challenge.userId,
@@ -85,6 +85,11 @@ export function navigateToTwoFactorVerify(challenge: TwoFactorLoginChallenge) {
       destination: challenge.destination || '',
     },
   });
+}
+
+export function leaveTwoFactorVerifyScreen() {
+  clearTwoFactorLoginChallenge();
+  router.replace('/auth/login');
 }
 
 export async function prepareTwoFactorLoginChallenge(input: {

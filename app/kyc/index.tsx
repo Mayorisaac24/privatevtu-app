@@ -19,9 +19,12 @@ import {
 } from '../../src/lib/api';
 import { useAuthStore } from '../../src/stores';
 import { useStatusBarStyle } from '../../src/hooks/useStatusBarStyle';
+import { useKeyboardInsets } from '../../src/hooks/useKeyboardInsets';
 import { Colors, Radius, Shadow, Spacing, Gradients } from '../../src/theme';
+import { KeyboardDismissView } from '../../src/components/ui/KeyboardDismissView';
 import { showToast } from '../../src/components/ui/Toast';
 import { navigateBack } from '../../src/lib/navigation';
+import { hiddenNumericInputStyle } from '../../src/lib/platform-ui';
 import {
   getKycStatusData,
   hasKycStatusCache,
@@ -599,6 +602,7 @@ function OtpInput({
         maxLength={6}
         style={styles.otpHiddenInput}
         caretHidden
+        pointerEvents="none"
       />
       <Text style={styles.otpHint}>Tap to enter · digit {activeIndex + 1} of 6</Text>
     </TouchableOpacity>
@@ -662,6 +666,7 @@ function FormShell({
 export default function KycScreen() {
   useStatusBarStyle('light');
   const insets = useSafeAreaInsets();
+  const { keyboardVisible, keyboardHeight } = useKeyboardInsets();
   const { updateUser } = useAuthStore();
 
   const [kycData, setKycData] = useState<KycStatusData | null>(() => {
@@ -1673,28 +1678,37 @@ export default function KycScreen() {
 
       <View style={styles.contentCurve} />
 
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         {loading ? (
           <View style={styles.loadingWrap}>
             <ActivityIndicator color={Colors.primary} size="large" />
             <Text style={styles.loadingText}>Loading verification status…</Text>
           </View>
         ) : (
-          <ScrollView
-            contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 32 }]}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            refreshControl={(
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={() => { void onRefresh(); }}
-                tintColor={Colors.primary}
-                colors={[Colors.primary]}
-              />
-            )}
-          >
-            {renderStepContent()}
-          </ScrollView>
+          <KeyboardDismissView style={styles.flex}>
+            <ScrollView
+              contentContainerStyle={[
+                styles.scroll,
+                {
+                  paddingBottom: insets.bottom + 32 + (keyboardVisible ? keyboardHeight + 12 : 0),
+                },
+              ]}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+              automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+              refreshControl={(
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={() => { void onRefresh(); }}
+                  tintColor={Colors.primary}
+                  colors={[Colors.primary]}
+                />
+              )}
+            >
+              {renderStepContent()}
+            </ScrollView>
+          </KeyboardDismissView>
         )}
       </KeyboardAvoidingView>
 
@@ -2414,12 +2428,7 @@ const styles = StyleSheet.create({
   },
   otpBoxFilled: { backgroundColor: '#F5F3FF' },
   otpDigit: { fontSize: 22, fontWeight: '800', color: Colors.heroDark },
-  otpHiddenInput: {
-    position: 'absolute',
-    opacity: 0,
-    width: 1,
-    height: 1,
-  },
+  otpHiddenInput: hiddenNumericInputStyle,
   otpHint: { fontSize: 12, color: Colors.mutedLight, fontWeight: '500' },
   secureNote: {
     flexDirection: 'row',

@@ -19,6 +19,8 @@ import { findCachedTransaction } from '../lib/transaction-cache';
 import { BankLogo } from '../components/BankLogo';
 import { formatAccountNumberDisplay, resolveTransferBankForDisplay } from '../lib/transfer-banks';
 import { getProviderLogo } from '../lib/providers';
+import { getEducationProviderLogo, hasEducationProviderLogo } from '../lib/education-providers';
+import { getBettingPlatformLogo, hasBettingPlatformLogo } from '../lib/betting-platforms';
 import { Colors, Gradients, Radius, Shadow, Spacing, Typography } from '../theme';
 import { Skeleton } from '../components/ui/Skeleton';
 import {
@@ -65,6 +67,10 @@ function formatPaymentMethod(type: string): string {
       return 'Electricity';
     case 'CABLE':
       return 'Cable TV';
+    case 'EDUCATION':
+      return 'Education PIN';
+    case 'BETTING':
+      return 'Betting';
     default:
       return type.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
   }
@@ -241,13 +247,66 @@ function TransactionAvatar({ tx, size = 64, onDark }: { tx: ReturnType<typeof en
   }
 
   if (visual.logoType === 'provider' && visual.providerCode) {
+    const providerImageUrl = readMetaString(tx.metadata, 'providerImageUrl')
+      || readMetaString(tx.metadata, 'platformImageUrl');
+
+    if (tx.type === 'BETTING') {
+      const bettingLogo = getBettingPlatformLogo({
+        code: visual.providerCode,
+        imageUrl: providerImageUrl,
+      });
+      if (bettingLogo && hasBettingPlatformLogo({ imageUrl: providerImageUrl })) {
+        return (
+          <View style={wrapStyle}>
+            <Image
+              source={bettingLogo as ImageSourcePropType}
+              style={{ width: size - 12, height: size - 12, borderRadius: 10 }}
+              resizeMode="contain"
+            />
+          </View>
+        );
+      }
+      return (
+        <View style={[wrapStyle, { backgroundColor: onDark ? 'rgba(255,255,255,0.16)' : Colors.primaryMuted }]}>
+          <Ionicons name="trophy-outline" size={size * 0.38} color={onDark ? Colors.white : Colors.primary} />
+        </View>
+      );
+    }
+
+    if (tx.type === 'EDUCATION') {
+      const eduLogo = getEducationProviderLogo({
+        code: visual.providerCode,
+        id: visual.providerCode,
+        imageUrl: providerImageUrl,
+      });
+      if (eduLogo && hasEducationProviderLogo({ imageUrl: providerImageUrl })) {
+        return (
+          <View style={wrapStyle}>
+            <Image
+              source={eduLogo as ImageSourcePropType}
+              style={{ width: size - 12, height: size - 12, borderRadius: 10 }}
+              resizeMode="contain"
+            />
+          </View>
+        );
+      }
+    }
+
+    if (tx.type === 'AIRTIME' || tx.type === 'DATA') {
+      return (
+        <View style={wrapStyle}>
+          <Image
+            source={getProviderLogo({ code: visual.providerCode, id: visual.providerCode, imageUrl: providerImageUrl }) as ImageSourcePropType}
+            style={{ width: size - 12, height: size - 12, borderRadius: 10 }}
+            resizeMode="contain"
+          />
+        </View>
+      );
+    }
+
     return (
-      <View style={wrapStyle}>
-        <Image
-          source={getProviderLogo({ code: visual.providerCode, id: visual.providerCode, imageUrl: '' }) as ImageSourcePropType}
-          style={{ width: size - 12, height: size - 12, borderRadius: 10 }}
-          resizeMode="contain"
-        />
+      <View style={[wrapStyle, { backgroundColor: onDark ? 'rgba(255,255,255,0.16)' : visual.bgColor }]}>
+        <Ionicons name={visual.icon as any} size={size * 0.38} color={onDark ? Colors.white : visual.iconColor} />
       </View>
     );
   }
@@ -404,6 +463,10 @@ export default function TransactionDetailScreen({ id }: Props) {
   if (!isTransfer) {
     if (tx.phone) detailRows.push({ label: 'Phone', value: tx.phone, copyValue: tx.phone });
     if (tx.provider) detailRows.push({ label: 'Provider', value: tx.provider });
+    const purchasedPin = readMetaString(tx.metadata, 'purchasedPin');
+    if (purchasedPin) {
+      detailRows.push({ label: 'Exam PIN', value: purchasedPin, copyValue: purchasedPin, mono: true });
+    }
   }
 
   detailRows.push({

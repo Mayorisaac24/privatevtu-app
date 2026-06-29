@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../stores';
-import { api } from '../lib/api';
+import { api, isResponseSuccess } from '../lib/api';
 import { Colors, Spacing, Typography, Radius, Shadow } from '../theme';
 import { useGradients } from '../theme/hooks';
 import { ThemedScreen } from '../components/ui/ThemedScreen';
@@ -60,6 +60,9 @@ export default function ProfileScreen() {
   const gradients = useGradients();
   const { pickAvatar, uploading } = useAvatarPicker();
   const [kycData, setKycData] = useState<KycStatusData | null>(() => peekKycStatusCache());
+  const [programSubtitle, setProgramSubtitle] = useState('Upgrade your pricing tier');
+  const [apiAccessSubtitle, setApiAccessSubtitle] = useState('Request developer API credentials');
+  const [apiAccessBadge, setApiAccessBadge] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -67,6 +70,27 @@ export default function ProfileScreen() {
       void getKycStatusData({ force: true }).then((data) => {
         if (data) setKycData(data);
       });
+      void Promise.all([api.getMyUserType(), api.getMyApiAccess()]).then(([typeRes, apiRes]) => {
+        if (isResponseSuccess(typeRes) && typeRes.data) {
+          const label = typeRes.data.name || typeRes.data.code || 'Default';
+          setProgramSubtitle(`Current plan: ${label}`);
+        }
+        if (isResponseSuccess(apiRes) && apiRes.data) {
+          if (apiRes.data.activeClient?.isActive) {
+            setApiAccessSubtitle(`Active · ${apiRes.data.activeClient.responseFormat}`);
+            setApiAccessBadge(false);
+          } else if (apiRes.data.pending) {
+            setApiAccessSubtitle('Request pending admin review');
+            setApiAccessBadge(true);
+          } else if (apiRes.data.latest?.status === 'REJECTED') {
+            setApiAccessSubtitle('Last request rejected — you can resubmit');
+            setApiAccessBadge(true);
+          } else {
+            setApiAccessSubtitle('Request developer API credentials');
+            setApiAccessBadge(false);
+          }
+        }
+      }).catch(() => undefined);
     }, []),
   );
 
@@ -118,6 +142,19 @@ export default function ProfileScreen() {
           subtitle: kycMenuSubtitle,
           action: () => router.push('/kyc'),
           badge: showMenuBadge,
+        },
+        {
+          icon: 'ribbon-outline',
+          label: 'Programs',
+          subtitle: programSubtitle,
+          action: () => router.push('/profile/programs'),
+        },
+        {
+          icon: 'code-slash-outline',
+          label: 'API Access',
+          subtitle: apiAccessSubtitle,
+          badge: apiAccessBadge,
+          action: () => router.push('/profile/api-access'),
         },
         {
           icon: 'lock-closed-outline',
