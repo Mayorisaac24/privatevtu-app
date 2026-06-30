@@ -37,6 +37,8 @@ export function filterPlansByActiveCategories(
   categories: DataCategory[],
 ): Record<string, unknown>[] {
   const activeCategoryIds = new Set(categories.map((category) => String(category.id)));
+  if (activeCategoryIds.size === 0) return rawPlans;
+
   return rawPlans.filter((plan) => {
     const category = plan.category as { id?: string } | undefined;
     const categoryId = String(plan.categoryId || category?.id || '').trim();

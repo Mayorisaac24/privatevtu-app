@@ -1,23 +1,27 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
+  ActionSheetIOS,
+  Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNotificationsStore } from '../stores/notifications-store';
 import { useTabContext } from '../stores/tab-context';
-import { type AppNotification, type AppNotificationType } from '../lib/api';
+import { api, isResponseSuccess, type AppNotification, type AppNotificationType } from '../lib/api';
+import { getLoginDeviceId } from '../lib/login-context';
 import { navigateBack } from '../lib/navigation';
-import { Colors, Spacing } from '../theme';
+import { Colors, Spacing, getNotificationTypePalette, useColors } from '../theme';
 import { ThemedScreen } from '../components/ui/ThemedScreen';
 import { GlassCard } from '../components/ui/GlassCard';
 import { GlassSurface } from '../components/ui/GlassSurface';
-
+import { showToast } from '../components/ui/Toast';
 
 function formatWhen(iso: string) {
   const date = new Date(iso);
@@ -40,19 +44,6 @@ function iconForType(type: AppNotificationType): keyof typeof Ionicons.glyphMap 
   }
 }
 
-function paletteForType(type: AppNotificationType) {
-  switch (type) {
-    case 'success':
-      return { bg: '#ECFDF5', color: '#059669' };
-    case 'error':
-      return { bg: '#FEF2F2', color: '#DC2626' };
-    case 'warning':
-      return { bg: '#FFFBEB', color: '#D97706' };
-    default:
-      return { bg: Colors.primaryMuted, color: Colors.primary };
-  }
-}
-
 function resolveCategory(notification: AppNotification) {
   if (notification.category) return notification.category;
   const dataCategory = typeof notification.data?.category === 'string'
@@ -64,6 +55,7 @@ function resolveCategory(notification: AppNotification) {
   if (dataCategory === 'SYSTEM') return 'SYSTEM';
   return undefined;
 }
+
 function categoryLabel(category?: string) {
   switch (category) {
     case 'SECURITY': return 'Security';
@@ -79,25 +71,62 @@ type Props = {
 };
 
 export default function NotificationDetailScreen({ id }: Props) {
+  const colors = useColors();
   const insets = useSafeAreaInsets();
   const { setTab } = useTabContext();
-  const { items, loading, fetchNotifications, markRead } = useNotificationsStore();
-
-  const notification = useMemo(
-    () => items.find((item) => item.id === id) ?? null,
-    [items, id],
-  );
-
-  useEffect(() => {
-    if (!notification && !loading) {
-      void fetchNotifications({ refresh: true, page: 1 });
-    }
-  }, [fetchNotifications, id, loading, notification]);
+  const { markRead, markUnread, deleteNotification, upsertNotification } = useNotificationsStore();
+  const [notification, setNotification] = useState<AppNotification | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const markedReadRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    if (notification && !notification.isRead) {
-      void markRead(notification.id);
+    markedReadRef.current = new Set();
+    const cached = useNotificationsStore.getState().items.find((item) => item.id === id) ?? null;
+    setNotification(cached);
+    setLoading(!cached);
+    setNotFound(false);
+
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const excludeLoginDeviceId = await getLoginDeviceId();
+        const res = await api.getNotificationById(id, excludeLoginDeviceId || undefined);
+        if (cancelled) return;
+        if (isResponseSuccess(res) && res.data?.id === id) {
+          setNotification(res.data);
+          upsertNotification(res.data);
+          setNotFound(false);
+        } else if (!cached) {
+          setNotFound(true);
+        }
+      } catch {
+        if (!cancelled && !cached) {
+          setNotFound(true);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, upsertNotification]);
+
+  useEffect(() => {
+    if (!notification || notification.isRead || markedReadRef.current.has(notification.id)) {
+      return;
     }
+    markedReadRef.current.add(notification.id);
+    void markRead(notification.id).then((ok) => {
+      if (ok) {
+        setNotification((prev) => (prev ? { ...prev, isRead: true } : prev));
+      }
+    });
   }, [markRead, notification]);
 
   const resolvedCategory = notification ? resolveCategory(notification) : undefined;
@@ -117,6 +146,11 @@ export default function NotificationDetailScreen({ id }: Props) {
 
     if (category === 'SECURITY') {
       router.push('/profile/change-password');
+      return;
+    }
+
+    if (type === 'kyc_document_review') {
+      router.push('/kyc');
     }
   }, [notification, setTab]);
 
@@ -125,19 +159,104 @@ export default function NotificationDetailScreen({ id }: Props) {
     const category = resolveCategory(notification);
     const reference = typeof notification.data?.reference === 'string' ? notification.data.reference : '';
     const type = typeof notification.data?.type === 'string' ? notification.data.type : '';
-    return category === 'TRANSACTIONAL' || Boolean(reference) || type.startsWith('transfer') || category === 'SECURITY';
+    return category === 'TRANSACTIONAL' || Boolean(reference) || type.startsWith('transfer') || category === 'SECURITY' || type === 'kyc_document_review';
   }, [notification]);
 
   const relatedActionLabel = useMemo(() => {
     if (!notification) return '';
     const category = resolveCategory(notification);
     const type = typeof notification.data?.type === 'string' ? notification.data.type : '';
+    if (type === 'kyc_document_review') return 'Open KYC';
     if (category === 'SECURITY') return 'Change password';
     if (category === 'TRANSACTIONAL' || type.startsWith('transfer')) return 'View in history';
     return 'View details';
   }, [notification]);
 
-  if (!notification) {
+  const handleDelete = useCallback(() => {
+    if (!notification) return;
+    Alert.alert(
+      'Delete notification?',
+      'This notification will be removed from your inbox.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              const ok = await deleteNotification(notification.id);
+              if (ok) {
+                showToast({ type: 'success', text1: 'Notification deleted' });
+                navigateBack();
+              } else {
+                showToast({ type: 'error', text1: 'Could not delete notification' });
+              }
+            })();
+          },
+        },
+      ],
+    );
+  }, [deleteNotification, notification]);
+
+  const runMarkUnread = useCallback(() => {
+    if (!notification) return;
+    void (async () => {
+      const ok = await markUnread(notification.id);
+      if (ok) {
+        setNotification((prev) => (prev ? { ...prev, isRead: false } : prev));
+        showToast({ type: 'success', text1: 'Marked as unread' });
+      }
+    })();
+  }, [markUnread, notification]);
+
+  const runMarkRead = useCallback(() => {
+    if (!notification) return;
+    void (async () => {
+      const ok = await markRead(notification.id);
+      if (ok) {
+        setNotification((prev) => (prev ? { ...prev, isRead: true } : prev));
+        showToast({ type: 'success', text1: 'Marked as read' });
+      }
+    })();
+  }, [markRead, notification]);
+
+  const openActions = useCallback(() => {
+    if (!notification) return;
+
+    const options = notification.isRead
+      ? ['Mark as unread', 'Delete', 'Cancel']
+      : ['Mark as read', 'Delete', 'Cancel'];
+    const destructiveButtonIndex = 1;
+    const cancelButtonIndex = 2;
+
+    const onSelect = (index?: number) => {
+      if (index === 0) {
+        if (notification.isRead) runMarkUnread();
+        else runMarkRead();
+      } else if (index === 1) {
+        handleDelete();
+      }
+    };
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options, destructiveButtonIndex, cancelButtonIndex },
+        onSelect,
+      );
+      return;
+    }
+
+    Alert.alert('Notification actions', undefined, [
+      {
+        text: notification.isRead ? 'Mark as unread' : 'Mark as read',
+        onPress: () => onSelect(0),
+      },
+      { text: 'Delete', style: 'destructive', onPress: () => onSelect(1) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }, [handleDelete, notification, runMarkRead, runMarkUnread]);
+
+  if (loading && !notification) {
     return (
       <ThemedScreen>
         <View style={[styles.loadingWrap, { paddingTop: insets.top + 80 }]}>
@@ -148,11 +267,20 @@ export default function NotificationDetailScreen({ id }: Props) {
     );
   }
 
-  const palette = paletteForType(notification.type);
+  if (!notification || notFound) {
+    return (
+      <ThemedScreen>
+        <View style={[styles.loadingWrap, { paddingTop: insets.top + 80 }]}>
+          <Text style={styles.loadingText}>Notification not found.</Text>
+        </View>
+      </ThemedScreen>
+    );
+  }
+
+  const palette = getNotificationTypePalette(notification.type, colors);
 
   return (
     <ThemedScreen>
-
       <GlassSurface
         variant="light"
         borderRadius={0}
@@ -166,6 +294,9 @@ export default function NotificationDetailScreen({ id }: Props) {
           <Text style={styles.headerTitle}>Notification</Text>
           <Text style={styles.headerSub}>{categoryLabel(resolvedCategory)}</Text>
         </View>
+        <TouchableOpacity style={styles.menuBtn} onPress={openActions} activeOpacity={0.8}>
+          <Ionicons name="ellipsis-horizontal" size={20} color={Colors.dark} />
+        </TouchableOpacity>
       </GlassSurface>
 
       <View style={[styles.body, { paddingBottom: insets.bottom + 24 }]}>
@@ -204,6 +335,14 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(124, 58, 237, 0.08)',
+  },
+  menuBtn: {
     width: 40,
     height: 40,
     borderRadius: 12,

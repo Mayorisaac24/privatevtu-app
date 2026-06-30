@@ -61,6 +61,7 @@ export function SessionBootstrap() {
       if (state === 'active') {
         void api.getValidToken({ logoutOnAuthFailure: true });
         void fetchUnreadCount();
+        void fetchNotifications({ refresh: true, page: 1 });
         void refreshUserProfile();
         void syncCatalogRevision({ force: true });
         void useServiceAvailabilityStore.getState().refresh({ force: true });
@@ -68,7 +69,7 @@ export function SessionBootstrap() {
       }
     });
     return () => sub.remove();
-  }, [fetchUnreadCount, isAuthenticated, onAuthRoute]);
+  }, [fetchNotifications, fetchUnreadCount, isAuthenticated, onAuthRoute]);
 
   useEffect(() => {
     registerSessionExpiredHandler(async (reason) => {

@@ -2,7 +2,9 @@ import { View, Text, Image, StyleSheet, type ImageSourcePropType } from 'react-n
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GlassCard } from '../ui/GlassCard';
-import { Colors, Radius, Shadow, Gradients } from '../../theme';
+import { Overlays, Radius, Shadow, getPurchaseConfirmGradient, useColors, useGradients, useThemedStyles } from '../../theme';
+import type { ThemeColors } from '../../theme';
+import { formatCurrency } from '../../lib/api';
 
 export type PurchaseConfirmRow = {
   label: string;
@@ -18,14 +20,35 @@ type PurchaseConfirmCardProps = {
   logo?: ImageSourcePropType;
   icon?: keyof typeof Ionicons.glyphMap;
   rows: PurchaseConfirmRow[];
+  /** @deprecated All purchase confirms use the brand card gradient. */
   accent?: 'airtime' | 'data' | 'default';
+  walletBalanceKobo?: number;
+  requiredKobo?: number;
+  insufficientFunds?: boolean;
 };
 
-const ACCENT_GRADIENTS = {
-  airtime: Gradients.card,
-  data: ['#065F46', '#059669', '#10B981'] as [string, string, ...string[]],
-  default: Gradients.card,
-};
+function InsufficientBalanceNotice({
+  walletBalanceNaira,
+  requiredNaira,
+}: {
+  walletBalanceNaira: number;
+  requiredNaira: number;
+}) {
+  const colors = useColors();
+  const styles = useThemedStyles(createStyles);
+
+  return (
+    <View style={[styles.insufficientBanner, { borderColor: Overlays.borderError12 }]}>
+      <Ionicons name="warning-outline" size={18} color={colors.error} />
+      <View style={styles.insufficientTextWrap}>
+        <Text style={styles.insufficientTitle}>Insufficient balance</Text>
+        <Text style={styles.insufficientBody}>
+          Available: ₦{walletBalanceNaira.toLocaleString()} · Required: ₦{requiredNaira.toLocaleString()}
+        </Text>
+      </View>
+    </View>
+  );
+}
 
 export function PurchaseConfirmCard({
   eyebrow,
@@ -35,14 +58,29 @@ export function PurchaseConfirmCard({
   logo,
   icon = 'receipt-outline',
   rows,
-  accent = 'default',
+  walletBalanceKobo,
+  requiredKobo,
+  insufficientFunds = false,
 }: PurchaseConfirmCardProps) {
-  const gradient = ACCENT_GRADIENTS[accent];
+  const colors = useColors();
+  const gradients = useGradients();
+  const styles = useThemedStyles(createStyles);
+  const gradient = getPurchaseConfirmGradient(gradients);
+  const detailRows = walletBalanceKobo != null
+    ? [
+      ...rows,
+      {
+        label: 'Wallet balance',
+        value: formatCurrency(walletBalanceKobo),
+        highlight: !insufficientFunds,
+      },
+    ]
+    : rows;
 
   return (
     <GlassCard variant="solid" borderRadius={Radius.xl} padding={0} style={styles.sheet} contentStyle={styles.sheetInner}>
       <LinearGradient
-        colors={gradient}
+        colors={[...gradient]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.hero}
@@ -55,15 +93,15 @@ export function PurchaseConfirmCard({
             {logo ? (
               <Image source={logo} style={styles.logo} resizeMode="contain" />
             ) : (
-              <View style={styles.iconFallback}>
-                <Ionicons name={icon} size={28} color={Colors.white} />
+              <View style={[styles.iconFallback, { backgroundColor: colors.primary }]}>
+                <Ionicons name={icon} size={28} color={colors.white} />
               </View>
             )}
           </View>
 
           <View style={styles.heroInfo}>
             <Text style={styles.eyebrow}>{eyebrow}</Text>
-            <Text style={styles.amount}>{amount}</Text>
+            <Text style={[styles.amount, { color: colors.white }]}>{amount}</Text>
             <Text style={styles.title} numberOfLines={2}>{title}</Text>
             {chip ? (
               <View style={styles.chip}>
@@ -75,26 +113,37 @@ export function PurchaseConfirmCard({
       </LinearGradient>
 
       <View style={styles.body}>
-        {rows.map((row, index) => (
+        {detailRows.map((row, index) => (
           <View
             key={row.label}
-            style={[styles.row, index < rows.length - 1 && styles.rowBorder]}
+            style={[styles.row, index < detailRows.length - 1 && styles.rowBorder]}
           >
             <Text style={styles.rowLabel}>{row.label}</Text>
             <Text
-              style={[styles.rowValue, row.highlight && styles.rowValueHighlight]}
+              style={[
+                styles.rowValue,
+                row.highlight && styles.rowValueHighlight,
+                row.label === 'Wallet balance' && insufficientFunds && styles.rowValueError,
+              ]}
               numberOfLines={2}
             >
               {row.value}
             </Text>
           </View>
         ))}
+
+        {insufficientFunds && requiredKobo != null ? (
+          <InsufficientBalanceNotice
+            walletBalanceNaira={(walletBalanceKobo ?? 0) / 100}
+            requiredNaira={requiredKobo / 100}
+          />
+        ) : null}
       </View>
     </GlassCard>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   sheet: {
     overflow: 'hidden',
     marginBottom: 14,
@@ -115,7 +164,7 @@ const styles = StyleSheet.create({
     width: 110,
     height: 110,
     borderRadius: 55,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: Overlays.white08,
   },
   heroBlob2: {
     position: 'absolute',
@@ -124,7 +173,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: Overlays.white06,
   },
   heroRow: {
     flexDirection: 'row',
@@ -135,11 +184,11 @@ const styles = StyleSheet.create({
     width: 78,
     height: 78,
     borderRadius: 39,
-    backgroundColor: 'rgba(255,255,255,0.96)',
+    backgroundColor: Overlays.white95,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.72)',
+    borderColor: Overlays.white72,
     ...Shadow.sm,
   },
   logo: {
@@ -150,7 +199,6 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -161,21 +209,20 @@ const styles = StyleSheet.create({
   eyebrow: {
     fontSize: 11,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.65)',
+    color: Overlays.white65,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
   amount: {
     fontSize: 32,
     fontWeight: '800',
-    color: Colors.white,
     letterSpacing: -0.8,
     marginTop: 2,
   },
   title: {
     fontSize: 14,
     fontWeight: '700',
-    color: 'rgba(255,255,255,0.92)',
+    color: Overlays.white92,
     marginTop: 4,
     lineHeight: 18,
   },
@@ -185,14 +232,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: Radius.full,
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: Overlays.white14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
+    borderColor: Overlays.white18,
   },
   chipText: {
     fontSize: 11,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.9)',
+    color: Overlays.white90,
   },
   body: {
     paddingHorizontal: 18,
@@ -208,23 +255,50 @@ const styles = StyleSheet.create({
   },
   rowBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: Colors.surface,
+    borderBottomColor: colors.surface,
   },
   rowLabel: {
     fontSize: 13,
-    color: Colors.muted,
+    color: colors.muted,
     flexShrink: 0,
   },
   rowValue: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.dark,
+    color: colors.dark,
     textAlign: 'right',
     flex: 1,
   },
   rowValueHighlight: {
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: '800',
     fontSize: 15,
+  },
+  rowValueError: {
+    color: colors.error,
+  },
+  insufficientBanner: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    padding: 12,
+    borderRadius: Radius.lg,
+    backgroundColor: colors.errorLight,
+    borderWidth: 1,
+  },
+  insufficientTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  insufficientTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.errorDark,
+  },
+  insufficientBody: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.error,
   },
 });

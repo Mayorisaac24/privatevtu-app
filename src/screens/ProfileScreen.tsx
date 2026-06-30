@@ -209,20 +209,26 @@ export default function ProfileScreen() {
         {
           icon: 'help-circle-outline',
           label: 'Help & FAQ',
-          subtitle: 'Answers to common questions',
+          subtitle: 'Searchable answers from admin',
           action: () => router.push('/profile/help'),
         },
         {
           icon: 'chatbubble-outline',
           label: 'Contact Support',
-          subtitle: 'support@privatevtu.com',
-          action: () => Alert.alert('Support', 'Email: support@privatevtu.com'),
+          subtitle: 'Disputes, email & help channels',
+          action: () => router.push('/profile/contact'),
+        },
+        {
+          icon: 'shield-outline',
+          label: 'My Disputes',
+          subtitle: 'Track transaction issues',
+          action: () => router.push('/profile/disputes'),
         },
         {
           icon: 'star-outline',
           label: 'Rate the App',
           subtitle: 'Share your experience',
-          action: () => Alert.alert('Thank you!', 'We appreciate your support!'),
+          action: () => router.push('/profile/rate-app'),
         },
         {
           icon: 'document-text-outline',

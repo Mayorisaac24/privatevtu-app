@@ -27,6 +27,7 @@ export function AppLockHost() {
     prefsLoaded,
   } = useSecurityStore();
   const appState = useRef(AppState.currentState);
+  const redirectingRef = useRef(false);
 
   useEffect(() => {
     void loadPrefs();
@@ -47,7 +48,7 @@ export function AppLockHost() {
 
       if (prev.match(/inactive|background/) && nextState === 'active') {
         if (shouldLockOnResume()) {
-          lock();
+          lock(pathname);
         } else {
           useSecurityStore.setState({
             isPrivacyMode: false,
@@ -65,16 +66,26 @@ export function AppLockHost() {
     user?.hasPin,
     lock,
     markLeftApp,
+    pathname,
     shouldLockOnResume,
   ]);
 
   useEffect(() => {
     if (!prefsLoaded || !isAuthenticated || !user?.hasPin) return;
-    if (!isLocked) return;
+    if (!isLocked) {
+      redirectingRef.current = false;
+      return;
+    }
     if (pathname === UNLOCK_ROUTE) return;
     if (AUTH_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return;
+    if (redirectingRef.current) return;
 
-    router.push(UNLOCK_ROUTE);
+    redirectingRef.current = true;
+    const { lockReturnPath } = useSecurityStore.getState();
+    if (!lockReturnPath) {
+      useSecurityStore.setState({ lockReturnPath: pathname });
+    }
+    router.replace(UNLOCK_ROUTE);
   }, [isLocked, isAuthenticated, user?.hasPin, pathname, prefsLoaded]);
 
   useEffect(() => {

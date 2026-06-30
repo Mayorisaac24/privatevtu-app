@@ -6,6 +6,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  type RefreshControlProps,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -13,7 +14,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Typography } from '../../theme';
 import { useGradients } from '../../theme/hooks';
 import { ThemedScreen } from '../ui/ThemedScreen';
-import { KeyboardDismissView } from '../ui/KeyboardDismissView';
 import { navigateBack } from '../../lib/navigation';
 import { useStatusBarStyle } from '../../hooks/useStatusBarStyle';
 import { useKeyboardInsets } from '../../hooks/useKeyboardInsets';
@@ -28,6 +28,7 @@ type ProfileSubScreenProps = {
   headerIcon?: keyof typeof Ionicons.glyphMap;
   children: ReactNode;
   footer?: ReactNode;
+  refreshControl?: React.ReactElement<RefreshControlProps>;
 };
 
 export function ProfileSubScreen({
@@ -37,6 +38,7 @@ export function ProfileSubScreen({
   headerIcon,
   children,
   footer,
+  refreshControl,
 }: ProfileSubScreenProps) {
   useStatusBarStyle('light');
   const insets = useSafeAreaInsets();
@@ -54,7 +56,7 @@ export function ProfileSubScreen({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={0}
       >
-        <KeyboardDismissView style={styles.flex}>
+        <View style={styles.flex}>
           <LinearGradient
             colors={[...gradients.hero]}
             start={{ x: 0, y: 0 }}
@@ -83,6 +85,7 @@ export function ProfileSubScreen({
           <View style={styles.curve} />
 
           <ScrollView
+            style={styles.flex}
             contentContainerStyle={[
               styles.scroll,
               {
@@ -93,10 +96,14 @@ export function ProfileSubScreen({
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+            nestedScrollEnabled
+            refreshControl={refreshControl}
           >
-            <ScreenContent centered>{children}</ScreenContent>
+            <ScreenContent centered>
+              <View style={styles.content}>{children}</View>
+            </ScreenContent>
           </ScrollView>
-        </KeyboardDismissView>
+        </View>
 
         {footer ? (
           <View style={[styles.footer, { paddingHorizontal: pagePadding, paddingBottom: insets.bottom + 12 }]}>
@@ -159,7 +166,8 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
   },
-  scroll: { paddingTop: 8, gap: 14 },
+  scroll: { paddingTop: 8, flexGrow: 1 },
+  content: { gap: 14 },
   footer: {
     paddingTop: 12,
     backgroundColor: Colors.white,

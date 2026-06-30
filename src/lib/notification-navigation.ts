@@ -23,6 +23,21 @@ export function navigateFromNotificationData(data?: Record<string, unknown> | nu
     return;
   }
 
+  if (type === 'kyc_document_review') {
+    router.push('/kyc');
+    return;
+  }
+
+  if (type === 'dispute_created' || type === 'dispute_updated' || type === 'dispute_message' || screen === 'dispute-details') {
+    const disputeId = typeof data.disputeId === 'string' ? data.disputeId : '';
+    if (disputeId) {
+      router.push(`/profile/disputes/${disputeId}`);
+      return;
+    }
+    router.push('/profile/disputes');
+    return;
+  }
+
   if (screen === 'transaction-details' || category === 'transaction' || reference) {
     router.push('/(tabs)/history');
     return;

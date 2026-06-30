@@ -1,6 +1,10 @@
 import * as SecureStore from 'expo-secure-store';
 import { api, isResponseSuccess } from './api';
 import { getCachedElectricityDiscos } from './electricity-discos-cache';
+import {
+  getCachedEducationProviders,
+  resetEducationCatalogCache,
+} from './education-catalog-cache';
 import { getNumberPrefixesCached, resetNumberPrefixCache } from './number-prefix-cache';
 import { resetServiceCatalogCache, getServiceProvidersCached } from './service-catalog-cache';
 import { resetTransferConfigCache, getCachedTransferConfig } from './transfer-config-cache';
@@ -39,6 +43,7 @@ async function preloadCatalogAfterInvalidation(): Promise<void> {
     getServiceProvidersCached('data', { forceRefresh: true }),
     getServiceProvidersCached('cable', { forceRefresh: true }),
     getCachedElectricityDiscos({ forceRefresh: true }),
+    getCachedEducationProviders({ forceRefresh: true }),
     getCachedTransferConfig({ forceRefresh: true }),
     getWalletFundingData({ force: true }),
     getNumberPrefixesCached({ forceRefresh: true }),
@@ -47,6 +52,7 @@ async function preloadCatalogAfterInvalidation(): Promise<void> {
 
 async function applyCatalogInvalidation(): Promise<void> {
   resetServiceCatalogCache();
+  resetEducationCatalogCache();
   resetTransferConfigCache();
   resetWalletFundingCache();
   resetNumberPrefixCache();

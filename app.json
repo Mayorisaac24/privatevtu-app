@@ -101,7 +101,10 @@
         "expo-notifications",
         {
           "icon": "./assets/icon.png",
-          "color": "#7C3AED"
+          "color": "#7C3AED",
+          "sounds": [
+            "./assets/sounds/notification_ping.mp3"
+          ]
         }
       ],
       [

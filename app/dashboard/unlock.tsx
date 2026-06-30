@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { router } from 'expo-router';
+import { BackHandler } from 'react-native';
+import { router, useNavigation } from 'expo-router';
 import { api } from '../../src/lib/api';
 import { getBiometricCapability, unlockWithBiometric } from '../../src/lib/biometric-auth';
 import { canUnlockWithBiometric } from '../../src/lib/security-storage';
@@ -10,19 +11,23 @@ import { LockScreenShell } from '../../src/components/security/LockScreenShell';
 
 export default function UnlockScreen() {
   useStatusBarStyle('light');
+  const navigation = useNavigation();
   const user = useAuthStore((s) => s.user);
   const unlock = useSecurityStore((s) => s.unlock);
+  const lockReturnPath = useSecurityStore((s) => s.lockReturnPath);
   const prefs = useSecurityStore((s) => s.prefs);
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [bioLoading, setBioLoading] = useState(false);
   const [bioIcon, setBioIcon] = useState<'finger-print-outline' | 'scan-outline'>('finger-print-outline');
   const bioPrompted = useRef(false);
+  const unlockedRef = useRef(false);
 
   const showBiometric = canUnlockWithBiometric(prefs);
   const fullName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '';
 
   const handleLogout = async () => {
+    unlockedRef.current = true;
     await useAuthStore.getState().logout();
     router.replace('/auth/login');
   };
@@ -34,6 +39,19 @@ export default function UnlockScreen() {
   }, [user]);
 
   useEffect(() => {
+    const backSub = BackHandler.addEventListener('hardwareBackPress', () => true);
+    const removeSub = navigation.addListener('beforeRemove', (event) => {
+      if (unlockedRef.current) return;
+      event.preventDefault();
+    });
+
+    return () => {
+      backSub.remove();
+      removeSub();
+    };
+  }, [navigation]);
+
+  useEffect(() => {
     void getBiometricCapability().then((capability) => {
       if (capability.label === 'Face ID') {
         setBioIcon('scan-outline');
@@ -42,13 +60,11 @@ export default function UnlockScreen() {
   }, []);
 
   const finishUnlock = useCallback(() => {
+    unlockedRef.current = true;
+    const destination = lockReturnPath || '/(tabs)';
     unlock();
-    if (router.canGoBack()) {
-      router.back();
-    } else {
-      router.replace('/(tabs)');
-    }
-  }, [unlock]);
+    router.replace(destination as '/(tabs)');
+  }, [lockReturnPath, unlock]);
 
   const verifyPin = useCallback(async (value: string) => {
     if (value.length !== 4) return;

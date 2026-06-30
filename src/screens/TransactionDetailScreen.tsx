@@ -4,9 +4,9 @@ import {
   ImageSourcePropType,
   Pressable,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { router } from 'expo-router';
@@ -38,6 +38,7 @@ import { useGradients } from '../theme/hooks';
 import { gradientStops } from '../theme/gradient-utils';
 import { GlassCard } from '../components/ui/GlassCard';
 import { GlassSurface } from '../components/ui/GlassSurface';
+import { ShareReceiptSheet } from '../components/transaction/ShareReceiptSheet';
 const TIMELINE_BRAND = Colors.primary;
 const TIMELINE_BRAND_RING = 'rgba(124, 58, 237, 0.2)';
 const TIMELINE_BRAND_LINE = Colors.primaryLight;
@@ -329,11 +330,22 @@ function SectionHeader({ icon, title }: { icon: keyof typeof Ionicons.glyphMap; 
   );
 }
 
+const DISPUTABLE_TYPES = new Set([
+  'AIRTIME', 'DATA', 'ELECTRICITY', 'CABLE', 'EDUCATION', 'BETTING',
+  'TRANSFER', 'WITHDRAWAL', 'WALLET_FUND',
+]);
+
 export default function TransactionDetailScreen({ id }: Props) {
   const insets = useSafeAreaInsets();
   const gradients = useGradients();
   const [transaction, setTransaction] = useState<Transaction | null>(() => findCachedTransaction(id));
   const [loadingDetail, setLoadingDetail] = useState(() => !findCachedTransaction(id));
+  const [disputeEligibility, setDisputeEligibility] = useState<{
+    allowed: boolean;
+    reason?: string;
+    existingDisputeId?: string;
+  } | null>(null);
+  const [showShareSheet, setShowShareSheet] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -357,6 +369,20 @@ export default function TransactionDetailScreen({ id }: Props) {
     };
   }, [id]);
 
+  useEffect(() => {
+    if (!transaction?.id || !DISPUTABLE_TYPES.has(String(transaction.type || '').toUpperCase())) {
+      setDisputeEligibility(null);
+      return;
+    }
+    let cancelled = false;
+    void api.getDisputeEligibility(transaction.id).then((res) => {
+      if (!cancelled && isResponseSuccess(res) && res.data) {
+        setDisputeEligibility(res.data);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [transaction?.id, transaction?.type]);
+
   const tx = useMemo(
     () => (transaction ? enrichTransaction(transaction) : null),
     [transaction],
@@ -367,19 +393,9 @@ export default function TransactionDetailScreen({ id }: Props) {
     showToast({ type: 'success', text1: 'Copied', text2: `${label} copied` });
   }, []);
 
-  const handleShare = useCallback(async () => {
+  const handleShare = useCallback(() => {
     if (!tx) return;
-    const displayAmount = tx.displayAmountKobo || tx.amount;
-    const lines = [
-      tx.displayTitle || tx.type,
-      formatCurrencyVisible(displayAmount, true, getAmountPresentation(tx).prefix),
-      `Status: ${tx.displayStatusLabel || tx.status}`,
-      `Reference: ${tx.reference}`,
-    ];
-    if (tx.transferDetails?.accountNumber) {
-      lines.push(`Account: ${tx.transferDetails.accountNumber}`);
-    }
-    await Share.share({ message: lines.join('\n') });
+    setShowShareSheet(true);
   }, [tx]);
 
   const header = (
@@ -395,7 +411,7 @@ export default function TransactionDetailScreen({ id }: Props) {
       <Text style={styles.headerTitle}>Transaction</Text>
       <Pressable
         style={[styles.shareBtn, !tx && styles.shareBtnDisabled]}
-        onPress={() => void handleShare()}
+        onPress={() => handleShare()}
         disabled={!tx}
       >
         <Ionicons name="share-outline" size={16} color={tx ? Colors.primary : Colors.mutedLight} />
@@ -636,8 +652,47 @@ export default function TransactionDetailScreen({ id }: Props) {
               />
             ))}
           </GlassCard>
+
+          {disputeEligibility?.existingDisputeId ? (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => router.push(`/profile/disputes/${disputeEligibility.existingDisputeId}`)}
+            >
+              <GlassCard borderRadius={Radius.xl} padding={16} contentStyle={styles.disputeCard}>
+                <Ionicons name="shield-outline" size={20} color={Colors.primary} />
+                <View style={styles.disputeCopy}>
+                  <Text style={styles.disputeTitle}>Dispute in progress</Text>
+                  <Text style={styles.disputeSub}>View your open case for this transaction</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={Colors.mutedLight} />
+              </GlassCard>
+            </TouchableOpacity>
+          ) : disputeEligibility?.allowed ? (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => router.push({
+                pathname: '/profile/disputes/new',
+                params: { transactionId: tx.id },
+              })}
+            >
+              <GlassCard borderRadius={Radius.xl} padding={16} contentStyle={styles.disputeCard}>
+                <Ionicons name="alert-circle-outline" size={20} color="#D97706" />
+                <View style={styles.disputeCopy}>
+                  <Text style={styles.disputeTitle}>Report an issue</Text>
+                  <Text style={styles.disputeSub}>Open a dispute if this transaction did not go as expected</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={Colors.mutedLight} />
+              </GlassCard>
+            </TouchableOpacity>
+          ) : null}
         </View>
       </ScrollView>
+
+      <ShareReceiptSheet
+        visible={showShareSheet}
+        transaction={tx}
+        onClose={() => setShowShareSheet(false)}
+      />
     </ThemedScreen>
   );
 }
@@ -676,6 +731,15 @@ const styles = StyleSheet.create({
   shareBtnDisabled: { backgroundColor: Colors.surfaceAlt },
   shareText: { ...Typography.captionMed, color: Colors.primary },
   shareTextDisabled: { color: Colors.mutedLight },
+  disputeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 12,
+  },
+  disputeCopy: { flex: 1, gap: 2 },
+  disputeTitle: { ...Typography.captionMed, color: Colors.dark, fontWeight: '700' },
+  disputeSub: { ...Typography.small, color: Colors.muted },
   content: { paddingBottom: 40 },
   skeletonWrap: { flex: 1 },
   skeletonBody: { marginTop: -18, paddingHorizontal: Spacing.page, gap: 14 },

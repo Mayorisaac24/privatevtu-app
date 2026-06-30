@@ -43,10 +43,8 @@ export function useTransactionLockAuth(isVisible: boolean) {
       promptedRef.current = true;
 
       const ok = await promptLocalBiometric('Authorize transaction');
-      if (!cancelled) {
-        setInitialBiometricAttempted(true);
-        if (ok) setBiometricVerified(true);
-      }
+      setInitialBiometricAttempted(true);
+      if (ok) setBiometricVerified(true);
     })();
 
     return () => {
@@ -68,21 +66,26 @@ export function useTransactionLockAuth(isVisible: boolean) {
     if (pin.length === 4) {
       return { pin };
     }
-    if (biometricVerified) {
-      const creds = await getBiometricCredentials();
-      if (!creds?.biometricToken || !creds.deviceId) return null;
-      return {
-        biometricToken: creds.biometricToken,
-        deviceId: creds.deviceId,
-      };
-    }
     return null;
-  }, [biometricVerified]);
+  }, []);
+
+  const buildBiometricAuthPayload = useCallback(async (): Promise<TransactionAuthPayload | null> => {
+    const creds = await getBiometricCredentials();
+    if (!creds?.biometricToken || !creds.deviceId) return null;
+    return {
+      biometricToken: creds.biometricToken,
+      deviceId: creds.deviceId,
+    };
+  }, []);
 
   const resetAuth = useCallback(() => {
     setBiometricVerified(false);
     setInitialBiometricAttempted(false);
     promptedRef.current = false;
+  }, []);
+
+  const clearBiometricVerification = useCallback(() => {
+    setBiometricVerified(false);
   }, []);
 
   return {
@@ -93,6 +96,8 @@ export function useTransactionLockAuth(isVisible: boolean) {
     initialBiometricAttempted,
     retryBiometric,
     buildAuthPayload,
+    buildBiometricAuthPayload,
     resetAuth,
+    clearBiometricVerification,
   };
 }

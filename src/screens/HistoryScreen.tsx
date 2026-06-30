@@ -6,7 +6,12 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { dedupeTransactionsForDisplay, enrichTransaction, matchesHistoryTab } from '../lib/transaction-display';
+import {
+  computeHomeDashboardStats,
+  dedupeTransactionsForDisplay,
+  enrichTransaction,
+  matchesHistoryTab,
+} from '../lib/transaction-display';
 import { getHomeDashboardStats, hasHistoryStatsReady, refreshHistoryData, refreshHomeDashboardStats } from '../lib/dashboard-data';
 import { useWalletStore } from '../stores';
 import { Colors, Spacing, Typography, Radius, Shadow } from '../theme';
@@ -108,7 +113,13 @@ export default function HistoryScreen() {
   }, []);
 
   const monthLabel = new Date().toLocaleDateString('en-NG', { month: 'long' });
-  const dashboardStats = useMemo(() => getHomeDashboardStats(), [dashboardVersion]);
+  const dashboardStats = useMemo(() => {
+    if (transactions.length > 0) {
+      return computeHomeDashboardStats(transactions);
+    }
+    return getHomeDashboardStats();
+  }, [transactions, dashboardVersion]);
+  const overviewLoading = transactions.length === 0 && !hasHistoryStatsReady();
 
   const enriched = useMemo(
     () => dedupeTransactionsForDisplay(transactions).map((tx) => enrichTransaction(tx)),
@@ -147,17 +158,19 @@ export default function HistoryScreen() {
     }));
   }, [filtered]);
 
-  const listHeader = !hasHistoryStatsReady() ? (
-    <OverviewSkeleton />
-  ) : (
-    <MonthActivityPanel
-      monthLabel={monthLabel}
-      stats={dashboardStats}
-      loading={false}
-      balanceVisible={balanceVisible}
-      embedded
-    />
-  );
+  const renderListHeader = useCallback(() => (
+    overviewLoading ? (
+      <OverviewSkeleton />
+    ) : (
+      <MonthActivityPanel
+        monthLabel={monthLabel}
+        stats={dashboardStats}
+        loading={overviewLoading}
+        balanceVisible={balanceVisible}
+        embedded
+      />
+    )
+  ), [monthLabel, dashboardStats, overviewLoading, balanceVisible]);
 
   return (
     <ThemedScreen>
@@ -242,16 +255,16 @@ export default function HistoryScreen() {
 
       {showInitialLoading ? (
         <View style={styles.loadingWrap}>
-          {hasHistoryStatsReady() ? (
+          {overviewLoading ? (
+            <OverviewSkeleton />
+          ) : (
             <MonthActivityPanel
               monthLabel={monthLabel}
               stats={dashboardStats}
-              loading={false}
+              loading={overviewLoading}
               balanceVisible={balanceVisible}
               embedded
             />
-          ) : (
-            <OverviewSkeleton />
           )}
           {[1, 2, 3].map((i) => (
             <View key={i} style={styles.dayGroup}>
@@ -263,6 +276,7 @@ export default function HistoryScreen() {
       ) : (
         <FlatList
           data={dayGroups}
+          extraData={`${dashboardVersion}-${overviewLoading}-${transactions.length}`}
           keyExtractor={(item) => item.key}
           contentContainerStyle={[
             styles.listContent,
@@ -277,7 +291,7 @@ export default function HistoryScreen() {
               tintColor={Colors.primary}
             />
           }
-          ListHeaderComponent={listHeader}
+          ListHeaderComponent={renderListHeader}
           ListEmptyComponent={
             loading || !historyHydrated ? null : (
               <View style={styles.empty}>

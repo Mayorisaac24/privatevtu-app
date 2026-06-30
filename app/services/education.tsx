@@ -2,9 +2,9 @@ import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, ActivityIndicator, Keyboard,
 } from 'react-native';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { api, formatCurrency, isResponseSuccess, parseWalletBalanceKobo, type EducationPlan, type EducationProvider } from '../../src/lib/api';
+import { api, formatCurrency, isResponseSuccess, parseWalletBalanceKobo, type EducationPlan } from '../../src/lib/api';
 import { useWalletStore } from '../../src/stores';
 import { Colors, Typography, Radius } from '../../src/theme';
 import { showToast } from '../../src/components/ui/Toast';
@@ -21,30 +21,19 @@ import {
 } from '../../src/components/purchase/ServicePurchaseUi';
 import { TransactionLockSheet } from '../../src/components/security/TransactionLockSheet';
 import type { TransactionAuthPayload } from '../../src/hooks/useTransactionLockAuth';
+import { useWalletAffordability } from '../../src/hooks/useWalletAffordability';
 import { ServiceGate } from '../../src/components/ServiceGate';
 import { SERVICE_CODES } from '../../src/lib/service-availability';
 import { ScreenBody } from '../../src/components/ui/ScreenBody';
 import { EducationProviderGrid } from '../../src/components/EducationProviderGrid';
-import { getEducationProviderDisplayName } from '../../src/lib/education-providers';
-
-function mapEducationPlan(raw: Record<string, unknown>): EducationPlan {
-  const platformPrice = Number(raw.platformPrice || 0);
-  return {
-    id: String(raw.id || ''),
-    name: String(raw.name || 'Plan'),
-    price: platformPrice / 100,
-    platformPrice,
-    description: raw.description ? String(raw.description) : null,
-  };
-}
+import { getEducationProviderDisplayName, getEducationProviderLogo } from '../../src/lib/education-providers';
+import { useCachedEducationPlans, useCachedEducationProviders } from '../../src/hooks/useEducationCatalog';
 
 function EducationScreen() {
   const { balance, setBalance } = useWalletStore();
-  const [providers, setProviders] = useState<EducationProvider[]>([]);
-  const [loadingProviders, setLoadingProviders] = useState(true);
+  const { providers, loading: loadingProviders } = useCachedEducationProviders();
   const [selectedProvider, setSelectedProvider] = useState('');
-  const [plans, setPlans] = useState<EducationPlan[]>([]);
-  const [loadingPlans, setLoadingPlans] = useState(false);
+  const { plans, loadingPlans } = useCachedEducationPlans(selectedProvider);
   const [selectedPlan, setSelectedPlan] = useState<EducationPlan | null>(null);
   const [phone, setPhone] = useState('');
   const [profileId, setProfileId] = useState('');
@@ -60,46 +49,10 @@ function EducationScreen() {
   );
 
   useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const res = await api.getEducationProviders();
-        if (active && res.success && Array.isArray(res.data)) {
-          setProviders(res.data);
-        }
-      } catch {
-        if (active) setProviders([]);
-      } finally {
-        if (active) setLoadingProviders(false);
-      }
-    })();
-    return () => { active = false; };
-  }, []);
-
-  useEffect(() => {
-    if (!selectedProvider) {
-      setPlans([]);
-      setSelectedPlan(null);
-      return;
-    }
-    let active = true;
-    setLoadingPlans(true);
+    if (!selectedProvider) return;
     setSelectedPlan(null);
-    (async () => {
-      try {
-        const res = await api.getEducationPlans(selectedProvider);
-        if (active && res.success && Array.isArray(res.data)) {
-          setPlans((res.data as Record<string, unknown>[]).map(mapEducationPlan));
-        } else if (active) {
-          setPlans([]);
-        }
-      } catch {
-        if (active) setPlans([]);
-      } finally {
-        if (active) setLoadingPlans(false);
-      }
-    })();
-    return () => { active = false; };
+    setCustomerName('');
+    setProfileId('');
   }, [selectedProvider]);
 
   const handleVerifyProfile = async () => {
@@ -169,7 +122,6 @@ function EducationScreen() {
         const balRes = await api.getWalletBalance();
         if (isResponseSuccess(balRes)) setBalance(parseWalletBalanceKobo(balRes.data));
         showToast({ type: 'success', text1: 'PIN Purchase Started', text2: 'You will be notified when your PIN is ready' });
-        setShowLock(false);
         setTimeout(() => {
           setPhone('');
           setProfileId('');
@@ -185,17 +137,17 @@ function EducationScreen() {
       showToast({ type: 'error', text1: 'Purchase Failed', text2: err?.data?.message || err?.message || 'Please try again' });
     } finally {
       setLoading(false);
+      setShowLock(false);
     }
   };
 
   const selectedProv = providers.find((p) => p.code === selectedProvider);
   const selectedProvName = selectedProv ? getEducationProviderDisplayName(selectedProv) : selectedProvider;
+  const requiredKobo = selectedPlan?.platformPrice ?? selectedPlan?.price ?? 0;
+  const afford = useWalletAffordability(requiredKobo, step === 'confirm');
 
   const handleSelectProvider = useCallback((code: string) => {
     setSelectedProvider(code);
-    setCustomerName('');
-    setProfileId('');
-    setSelectedPlan(null);
   }, []);
 
   const handleBack = useCallback(() => {
@@ -232,23 +184,22 @@ function EducationScreen() {
             <View style={styles.stack}>
               <ServicePurchaseCard>
                 <ServiceSectionLabel>Exam body</ServiceSectionLabel>
-                {loadingProviders ? (
-                  <ActivityIndicator color={Colors.primary} style={{ marginVertical: 12 }} />
-                ) : (
-                  <EducationProviderGrid
-                    providers={providers}
-                    selectedCode={selectedProvider}
-                    onSelect={handleSelectProvider}
-                    loading={loadingProviders}
-                  />
-                )}
+                <EducationProviderGrid
+                  providers={providers}
+                  selectedCode={selectedProvider}
+                  onSelect={handleSelectProvider}
+                  loading={loadingProviders}
+                />
               </ServicePurchaseCard>
 
               {selectedProvider ? (
                 <ServicePurchaseCard>
                   <ServiceSectionLabel>PIN package</ServiceSectionLabel>
-                  {loadingPlans ? (
-                    <ActivityIndicator color={Colors.primary} style={{ marginVertical: 12 }} />
+                  {loadingPlans && plans.length === 0 ? (
+                    <View style={styles.loadRow}>
+                      <ActivityIndicator color={Colors.primary} />
+                      <Text style={styles.loadText}>Loading packages...</Text>
+                    </View>
                   ) : plans.length === 0 ? (
                     <Text style={styles.muted}>No plans available for this provider yet.</Text>
                   ) : (
@@ -258,13 +209,25 @@ function EducationScreen() {
                         return (
                           <TouchableOpacity
                             key={plan.id}
-                            style={[styles.planRow, active && styles.planRowActive]}
+                            style={[styles.planItem, active && styles.planItemActive]}
                             onPress={() => setSelectedPlan(plan)}
+                            activeOpacity={0.75}
                           >
-                            <View style={{ flex: 1 }}>
-                              <Text style={styles.planName}>{plan.name}</Text>
+                            <View style={styles.planLeft}>
+                              <Text style={[styles.planName, active && styles.planNameActive]}>{plan.name}</Text>
+                              {plan.description ? (
+                                <View style={styles.planMeta}>
+                                  <Ionicons name="document-text-outline" size={11} color={Colors.muted} />
+                                  <Text style={styles.planMetaText}>{plan.description}</Text>
+                                </View>
+                              ) : null}
                             </View>
-                            <Text style={styles.planPrice}>{formatCurrency(plan.price)}</Text>
+                            <View style={styles.planRight}>
+                              <Text style={[styles.planPrice, active && styles.planPriceActive]}>
+                                {formatCurrency(plan.price)}
+                              </Text>
+                              {active ? <Ionicons name="checkmark-circle" size={16} color={Colors.primary} /> : null}
+                            </View>
                           </TouchableOpacity>
                         );
                       })}
@@ -289,7 +252,12 @@ function EducationScreen() {
                       <TouchableOpacity style={styles.verifyBtn} onPress={handleVerifyProfile} disabled={verifying}>
                         {verifying ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.verifyBtnText}>Verify Profile</Text>}
                       </TouchableOpacity>
-                      {customerName ? <Text style={styles.verifiedName}>✓ {customerName}</Text> : null}
+                      {customerName ? (
+                        <View style={styles.customerBadge}>
+                          <Ionicons name="checkmark-circle" size={14} color={Colors.successDark} />
+                          <Text style={styles.customerText}>{customerName}</Text>
+                        </View>
+                      ) : null}
                     </>
                   ) : null}
 
@@ -309,17 +277,29 @@ function EducationScreen() {
           ) : (
             <View style={styles.stack}>
               <PurchaseConfirmCard
-                title="Confirm PIN purchase"
+                eyebrow="You're buying"
+                amount={formatCurrency(requiredKobo)}
+                title={selectedPlan?.name || 'Exam PIN'}
+                chip={selectedProvName}
+                logo={selectedProv ? getEducationProviderLogo(selectedProv) ?? undefined : undefined}
+                icon="school-outline"
                 rows={[
                   { label: 'Provider', value: selectedProvName },
                   { label: 'Package', value: selectedPlan?.name || '' },
-                  { label: 'Amount', value: formatCurrency(selectedPlan?.price || 0), emphasize: true },
                   { label: 'Phone', value: phone },
                   ...(requiresProfile ? [{ label: 'Profile', value: customerName || profileId }] : []),
+                  { label: 'You pay', value: formatCurrency(requiredKobo), highlight: true },
                 ]}
+                walletBalanceKobo={afford.walletBalanceKobo}
+                requiredKobo={requiredKobo}
+                insufficientFunds={afford.insufficientFunds}
               />
               <ServiceEditLink onPress={() => setStep('details')} />
-              <ServiceContinueButton label="Pay with wallet" onPress={() => setShowLock(true)} />
+              <ServiceContinueButton
+                label={afford.insufficientFunds ? 'Insufficient balance' : 'Pay with wallet'}
+                onPress={() => setShowLock(true)}
+                disabled={loading || afford.insufficientFunds}
+              />
             </View>
           )}
         </ScrollView>
@@ -327,10 +307,18 @@ function EducationScreen() {
 
       <TransactionLockSheet
         visible={showLock}
-        onClose={() => setShowLock(false)}
-        onAuthorize={handlePurchase}
-        loading={loading}
-        amountLabel={formatCurrency(selectedPlan?.price || 0)}
+        onClose={() => {
+          if (loading) return;
+          setShowLock(false);
+        }}
+        onAuthorized={handlePurchase}
+        title="Confirm PIN purchase"
+        subtitle={`Authorize ${formatCurrency(requiredKobo)} for ${selectedPlan?.name || 'exam PIN'}`}
+        amount={formatCurrency(requiredKobo)}
+        processing={loading}
+        processingMessage="Processing purchase"
+        processingSubmessage="Completing your exam PIN order"
+        processingIcon="school-outline"
       />
     </ThemedScreen>
   );
@@ -346,33 +334,31 @@ export default function EducationRoute() {
 
 const styles = StyleSheet.create({
   stack: { gap: 14, paddingBottom: 24 },
-  providerGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  providerChip: {
-    minWidth: '47%',
-    flexGrow: 1,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: Radius.md,
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-    backgroundColor: Colors.white,
-  },
-  providerChipActive: { borderColor: Colors.primary, backgroundColor: Colors.primary + '12' },
-  providerChipText: { ...Typography.body, color: Colors.dark, textAlign: 'center' },
-  providerChipTextActive: { color: Colors.primary, fontWeight: '700' },
+  loadRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, justifyContent: 'center' },
+  loadText: { ...Typography.small, color: Colors.muted },
   planList: { gap: 8 },
-  planRow: {
+  planItem: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
     borderRadius: Radius.md,
-    padding: 12,
-    backgroundColor: Colors.white,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
   },
-  planRowActive: { borderColor: Colors.primary, backgroundColor: Colors.primary + '10' },
-  planName: { ...Typography.body, color: Colors.dark, fontWeight: '600' },
-  planPrice: { ...Typography.body, color: Colors.primary, fontWeight: '700' },
+  planItemActive: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryMuted,
+  },
+  planLeft: { flex: 1, paddingRight: 10 },
+  planRight: { alignItems: 'flex-end', gap: 4 },
+  planName: { ...Typography.smallMed, color: Colors.dark, marginBottom: 4 },
+  planNameActive: { color: Colors.primary },
+  planMeta: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  planMetaText: { ...Typography.caption, color: Colors.muted, textTransform: 'capitalize' },
+  planPrice: { ...Typography.bodyMed, color: Colors.dark, fontWeight: '700' },
+  planPriceActive: { color: Colors.primary },
   input: {
     borderWidth: 1,
     borderColor: Colors.border,
@@ -392,6 +378,17 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   verifyBtnText: { color: Colors.white, fontWeight: '700' },
-  verifiedName: { ...Typography.caption, color: Colors.success, marginBottom: 8 },
-  muted: { ...Typography.body, color: Colors.muted },
+  customerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: Colors.successLight,
+    borderRadius: Radius.md,
+    padding: 10,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: Colors.success + '33',
+  },
+  customerText: { ...Typography.smallMed, color: Colors.successDark },
+  muted: { ...Typography.body, color: Colors.muted, textAlign: 'center', paddingVertical: 12 },
 });

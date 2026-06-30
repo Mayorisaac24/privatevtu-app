@@ -21,6 +21,8 @@ import {
 } from '../../src/components/purchase/ServicePurchaseUi';
 import { TransactionLockSheet } from '../../src/components/security/TransactionLockSheet';
 import type { TransactionAuthPayload } from '../../src/hooks/useTransactionLockAuth';
+import { useWalletAffordability } from '../../src/hooks/useWalletAffordability';
+import { nairaToKobo } from '../../src/lib/wallet-affordability';
 import { ScreenBody } from '../../src/components/ui/ScreenBody';
 import { BettingPlatformPickerModal } from '../../src/components/BettingPlatformPickerModal';
 import { BettingPlatformLogo } from '../../src/components/BettingPlatformLogo';
@@ -135,7 +137,6 @@ export default function BettingScreen() {
           text1: 'Funding submitted',
           text2: res.message || `₦${parseFloat(amount).toLocaleString()} betting wallet funding is processing`,
         });
-        setShowLock(false);
         setTimeout(() => {
           setAccountNumber('');
           setAmount('');
@@ -150,11 +151,14 @@ export default function BettingScreen() {
       showToast({ type: 'error', text1: 'Funding failed', text2: err?.data?.message || err?.message || 'Please try again' });
     } finally {
       setLoading(false);
+      setShowLock(false);
     }
   };
 
   const stepIndex = step === 'details' ? 0 : step === 'amount' ? 1 : 2;
   const STEPS = ['Account', 'Amount', 'Confirm'];
+  const requiredKobo = nairaToKobo(parseFloat(amount || '0'));
+  const afford = useWalletAffordability(requiredKobo, step === 'confirm');
 
   const handleBack = useCallback(() => {
     if (showLock) {
@@ -294,13 +298,15 @@ export default function BettingScreen() {
                   { label: 'Account ID', value: accountNumber },
                   { label: 'You pay', value: `₦${parseFloat(amount).toLocaleString()}`, highlight: true },
                 ]}
+                walletBalanceKobo={afford.walletBalanceKobo}
+                requiredKobo={requiredKobo}
+                insufficientFunds={afford.insufficientFunds}
               />
 
               <ServiceContinueButton
-                label={`Fund ₦${parseFloat(amount || '0').toLocaleString()}`}
+                label={afford.insufficientFunds ? 'Insufficient balance' : `Fund ₦${parseFloat(amount || '0').toLocaleString()}`}
                 onPress={() => setShowLock(true)}
-                disabled={loading}
-                loading={loading}
+                disabled={loading || afford.insufficientFunds}
                 icon="trophy"
               />
 
@@ -321,11 +327,18 @@ export default function BettingScreen() {
 
       <TransactionLockSheet
         visible={showLock}
-        onClose={() => setShowLock(false)}
+        onClose={() => {
+          if (loading) return;
+          setShowLock(false);
+        }}
         onAuthorized={handlePay}
         title="Confirm betting funding"
         subtitle={`Authorize ₦${parseFloat(amount || '0').toLocaleString()} for ${accountNumber}`}
         amount={`₦${parseFloat(amount || '0').toLocaleString()}`}
+        processing={loading}
+        processingMessage="Funding account"
+        processingSubmessage="Processing payment to your betting wallet"
+        processingIcon="trophy-outline"
       />
     </ThemedScreen>
   );

@@ -26,6 +26,8 @@ import {
 } from '../components/purchase/ServicePurchaseUi';
 import { TransactionLockSheet } from '../components/security/TransactionLockSheet';
 import type { TransactionAuthPayload } from '../hooks/useTransactionLockAuth';
+import { useWalletAffordability } from '../hooks/useWalletAffordability';
+import { nairaToKobo } from '../lib/wallet-affordability';
 import { useCachedServiceProviders } from '../hooks/useServiceCatalog';
 import { useNetworkAutoDetect } from '../hooks/useNetworkAutoDetect';
 import { formatPhoneDisplay } from '../lib/phone';
@@ -73,18 +75,22 @@ export default function AirtimePurchaseScreen() {
         const balRes = await api.getWalletBalance();
         if (isResponseSuccess(balRes)) setBalance(parseWalletBalanceKobo(balRes.data));
         showToast({ type: 'success', text1: 'Airtime Sent! 🎉', text2: `₦${parseFloat(amount).toLocaleString()} sent to ${normalizedPhone}` });
-        setShowLock(false);
         setTimeout(() => { setPhone(''); setAmount(''); setStep('details'); setSelectedNetwork(''); }, 1500);
       } else {
         showToast({ type: 'error', text1: 'Purchase Failed', text2: res.message || 'Please try again' });
       }
     } catch (err: any) {
       showToast({ type: 'error', text1: 'Purchase Failed', text2: err?.data?.message || err?.message || 'Please try again' });
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+      setShowLock(false);
+    }
   };
 
   const selectedProv = providers.find(p => getProviderCode(p) === selectedNetwork.toLowerCase());
   const parsedAmount = parseFloat(amount);
+  const requiredKobo = nairaToKobo(parsedAmount);
+  const afford = useWalletAffordability(requiredKobo, step === 'confirm');
 
   const handleBack = useCallback(() => {
     if (showLock) {
@@ -194,15 +200,17 @@ export default function AirtimePurchaseScreen() {
                 { label: 'Network', value: selectedProv?.name || selectedNetwork },
                 { label: 'You pay', value: `₦${parsedAmount.toLocaleString()}`, highlight: true },
               ]}
+              walletBalanceKobo={afford.walletBalanceKobo}
+              requiredKobo={requiredKobo}
+              insufficientFunds={afford.insufficientFunds}
             />
 
             <ServiceSecureNote text="Secured payment · Instant delivery" />
 
             <ServiceContinueButton
-              label="Confirm Purchase"
+              label={afford.insufficientFunds ? 'Insufficient balance' : 'Confirm Purchase'}
               onPress={() => setShowLock(true)}
-              disabled={loading}
-              loading={loading}
+              disabled={loading || afford.insufficientFunds}
             />
 
             <ServiceEditLink onPress={() => setStep('details')} />
@@ -213,12 +221,18 @@ export default function AirtimePurchaseScreen() {
 
       <TransactionLockSheet
         visible={showLock}
-        onClose={() => setShowLock(false)}
+        onClose={() => {
+          if (loading) return;
+          setShowLock(false);
+        }}
         onAuthorized={handlePurchase}
         title="Confirm airtime purchase"
         subtitle={`Authorize ₦${parsedAmount.toLocaleString()} airtime to ${formatPhoneDisplay(phone)}`}
         amount={`₦${parsedAmount.toLocaleString()}`}
         processing={loading}
+        processingMessage="Sending your airtime"
+        processingSubmessage="Processing payment and delivering recharge"
+        processingIcon="phone-portrait-outline"
       />
     </ThemedScreen>
   );

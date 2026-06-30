@@ -1,5 +1,5 @@
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  View, Text, TouchableOpacity, StyleSheet,
   ScrollView, ActivityIndicator, Keyboard,
 } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
@@ -26,42 +26,17 @@ import {
 } from '../../src/components/purchase/ServicePurchaseUi';
 import { TransactionLockSheet } from '../../src/components/security/TransactionLockSheet';
 import type { TransactionAuthPayload } from '../../src/hooks/useTransactionLockAuth';
+import { useWalletAffordability } from '../../src/hooks/useWalletAffordability';
 import { getProviderLogo } from '../../src/lib/providers';
 import { useNetworkAutoDetect } from '../../src/hooks/useNetworkAutoDetect';
 import { useCachedDataCatalog, useCachedServiceProviders } from '../../src/hooks/useServiceCatalog';
 import { formatPhoneDisplay } from '../../src/lib/phone';
 import { ScreenBody } from '../../src/components/ui/ScreenBody';
+import { DataPlanPickerSheet, DataPlanSelectField } from '../../src/components/DataPlanPickerSheet';
 import {
   filterDataPlansByType,
   shouldShowDataTypeFilters,
 } from '../../src/lib/data-plans';
-
-function PlanCard({ plan, selected, onSelect }: { plan: DataPlan; selected: boolean; onSelect: () => void }) {
-  return (
-    <TouchableOpacity
-      style={[styles.planCard, selected && styles.planCardActive]}
-      onPress={onSelect} activeOpacity={0.75}
-    >
-      <View style={styles.planTop}>
-        <Text style={[styles.planName, selected && { color: Colors.primary }]}>{plan.name}</Text>
-        {selected ? (
-          <View style={styles.planCheck}>
-            <Ionicons name="checkmark" size={12} color={Colors.white} />
-          </View>
-        ) : null}
-      </View>
-      {plan.validity ? (
-        <View style={styles.planValidity}>
-          <Ionicons name="time-outline" size={11} color={Colors.muted} />
-          <Text style={styles.planValidityText}>{plan.validity}</Text>
-        </View>
-      ) : null}
-      <Text style={[styles.planPrice, selected && { color: Colors.primary }]}>
-        {formatCurrency(plan.price)}
-      </Text>
-    </TouchableOpacity>
-  );
-}
 
 export default function DataScreen() {
   const { balance, setBalance } = useWalletStore();
@@ -73,7 +48,7 @@ export default function DataScreen() {
   const [step, setStep] = useState<'details' | 'confirm'>('details');
   const [showLock, setShowLock] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState('');
+  const [showPlanPicker, setShowPlanPicker] = useState(false);
   const [selectedDataType, setSelectedDataType] = useState('all');
   const {
     onPhoneChange,
@@ -93,7 +68,7 @@ export default function DataScreen() {
     if (!selectedNetwork) return;
     setSelectedPlan(null);
     setSelectedDataType('all');
-    setSearch('');
+    setShowPlanPicker(false);
   }, [selectedNetwork]);
 
   const handleContinue = () => {
@@ -111,19 +86,20 @@ export default function DataScreen() {
         const balRes = await api.getWalletBalance();
         if (isResponseSuccess(balRes)) setBalance(parseWalletBalanceKobo(balRes.data));
         showToast({ type: 'success', text1: 'Data Activated! 📶', text2: `${selectedPlan!.name} sent to ${normalizedPhone}` });
-        setShowLock(false);
         setTimeout(() => { setPhone(''); setStep('details'); setSelectedPlan(null); setSelectedNetwork(''); }, 1500);
       } else {
         showToast({ type: 'error', text1: 'Purchase Failed', text2: res.message || 'Please try again' });
       }
     } catch (err: any) {
       showToast({ type: 'error', text1: 'Purchase Failed', text2: err?.data?.message || err?.message || 'Please try again' });
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+      setShowLock(false);
+    }
   };
 
   const showDataTypeFilters = shouldShowDataTypeFilters(plans);
   const typeFilteredPlans = filterDataPlansByType(plans, selectedDataType, showDataTypeFilters);
-  const filteredPlans = typeFilteredPlans.filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()));
 
   useEffect(() => {
     if (!showDataTypeFilters && selectedDataType !== 'all') {
@@ -132,6 +108,8 @@ export default function DataScreen() {
   }, [showDataTypeFilters, selectedDataType]);
 
   const selectedProv = providers.find(p => String(p.code || '').toLowerCase() === selectedNetwork.toLowerCase());
+  const requiredKobo = selectedPlan?.price ?? 0;
+  const afford = useWalletAffordability(requiredKobo, step === 'confirm');
 
   const handleBack = useCallback(() => {
     if (showLock) {
@@ -224,39 +202,13 @@ export default function DataScreen() {
             {selectedNetwork && (
               <ServicePurchaseCard>
                 <ServiceSectionLabel title="Select plan" icon="albums-outline" />
-                {loadingPlans ? (
-                  <View style={styles.loadRow}>
-                    <ActivityIndicator size="small" color={Colors.primary} />
-                    <Text style={styles.loadText}>Loading plans...</Text>
-                  </View>
-                ) : (
-                  <>
-                    <View style={styles.searchWrap}>
-                      <Ionicons name="search-outline" size={15} color={Colors.muted} />
-                      <TextInput
-                        style={styles.searchInput}
-                        placeholder="Search plans..."
-                        placeholderTextColor={Colors.mutedLight}
-                        value={search}
-                        onChangeText={setSearch}
-                      />
-                    </View>
-                    {filteredPlans.length === 0 ? (
-                      <Text style={styles.noPlans}>No plans available</Text>
-                    ) : (
-                      <View style={styles.planGrid}>
-                        {filteredPlans.slice(0, 20).map(p => (
-                          <PlanCard
-                            key={p.id}
-                            plan={p}
-                            selected={selectedPlan?.id === p.id}
-                            onSelect={() => setSelectedPlan(p)}
-                          />
-                        ))}
-                      </View>
-                    )}
-                  </>
-                )}
+                <DataPlanSelectField
+                  selectedPlan={selectedPlan}
+                  planCount={typeFilteredPlans.length}
+                  loading={loadingPlans}
+                  disabled={typeFilteredPlans.length === 0 && !loadingPlans}
+                  onPress={() => setShowPlanPicker(true)}
+                />
               </ServicePurchaseCard>
             )}
 
@@ -281,15 +233,17 @@ export default function DataScreen() {
                 { label: 'Validity', value: selectedPlan?.validity || '—' },
                 { label: 'You pay', value: formatCurrency(selectedPlan?.price ?? 0), highlight: true },
               ]}
+              walletBalanceKobo={afford.walletBalanceKobo}
+              requiredKobo={requiredKobo}
+              insufficientFunds={afford.insufficientFunds}
             />
 
             <ServiceSecureNote text="Secured payment · Instant activation" />
 
             <ServiceContinueButton
-              label="Confirm Purchase"
+              label={afford.insufficientFunds ? 'Insufficient balance' : 'Confirm Purchase'}
               onPress={() => setShowLock(true)}
-              disabled={loading}
-              loading={loading}
+              disabled={loading || afford.insufficientFunds}
             />
 
             <ServiceEditLink onPress={() => setStep('details')} />
@@ -298,14 +252,29 @@ export default function DataScreen() {
         </ScreenBody>
       </ScrollView>
 
+      <DataPlanPickerSheet
+        visible={showPlanPicker}
+        plans={typeFilteredPlans}
+        selectedPlanId={selectedPlan?.id}
+        loading={loadingPlans}
+        onClose={() => setShowPlanPicker(false)}
+        onSelect={setSelectedPlan}
+      />
+
       <TransactionLockSheet
         visible={showLock}
-        onClose={() => setShowLock(false)}
+        onClose={() => {
+          if (loading) return;
+          setShowLock(false);
+        }}
         onAuthorized={handlePurchase}
         title="Confirm data purchase"
         subtitle={`Authorize ${formatCurrency(selectedPlan?.price ?? 0)} for ${selectedPlan?.name || 'data bundle'}`}
         amount={formatCurrency(selectedPlan?.price ?? 0)}
         processing={loading}
+        processingMessage="Sending your data"
+        processingSubmessage="Processing payment and delivering bundle to your line"
+        processingIcon="wifi-outline"
       />
     </ThemedScreen>
   );
@@ -313,41 +282,6 @@ export default function DataScreen() {
 
 const styles = StyleSheet.create({
   scroll: { paddingBottom: 40 },
-  loadRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
-  loadText: { ...Typography.small, color: Colors.muted },
-  searchWrap: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: Colors.surface, borderRadius: Radius.md,
-    paddingHorizontal: 12, height: 44, marginBottom: 12,
-    borderWidth: 1, borderColor: Colors.border,
-  },
-  searchInput: { flex: 1, fontSize: 14, color: Colors.dark },
-  noPlans: { ...Typography.small, color: Colors.muted, textAlign: 'center', paddingVertical: 16 },
-  planGrid: { gap: 8 },
-  planCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    padding: 14,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-  },
-  planCardActive: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primaryMuted,
-  },
-  planTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  planName: { ...Typography.smallMed, color: Colors.dark, flex: 1 },
-  planCheck: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  planValidity: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 },
-  planValidityText: { ...Typography.caption, color: Colors.muted },
-  planPrice: { ...Typography.bodyMed, color: Colors.dark, fontWeight: '700' },
   typePills: { gap: 8, paddingVertical: 2 },
   typePill: {
     paddingHorizontal: 14,

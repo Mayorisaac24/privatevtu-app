@@ -12,9 +12,10 @@ type SecurityState = {
   isPrivacyMode: boolean;
   lastLeftAt: number | null;
   leftViaBackground: boolean;
+  lockReturnPath: string | null;
   prefs: SecurityPrefs;
   prefsLoaded: boolean;
-  lock: () => void;
+  lock: (returnPath?: string) => void;
   unlock: () => void;
   setPrivacyMode: (value: boolean) => void;
   markLeftApp: (viaBackground: boolean) => void;
@@ -28,16 +29,22 @@ export const useSecurityStore = create<SecurityState>((set, get) => ({
   isPrivacyMode: false,
   lastLeftAt: null,
   leftViaBackground: false,
+  lockReturnPath: null,
   prefs: DEFAULT_SECURITY_PREFS,
   prefsLoaded: false,
 
-  lock: () => set({ isLocked: true, isPrivacyMode: false }),
+  lock: (returnPath) => set((state) => ({
+    isLocked: true,
+    isPrivacyMode: false,
+    lockReturnPath: returnPath ?? state.lockReturnPath,
+  })),
 
   unlock: () => set({
     isLocked: false,
     isPrivacyMode: false,
     lastLeftAt: null,
     leftViaBackground: false,
+    lockReturnPath: null,
   }),
 
   setPrivacyMode: (value) => set({ isPrivacyMode: value }),

@@ -26,6 +26,14 @@ export {
   createVioletLightGradients,
 } from './colors/semantic';
 
+export {
+  colorWithAlpha,
+  getPurchaseConfirmGradient,
+  getNotificationTypePalette,
+  getToastVariantPalette,
+} from './colors/ui-semantics';
+export type { NotificationVisualType, ToastVariant } from './colors/ui-semantics';
+
 export { Colors, Gradients, useThemeStore } from './theme-store';
 export { ThemeProvider } from './ThemeProvider';
 export { useTheme, useColors, useGradients, useThemeId, useThemedStyles } from './hooks';

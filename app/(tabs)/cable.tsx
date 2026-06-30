@@ -21,10 +21,12 @@ import {
 } from '../../src/components/purchase/ServicePurchaseUi';
 import { TransactionLockSheet } from '../../src/components/security/TransactionLockSheet';
 import type { TransactionAuthPayload } from '../../src/hooks/useTransactionLockAuth';
+import { useWalletAffordability } from '../../src/hooks/useWalletAffordability';
 import { useCachedCablePlans, useCachedServiceProviders } from '../../src/hooks/useServiceCatalog';
 import { ScreenBody } from '../../src/components/ui/ScreenBody';
 import { CableProviderGrid } from '../../src/components/CableProviderGrid';
 import { getCableProviderDisplayName, getCableProviderLogo } from '../../src/lib/cable-providers';
+import { DataPlanPickerSheet, DataPlanSelectField } from '../../src/components/DataPlanPickerSheet';
 
 export default function CableScreen() {
   const { balance, setBalance } = useWalletStore();
@@ -38,10 +40,12 @@ export default function CableScreen() {
   const [showLock, setShowLock] = useState(false);
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [showPlanPicker, setShowPlanPicker] = useState(false);
 
   useEffect(() => {
     if (!selectedProvider) return;
     setSelectedPlan(null);
+    setShowPlanPicker(false);
   }, [selectedProvider]);
 
   const handleVerify = async () => {
@@ -75,18 +79,23 @@ export default function CableScreen() {
         const balRes = await api.getWalletBalance();
         if (isResponseSuccess(balRes)) setBalance(parseWalletBalanceKobo(balRes.data));
         showToast({ type: 'success', text1: 'Subscription Active! 📺', text2: `${selectedPlan!.name} activated for ${customerName}` });
-        setShowLock(false);
         setTimeout(() => { setSmartCard(''); setCustomerName(''); setSelectedPlan(null); setSelectedProvider(''); setStep('details'); }, 1500);
       } else {
         showToast({ type: 'error', text1: 'Subscription Failed', text2: res.message || 'Please try again' });
       }
     } catch (err: any) {
       showToast({ type: 'error', text1: 'Subscription Failed', text2: err?.data?.message || err?.message || 'Please try again' });
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+      setShowLock(false);
+    }
   };
 
   const selectedProv = providers.find(p => p.code === selectedProvider);
   const selectedProvName = selectedProv ? getCableProviderDisplayName(selectedProv) : selectedProvider;
+  const requiredKobo = selectedPlan?.price ?? 0;
+  const afford = useWalletAffordability(requiredKobo, step === 'confirm');
+  const canContinue = Boolean(customerName && selectedPlan);
 
   const handleSelectProvider = useCallback((code: string) => {
     setSelectedProvider(code);
@@ -168,39 +177,21 @@ export default function CableScreen() {
             {selectedProvider && customerName && (
               <ServicePurchaseCard>
                 <ServiceSectionLabel title="Select plan" icon="albums-outline" />
-                {loadingPlans ? (
-                  <View style={styles.loadRow}><ActivityIndicator size="small" color={Colors.primary} /><Text style={styles.loadText}>Loading plans...</Text></View>
-                ) : plans.length === 0 ? (
-                  <Text style={styles.noPlans}>No plans available</Text>
-                ) : (
-                  <View style={styles.planList}>
-                    {plans.map(p => {
-                      const sel = selectedPlan?.id === p.id;
-                      return (
-                        <TouchableOpacity key={p.id} style={[styles.planItem, sel && styles.planItemActive]}
-                          onPress={() => setSelectedPlan(p)} activeOpacity={0.75}>
-                          <View style={styles.planLeft}>
-                            <Text style={[styles.planName, sel && { color: Colors.primary }]}>{p.name}</Text>
-                            {p.validity && (
-                              <View style={styles.planValidity}>
-                                <Ionicons name="time-outline" size={11} color={Colors.muted} />
-                                <Text style={styles.planValidityText}>{p.validity}</Text>
-                              </View>
-                            )}
-                          </View>
-                          <View style={styles.planRight}>
-                            <Text style={[styles.planPrice, sel && { color: Colors.primary }]}>{formatCurrency(p.price)}</Text>
-                            {sel && <Ionicons name="checkmark-circle" size={16} color={Colors.primary} />}
-                          </View>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                )}
+                <DataPlanSelectField
+                  selectedPlan={selectedPlan}
+                  planCount={plans.length}
+                  loading={loadingPlans}
+                  disabled={plans.length === 0 && !loadingPlans}
+                  onPress={() => setShowPlanPicker(true)}
+                />
               </ServicePurchaseCard>
             )}
 
-            <ServiceContinueButton label="Continue" onPress={handleContinue} />
+            <ServiceContinueButton
+              label="Continue"
+              onPress={handleContinue}
+              disabled={!canContinue}
+            />
           </>
         )}
 
@@ -221,13 +212,15 @@ export default function CableScreen() {
                 { label: 'Validity', value: selectedPlan?.validity || '—' },
                 { label: 'You pay', value: formatCurrency(selectedPlan?.price ?? 0), highlight: true },
               ]}
+              walletBalanceKobo={afford.walletBalanceKobo}
+              requiredKobo={requiredKobo}
+              insufficientFunds={afford.insufficientFunds}
             />
 
             <ServiceContinueButton
-              label="Confirm Subscription"
+              label={afford.insufficientFunds ? 'Insufficient balance' : 'Confirm Subscription'}
               onPress={() => setShowLock(true)}
-              disabled={loading}
-              loading={loading}
+              disabled={loading || afford.insufficientFunds}
             />
 
             <ServiceEditLink onPress={() => setStep('details')} />
@@ -236,14 +229,30 @@ export default function CableScreen() {
       </ScreenBody>
       </ScrollView>
 
+      <DataPlanPickerSheet
+        visible={showPlanPicker}
+        plans={plans}
+        selectedPlanId={selectedPlan?.id}
+        loading={loadingPlans}
+        title="Select cable plan"
+        onClose={() => setShowPlanPicker(false)}
+        onSelect={(plan) => setSelectedPlan(plan as CablePlan)}
+      />
+
       <TransactionLockSheet
         visible={showLock}
-        onClose={() => setShowLock(false)}
+        onClose={() => {
+          if (loading) return;
+          setShowLock(false);
+        }}
         onAuthorized={handlePurchase}
         title="Confirm cable subscription"
         subtitle={`Authorize ${formatCurrency(selectedPlan?.price ?? 0)} for ${selectedPlan?.name || 'subscription'}`}
         amount={formatCurrency(selectedPlan?.price ?? 0)}
         processing={loading}
+        processingMessage="Processing subscription"
+        processingSubmessage="Activating your cable TV plan"
+        processingIcon="tv-outline"
       />
     </ThemedScreen>
   );
@@ -251,8 +260,6 @@ export default function CableScreen() {
 
 const styles = StyleSheet.create({
   scroll: { paddingBottom: 40 },
-  loadRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
-  loadText: { ...Typography.small, color: Colors.muted },
   verifyRow: { flexDirection: 'row', gap: 8 },
   inputWrap: {
     flexDirection: 'row',
@@ -279,14 +286,4 @@ const styles = StyleSheet.create({
     borderColor: Colors.success + '33',
   },
   customerText: { ...Typography.smallMed, color: Colors.successDark },
-  noPlans: { ...Typography.small, color: Colors.muted, textAlign: 'center', paddingVertical: 16 },
-  planList: { gap: 8 },
-  planItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: Colors.surface, borderRadius: Radius.md, padding: 14, borderWidth: 1.5, borderColor: 'transparent' },
-  planItemActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryMuted },
-  planLeft: { flex: 1 },
-  planName: { ...Typography.smallMed, color: Colors.dark, marginBottom: 4 },
-  planValidity: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  planValidityText: { ...Typography.caption, color: Colors.muted },
-  planRight: { alignItems: 'flex-end', gap: 4 },
-  planPrice: { ...Typography.bodyMed, color: Colors.dark, fontWeight: '700' },
 });

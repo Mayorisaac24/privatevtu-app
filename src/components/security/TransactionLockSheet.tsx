@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,8 @@ import { useColors, useGradients } from '../../theme/hooks';
 import { gradientStops } from '../../theme/gradient-utils';
 import { PinDots, PinKeypad } from './PinKeypad';
 import { isAndroid } from '../../lib/platform-ui';
+import { showToast } from '../ui/Toast';
+import { LoadingOverlay } from '../ui/LoadingOverlay';
 
 type TransactionLockSheetProps = {
   visible: boolean;
@@ -27,6 +29,9 @@ type TransactionLockSheetProps = {
   subtitle?: string;
   amount?: string;
   processing?: boolean;
+  processingMessage?: string;
+  processingSubmessage?: string;
+  processingIcon?: keyof typeof Ionicons.glyphMap;
 };
 
 function recipientFromSubtitle(subtitle?: string): string | null {
@@ -43,6 +48,9 @@ export function TransactionLockSheet({
   subtitle = 'Confirm with your PIN or biometrics to complete this payment.',
   amount,
   processing = false,
+  processingMessage = 'Processing payment…',
+  processingSubmessage,
+  processingIcon = 'sparkles',
 }: TransactionLockSheetProps) {
   useStatusBarStyle('light');
   const insets = useSafeAreaInsets();
@@ -59,8 +67,13 @@ export function TransactionLockSheet({
     prefsReady,
     retryBiometric,
     buildAuthPayload,
+    buildBiometricAuthPayload,
     resetAuth,
+    clearBiometricVerification,
   } = useTransactionLockAuth(visible);
+  const authInFlightRef = useRef(false);
+  const biometricAutoSubmitRef = useRef(false);
+  const lastSubmittedPinRef = useRef('');
 
   const recipient = recipientFromSubtitle(subtitle);
 
@@ -72,23 +85,51 @@ export function TransactionLockSheet({
     });
   }, []);
 
-  const finishAuth = useCallback(async (payload: TransactionAuthPayload | null) => {
+  const submitAuthorization = useCallback(async (
+    payload: TransactionAuthPayload | null,
+    source: 'pin' | 'biometric',
+  ) => {
     if (!payload) {
       setPin('');
+      clearBiometricVerification();
+      showToast({
+        type: 'error',
+        text1: 'Authorization failed',
+        text2: source === 'biometric'
+          ? 'Biometric payment is not set up. Use your PIN instead.'
+          : 'Enter your 4-digit PIN to continue.',
+      });
       return;
     }
+    if (authInFlightRef.current) {
+      return;
+    }
+
+    authInFlightRef.current = true;
+    setPin('');
     setAuthorizing(true);
     try {
       await onAuthorized(payload);
-    } catch {
+    } catch (err) {
       setPin('');
+      lastSubmittedPinRef.current = '';
+      showToast({
+        type: 'error',
+        text1: 'Payment failed',
+        text2: err instanceof Error ? err.message : 'Please try again',
+      });
     } finally {
       setAuthorizing(false);
+      authInFlightRef.current = false;
+      clearBiometricVerification();
     }
-  }, [onAuthorized]);
+  }, [clearBiometricVerification, onAuthorized]);
 
   useEffect(() => {
     if (!visible) {
+      authInFlightRef.current = false;
+      biometricAutoSubmitRef.current = false;
+      lastSubmittedPinRef.current = '';
       setPin('');
       setBioLoading(false);
       setAuthorizing(false);
@@ -97,33 +138,81 @@ export function TransactionLockSheet({
   }, [visible, resetAuth]);
 
   useEffect(() => {
-    if (!visible || !biometricVerified || authorizing || processing) return;
-    void (async () => {
-      const payload = await buildAuthPayload('');
-      await finishAuth(payload);
-    })();
-  }, [visible, biometricVerified, buildAuthPayload, finishAuth, authorizing, processing]);
+    if (pin.length < 4) {
+      lastSubmittedPinRef.current = '';
+    }
+  }, [pin]);
 
   useEffect(() => {
-    if (pin.length !== 4 || authorizing || processing) return;
+    if (
+      !visible
+      || !prefsReady
+      || !biometricVerified
+      || authorizing
+      || processing
+      || authInFlightRef.current
+      || biometricAutoSubmitRef.current
+    ) {
+      return;
+    }
+
+    biometricAutoSubmitRef.current = true;
+    void (async () => {
+      const payload = await buildBiometricAuthPayload();
+      if (!payload) {
+        biometricAutoSubmitRef.current = false;
+      }
+      await submitAuthorization(payload, 'biometric');
+    })();
+  }, [
+    visible,
+    prefsReady,
+    biometricVerified,
+    authorizing,
+    processing,
+    buildBiometricAuthPayload,
+    submitAuthorization,
+  ]);
+
+  useEffect(() => {
+    if (pin.length !== 4 || authorizing || processing || authInFlightRef.current) return;
+    if (lastSubmittedPinRef.current === pin) return;
+
+    lastSubmittedPinRef.current = pin;
     void (async () => {
       const payload = await buildAuthPayload(pin);
-      await finishAuth(payload);
+      await submitAuthorization(payload, 'pin');
     })();
-  }, [pin, buildAuthPayload, finishAuth, authorizing, processing]);
+  }, [pin, buildAuthPayload, submitAuthorization, authorizing, processing]);
 
   const handleBiometric = async () => {
+    if (authorizing || bioLoading || processing || authInFlightRef.current || biometricAutoSubmitRef.current) return;
+    biometricAutoSubmitRef.current = true;
     setBioLoading(true);
     try {
-      await retryBiometric();
+      const ok = await retryBiometric();
+      if (!ok) {
+        biometricAutoSubmitRef.current = false;
+        return;
+      }
+      const payload = await buildBiometricAuthPayload();
+      if (!payload) {
+        biometricAutoSubmitRef.current = false;
+      }
+      await submitAuthorization(payload, 'biometric');
     } finally {
       setBioLoading(false);
     }
   };
 
-  const busy = processing || authorizing || bioLoading;
-  const showBiometric = biometricEnabled && !biometricVerified;
-  const statusLabel = processing ? 'Processing payment…' : 'Authorizing…';
+  const busy = authorizing || bioLoading || processing;
+  const showBiometric = biometricEnabled && !biometricVerified && !authorizing && !processing;
+  const showProcessingOverlay = authorizing || processing;
+  const overlayMessage = processing ? processingMessage : 'Authorizing…';
+  const overlaySubmessage = processing
+    ? processingSubmessage
+    : 'Verifying your PIN or biometrics';
+  const overlayIcon = processing ? processingIcon : 'shield-checkmark';
 
   return (
     <Modal
@@ -203,15 +292,7 @@ export function TransactionLockSheet({
             ) : (
               <View style={styles.pinBlock}>
                 <PinDots value={pin} variant="light" size="lg" />
-
-                {(authorizing || processing) ? (
-                  <View style={styles.statusRow}>
-                    <ActivityIndicator color={colors.primary} size="small" />
-                    <Text style={[styles.statusText, { color: colors.muted }]}>{statusLabel}</Text>
-                  </View>
-                ) : (
-                  <View style={styles.statusSpacer} />
-                )}
+                <View style={styles.statusSpacer} />
               </View>
             )}
           </View>
@@ -247,6 +328,14 @@ export function TransactionLockSheet({
             </View>
           </View>
         </LinearGradient>
+
+        <LoadingOverlay
+          embedded
+          visible={showProcessingOverlay}
+          message={overlayMessage}
+          submessage={overlaySubmessage}
+          icon={overlayIcon}
+        />
       </View>
     </Modal>
   );

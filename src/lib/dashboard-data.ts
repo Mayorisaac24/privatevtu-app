@@ -10,6 +10,8 @@ import { preloadTransferBanks } from './transfer-banks-cache';
 import { preloadRecentTransferRecipients } from './transfer-recipients-cache';
 import { preloadNumberPrefixes } from './number-prefix-cache';
 import { preloadServiceCatalog } from './service-catalog-cache';
+import { preloadEducationCatalog } from './education-catalog-cache';
+import { preloadSupportContent } from './support-cache';
 import { preloadVtuProviders } from './vtu-providers-cache';
 import { getKycStatusData } from './kyc-status-cache';
 import { preloadTwoFactorMethods, getTwoFactorMethods } from './two-factor-methods-cache';
@@ -44,6 +46,8 @@ function scheduleDeferredPreloads() {
     preloadWalletFundingData();
     preloadNumberPrefixes();
     preloadServiceCatalog();
+    preloadEducationCatalog();
+    preloadSupportContent();
   }, DEFERRED_PRELOAD_DELAY_MS);
 }
 
@@ -55,6 +59,7 @@ let homeLastUpdated: Date | null = null;
 let dashboardInflight: Promise<void> | null = null;
 let historyInflight: Promise<void> | null = null;
 let insightsInflight: Promise<void> | null = null;
+let statsInflight: Promise<void> | null = null;
 let walletFundingInflight: Promise<void> | null = null;
 let walletFundingFetchedAt: number | null = null;
 let prefetchInflight: Promise<void> | null = null;

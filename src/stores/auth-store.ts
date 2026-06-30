@@ -70,6 +70,10 @@ export const useAuthStore = create<AuthState>()(
         resetTransferRecipientsCache();
         resetVerifiedAccountsCache();
         resetServiceCatalogCache();
+        const { resetEducationCatalogCache } = await import('../lib/education-catalog-cache');
+        const { resetSupportCache } = await import('../lib/support-cache');
+        resetEducationCatalogCache();
+        resetSupportCache();
         resetCatalogRevisionSync();
         set({ accessToken: null, user: null, isAuthenticated: false, error: null });
       },

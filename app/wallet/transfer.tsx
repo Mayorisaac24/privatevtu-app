@@ -52,11 +52,12 @@ import { TransferSuccessModal } from '../../src/components/TransferSuccessModal'
 import { BankLogo } from '../../src/components/BankLogo';
 import { promptTransferScanSource, scanTransferDetails } from '../../src/lib/transfer-scan';
 import { refreshDashboardData, refreshHistoryData } from '../../src/lib/dashboard-data';
+import { useNotificationsStore } from '../../src/stores/notifications-store';
+import { useWalletAffordability } from '../../src/hooks/useWalletAffordability';
 import { useWalletStore } from '../../src/stores';
 import { Colors, Gradients, Spacing, Radius, Shadow } from '../../src/theme';
 import { useColors, useGradients } from '../../src/theme/hooks';
 import { gradientStops } from '../../src/theme/gradient-utils';
-import { LoadingOverlay } from '../../src/components/ui/LoadingOverlay';
 import { ThemedScreen } from '../../src/components/ui/ThemedScreen';
 import { GradientButton } from '../../src/components/ui/GradientButton';
 import { GlassCard } from '../../src/components/ui/GlassCard';
@@ -171,6 +172,8 @@ export default function TransferScreen() {
     accountName: string;
   } | null>(null);
   const banksHydrated = useRef(false);
+  const transferIdempotencyKeyRef = useRef<string | null>(null);
+  const transferSubmittingRef = useRef(false);
 
   const isAccountVerified = Boolean(
     accountName
@@ -232,6 +235,9 @@ export default function TransferScreen() {
     [numericAmount, transferConfig.feeType, transferConfig.feeValue],
   );
   const totalDebit = (Number.isFinite(numericAmount) ? numericAmount : 0) + transferFee;
+  const totalDebitKobo = Math.round(totalDebit * 100);
+  const afford = useWalletAffordability(totalDebitKobo, step === 'confirm');
+  const { insufficientFunds, walletBalanceNaira } = afford;
 
   const selectedBankDisplay = selectedBank ? enrichTransferBank(selectedBank) : null;
 
@@ -341,6 +347,15 @@ export default function TransferScreen() {
       setLoadingBanks(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (step !== 'confirm') return;
+    void api.getWalletBalance()
+      .then((res) => {
+        if (isResponseSuccess(res)) setBalance(parseWalletBalanceKobo(res.data));
+      })
+      .catch(() => {});
+  }, [setBalance, step]);
 
   useEffect(() => {
     preloadTransferBanks();
@@ -515,6 +530,9 @@ export default function TransferScreen() {
             clearInterval(timer);
             void refreshDashboardData({ force: true });
             void refreshHistoryData({ force: true });
+            const { fetchNotifications, fetchUnreadCount } = useNotificationsStore.getState();
+            void fetchNotifications({ refresh: true, page: 1 });
+            void fetchUnreadCount();
           }
         }
       } catch {
@@ -596,7 +614,39 @@ export default function TransferScreen() {
     setStep('confirm');
   };
 
-  const handleTransfer = async (auth: TransactionAuthPayload) => {
+  const openTransferLock = useCallback(() => {
+    if (insufficientFunds) {
+      showToast({
+        type: 'error',
+        text1: 'Insufficient balance',
+        text2: `You need ₦${totalDebit.toLocaleString()} but have ₦${walletBalanceNaira.toLocaleString()}`,
+      });
+      return;
+    }
+    transferSubmittingRef.current = false;
+    transferIdempotencyKeyRef.current = `xfer-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    setShowLock(true);
+  }, [insufficientFunds, totalDebit, walletBalanceNaira]);
+
+  const handleTransfer = useCallback(async (auth: TransactionAuthPayload) => {
+    if (transferSubmittingRef.current) {
+      showToast({
+        type: 'error',
+        text1: 'Please wait',
+        text2: 'Your transfer is already being processed',
+      });
+      return;
+    }
+    if (insufficientFunds) {
+      showToast({
+        type: 'error',
+        text1: 'Insufficient balance',
+        text2: `You need ₦${totalDebit.toLocaleString()} but have ₦${walletBalanceNaira.toLocaleString()}`,
+      });
+      return;
+    }
+
+    transferSubmittingRef.current = true;
     setLoading(true);
     try {
       const res = await api.initiateTransfer({
@@ -605,6 +655,7 @@ export default function TransferScreen() {
         accountName,
         amount: numericAmount,
         narration: narration || `Transfer to ${accountName}`,
+        idempotencyKey: transferIdempotencyKeyRef.current || undefined,
         ...auth,
       });
       if (isResponseSuccess(res)) {
@@ -621,7 +672,7 @@ export default function TransferScreen() {
           reference: res.data?.reference,
         });
         setShowSuccessModal(true);
-        setShowLock(false);
+        transferIdempotencyKeyRef.current = null;
         setRecentRecipients(
           upsertRecentTransferRecipient({
             accountNumber,
@@ -634,7 +685,12 @@ export default function TransferScreen() {
           pollTransferCompletion(res.data.reference, res.data.sessionId);
         }
       } else {
-        showToast({ type: 'error', text1: 'Transfer failed', text2: res.message || 'Please try again' });
+        const message = res.message || 'Please try again';
+        showToast({
+          type: 'error',
+          text1: /insufficient/i.test(message) ? 'Insufficient balance' : 'Transfer failed',
+          text2: message,
+        });
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Please try again';
@@ -645,12 +701,31 @@ export default function TransferScreen() {
           text2: 'Your transfer may still complete. Check your wallet and history shortly.',
         });
       } else {
-        showToast({ type: 'error', text1: 'Transfer failed', text2: message });
+        showToast({
+          type: 'error',
+          text1: /insufficient/i.test(message) ? 'Insufficient balance' : 'Transfer failed',
+          text2: message,
+        });
       }
     } finally {
+      transferSubmittingRef.current = false;
       setLoading(false);
+      setShowLock(false);
     }
-  };
+  }, [
+    accountName,
+    accountNumber,
+    displayAccount,
+    insufficientFunds,
+    narration,
+    numericAmount,
+    pollTransferCompletion,
+    selectedBank,
+    selectedBankDisplay?.shortName,
+    totalDebit,
+    transferFee,
+    walletBalanceNaira,
+  ]);
 
   const openBankPicker = useCallback(() => {
     if (recentEditMode) cancelRecentEdit();
@@ -789,7 +864,7 @@ export default function TransferScreen() {
           </View>
           <View style={styles.stepLine} />
           <View style={[styles.stepPill, step === 'confirm' && styles.stepPillActive]}>
-            <Text style={[styles.stepText, step === 'confirm' && styles.stepTextActive]}>2. Confirm</Text>
+            <Text style={[styles.stepText, step === 'confirm' && styles.stepTextActive]}>2. Order details</Text>
           </View>
         </View>
       </LinearGradient>
@@ -1210,6 +1285,17 @@ export default function TransferScreen() {
                   ) : null}
 
                   <View style={styles.confirmTotals}>
+                    <View style={styles.confirmTotalCol}>
+                      <Text style={styles.confirmTotalLabel}>Wallet balance</Text>
+                      <Text style={[
+                        styles.confirmTotalValue,
+                        insufficientFunds && styles.confirmTotalValueError,
+                      ]}
+                      >
+                        ₦{walletBalanceNaira.toLocaleString()}
+                      </Text>
+                    </View>
+                    <View style={styles.confirmTotalDivider} />
                     {transferFee > 0 ? (
                       <>
                         <View style={styles.confirmTotalCol}>
@@ -1224,6 +1310,18 @@ export default function TransferScreen() {
                       <Text style={styles.confirmTotalValueStrong}>₦{totalDebit.toLocaleString()}</Text>
                     </View>
                   </View>
+
+                  {insufficientFunds ? (
+                    <View style={styles.insufficientBanner}>
+                      <Ionicons name="warning-outline" size={18} color={Colors.error} />
+                      <View style={styles.insufficientBannerText}>
+                        <Text style={styles.insufficientTitle}>Insufficient balance</Text>
+                        <Text style={styles.insufficientBody}>
+                          Available: ₦{walletBalanceNaira.toLocaleString()} · Required: ₦{totalDebit.toLocaleString()}
+                        </Text>
+                      </View>
+                    </View>
+                  ) : null}
                 </View>
               </GlassCard>
             </>
@@ -1242,10 +1340,10 @@ export default function TransferScreen() {
             />
           ) : (
             <GradientButton
-              title={`Send ₦${(transferFee > 0 ? totalDebit : numericAmount).toLocaleString()}`}
-              onPress={() => setShowLock(true)}
-              disabled={loading}
-              isLoading={loading}
+              title={insufficientFunds ? 'Insufficient balance' : `Send ₦${(transferFee > 0 ? totalDebit : numericAmount).toLocaleString()}`}
+              onPress={openTransferLock}
+              disabled={loading || insufficientFunds}
+              inactive={insufficientFunds}
               size="compact"
               leftIcon={<Ionicons name="paper-plane" size={17} color={Colors.white} />}
             />
@@ -1268,19 +1366,19 @@ export default function TransferScreen() {
 
       <TransactionLockSheet
         visible={showLock}
-        onClose={() => setShowLock(false)}
+        onClose={() => {
+          if (loading) return;
+          transferIdempotencyKeyRef.current = null;
+          setShowLock(false);
+        }}
         onAuthorized={handleTransfer}
         title="Confirm transfer"
         subtitle={`Authorize ₦${(transferFee > 0 ? totalDebit : numericAmount).toLocaleString()} to ${accountName}`}
         amount={`₦${(transferFee > 0 ? totalDebit : numericAmount).toLocaleString()}`}
         processing={loading}
-      />
-
-      <LoadingOverlay
-        visible={loading}
-        message="Sending your transfer"
-        submessage="Securing payment and confirming with your bank"
-        icon="paper-plane"
+        processingMessage="Sending your payment"
+        processingSubmessage="Transferring money securely to the recipient's account"
+        processingIcon="paper-plane"
       />
 
       {successMeta && (
@@ -1936,6 +2034,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   confirmTotalValue: { fontSize: 15, fontWeight: '700', color: Colors.mid },
+  confirmTotalValueError: { color: Colors.error },
   confirmTotalLabelStrong: {
     fontSize: 10,
     fontWeight: '700',
@@ -1944,6 +2043,31 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   confirmTotalValueStrong: { fontSize: 18, fontWeight: '800', color: Colors.primary },
+  insufficientBanner: {
+    marginTop: 16,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    padding: 12,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.errorLight,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.18)',
+  },
+  insufficientBannerText: {
+    flex: 1,
+    gap: 2,
+  },
+  insufficientTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.errorDark,
+  },
+  insufficientBody: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: Colors.error,
+  },
   pinCard: {
     gap: 14,
   },

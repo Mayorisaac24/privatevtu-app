@@ -49,11 +49,17 @@ const TYPE_META: Record<string, Omit<TxDisplayMeta, 'isCredit'>> = {
   BETTING: { icon: 'trophy-outline', label: 'Betting', ...BRAND_TX_ICON },
 };
 
-function normalizeStatus(status?: string): DisplayStatus {
+const INSTANT_SERVICE_TYPES = ['AIRTIME', 'DATA', 'ELECTRICITY', 'CABLE', 'EDUCATION', 'BETTING'];
+
+function normalizeStatus(status?: string, type?: string): DisplayStatus {
   const value = String(status || '').toLowerCase();
+  const txType = String(type || '').toUpperCase();
   if (value === 'successful' || value === 'success' || value === 'completed') return 'successful';
   if (value === 'failed' || value === 'reversed') return 'failed';
-  if (value === 'processing') return 'processing';
+  if (value === 'processing') {
+    if (INSTANT_SERVICE_TYPES.includes(txType)) return 'successful';
+    return 'processing';
+  }
   return 'pending';
 }
 
@@ -136,7 +142,9 @@ function readMetaString(metadata: unknown, key: string): string {
 
 export function enrichTransaction(tx: Transaction): EnrichedTransaction {
   const txType = String(tx.type || '').toUpperCase();
-  const displayStatus = normalizeStatus(tx.displayStatus || tx.status);
+  const displayStatus = tx.displayStatus
+    ? normalizeStatus(tx.displayStatus)
+    : normalizeStatus(tx.status, txType);
   const category = tx.category || normalizeCategory(txType);
   const metadata = tx.metadata;
   const network = String(tx.provider || tx.network || '').trim();

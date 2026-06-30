@@ -92,7 +92,6 @@ export default function ProgramsScreen() {
           text1: 'Upgrade successful',
           text2: res.message || `You are now on ${selectedProgram.toUserType.name}`,
         });
-        setShowAuth(false);
         setSelectedProgram(null);
         const balRes = await api.getWalletBalance();
         if (isResponseSuccess(balRes)) {
@@ -119,6 +118,7 @@ export default function ProgramsScreen() {
       }
     } finally {
       setProcessing(false);
+      setShowAuth(false);
     }
   };
 
@@ -225,10 +225,9 @@ export default function ProgramsScreen() {
       <TransactionLockSheet
         visible={showAuth}
         onClose={() => {
-          if (!processing) {
-            setShowAuth(false);
-            setSelectedProgram(null);
-          }
+          if (processing) return;
+          setShowAuth(false);
+          setSelectedProgram(null);
         }}
         onAuthorized={handleUpgrade}
         title="Confirm upgrade"
@@ -243,6 +242,9 @@ export default function ProgramsScreen() {
             : undefined
         }
         processing={processing}
+        processingMessage="Processing upgrade"
+        processingSubmessage="Updating your account tier"
+        processingIcon="ribbon-outline"
       />
     </ProfileSubScreen>
   );

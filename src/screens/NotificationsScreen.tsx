@@ -6,8 +6,11 @@ import {
   FlatList,
   RefreshControl,
   ActivityIndicator,
+  Alert,
+  ActionSheetIOS,
+  Platform,
 } from 'react-native';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
 import { navigateBack } from '../lib/navigation';
@@ -15,11 +18,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNotificationsStore } from '../stores/notifications-store';
 import { type AppNotification, type AppNotificationType } from '../lib/api';
-import { Colors, Spacing, Radius } from '../theme';
+import { Colors, Spacing, getNotificationTypePalette, useColors } from '../theme';
 import { ThemedScreen } from '../components/ui/ThemedScreen';
 import { GlassCard } from '../components/ui/GlassCard';
 import { GlassSurface } from '../components/ui/GlassSurface';
-
+import { showToast } from '../components/ui/Toast';
 
 const FILTERS = [
   { key: 'all' as const, label: 'All' },
@@ -60,37 +63,56 @@ function iconForType(type: AppNotificationType): keyof typeof Ionicons.glyphMap 
   }
 }
 
-function paletteForType(type: AppNotificationType) {
-  switch (type) {
-    case 'success':
-      return { bg: '#ECFDF5', color: '#059669' };
-    case 'error':
-      return { bg: '#FEF2F2', color: '#DC2626' };
-    case 'warning':
-      return { bg: '#FFFBEB', color: '#D97706' };
-    default:
-      return { bg: Colors.primaryMuted, color: Colors.primary };
-  }
+function notificationCategoryLabel(item: AppNotification) {
+  if (item.category === 'SECURITY' || item.data?.alertType === 'login_alert') return 'Security';
+  if (typeof item.data?.type === 'string' && item.data.type.startsWith('dispute_')) return 'Support';
+  if (item.category === 'MARKETING' || item.data?.type === 'admin_broadcast') return 'Promotional';
+  if (item.data?.type === 'kyc_document_review') return 'KYC';
+  if (item.category === 'TRANSACTIONAL' || item.data?.category === 'transaction') return 'Transaction';
+  if (item.category === 'SYSTEM') return 'System';
+  return 'Update';
 }
 
 function NotificationRow({
   item,
+  selected,
+  selectionMode,
   onPress,
+  onLongPress,
+  onToggleSelect,
 }: {
   item: AppNotification;
+  selected: boolean;
+  selectionMode: boolean;
   onPress: (item: AppNotification) => void;
+  onLongPress: (item: AppNotification) => void;
+  onToggleSelect: (item: AppNotification) => void;
 }) {
-  const palette = paletteForType(item.type);
+  const colors = useColors();
+  const palette = getNotificationTypePalette(item.type, colors);
 
   return (
-    <TouchableOpacity activeOpacity={0.85} onPress={() => onPress(item)}>
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={() => (selectionMode ? onToggleSelect(item) : onPress(item))}
+      onLongPress={() => onLongPress(item)}
+    >
       <GlassCard
         variant={item.isRead ? 'light' : 'tinted'}
         borderRadius={16}
         padding={14}
-        style={styles.rowCard}
+        style={[styles.rowCard, selected && styles.rowCardSelected]}
       >
         <View style={styles.rowTop}>
+          {selectionMode ? (
+            <TouchableOpacity
+              style={[styles.checkbox, selected && styles.checkboxSelected]}
+              onPress={() => onToggleSelect(item)}
+              activeOpacity={0.8}
+            >
+              {selected ? <Ionicons name="checkmark" size={14} color={Colors.white} /> : null}
+            </TouchableOpacity>
+          ) : null}
           <View style={[styles.iconBadge, { backgroundColor: palette.bg }]}>
             <Ionicons name={iconForType(item.type)} size={18} color={palette.color} />
           </View>
@@ -99,12 +121,15 @@ function NotificationRow({
               <Text style={[styles.rowTitle, !item.isRead && styles.rowTitleUnread]} numberOfLines={1}>
                 {item.title}
               </Text>
-              {!item.isRead ? <View style={styles.unreadDot} /> : null}
+              {!item.isRead && !selectionMode ? <View style={styles.unreadDot} /> : null}
             </View>
+            <Text style={styles.rowCategory}>{notificationCategoryLabel(item)}</Text>
             <Text style={styles.rowMessage} numberOfLines={2}>{item.message}</Text>
           </View>
         </View>
-        <Text style={styles.rowTime}>{formatWhen(item.createdAt)}</Text>
+        <Text style={[styles.rowTime, selectionMode && styles.rowTimeWithCheckbox]}>
+          {formatWhen(item.createdAt)}
+        </Text>
       </GlassCard>
     </TouchableOpacity>
   );
@@ -125,17 +150,26 @@ export default function NotificationsScreen() {
     filter,
     pagination,
     fetchNotifications,
-    fetchUnreadCount,
+    refreshIfStale,
     setFilter,
     markAllRead,
+    markAllUnread,
+    bulkAction,
   } = useNotificationsStore();
+
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   useFocusEffect(
     useCallback(() => {
-      void fetchNotifications({ refresh: true, page: 1 });
-      void fetchUnreadCount();
-    }, [fetchNotifications, fetchUnreadCount]),
+      void refreshIfStale();
+    }, [refreshIfStale]),
   );
+
+  const exitSelectionMode = useCallback(() => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  }, []);
 
   const rows = useMemo(() => {
     const output: ListRow[] = [];
@@ -158,69 +192,177 @@ export default function NotificationsScreen() {
     });
   }, []);
 
+  const onLongPressItem = useCallback((item: AppNotification) => {
+    setSelectionMode(true);
+    setSelectedIds(new Set([item.id]));
+  }, []);
+
+  const toggleSelect = useCallback((item: AppNotification) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(item.id)) next.delete(item.id);
+      else next.add(item.id);
+      return next;
+    });
+  }, []);
+
+  const selectAllVisible = useCallback(() => {
+    setSelectedIds(new Set(items.map((item) => item.id)));
+  }, [items]);
+
+  const runBulk = useCallback(async (action: 'read' | 'unread' | 'delete') => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+
+    if (action === 'delete') {
+      Alert.alert(
+        ids.length === 1 ? 'Delete notification?' : `Delete ${ids.length} notifications?`,
+        'This cannot be undone.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => {
+              void (async () => {
+                const ok = await bulkAction(ids, 'delete');
+                if (ok) {
+                  showToast({ type: 'success', text1: 'Deleted', text2: `${ids.length} notification(s) removed` });
+                  exitSelectionMode();
+                }
+              })();
+            },
+          },
+        ],
+      );
+      return;
+    }
+
+    const ok = await bulkAction(ids, action);
+    if (ok) {
+      showToast({
+        type: 'success',
+        text1: action === 'read' ? 'Marked as read' : 'Marked as unread',
+      });
+      exitSelectionMode();
+    }
+  }, [bulkAction, exitSelectionMode, selectedIds]);
+
+  const openInboxActions = useCallback(() => {
+    const options = ['Mark all as read', 'Mark all as unread', 'Select notifications', 'Cancel'];
+    const cancelButtonIndex = 3;
+
+    const onSelect = (index?: number) => {
+      if (index === 0) void markAllRead();
+      else if (index === 1) void markAllUnread();
+      else if (index === 2) setSelectionMode(true);
+    };
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options, cancelButtonIndex },
+        onSelect,
+      );
+      return;
+    }
+
+    Alert.alert('Inbox actions', undefined, [
+      { text: 'Mark all as read', onPress: () => onSelect(0) },
+      { text: 'Mark all as unread', onPress: () => onSelect(1) },
+      { text: 'Select notifications', onPress: () => onSelect(2) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }, [markAllRead, markAllUnread]);
+
   const loadMore = useCallback(() => {
-    if (loading || refreshing || !pagination) return;
+    if (loading || refreshing || !pagination || selectionMode) return;
     if (pagination.page >= pagination.totalPages) return;
     void fetchNotifications({ page: pagination.page + 1 });
-  }, [fetchNotifications, loading, pagination, refreshing]);
+  }, [fetchNotifications, loading, pagination, refreshing, selectionMode]);
+
+  const selectedCount = selectedIds.size;
 
   return (
     <ThemedScreen>
-
       <GlassSurface
         variant="light"
         borderRadius={0}
         style={[styles.headerShell, { paddingTop: insets.top + 8 }]}
         contentStyle={styles.headerContent}
       >
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigateBack()} activeOpacity={0.8}>
-          <Ionicons name="arrow-back" size={22} color={Colors.dark} />
-        </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Notifications</Text>
-          {unreadCount > 0 ? (
-            <Text style={styles.headerSub}>{unreadCount} unread</Text>
-          ) : (
-            <Text style={styles.headerSub}>You&apos;re all caught up</Text>
-          )}
-        </View>
         <TouchableOpacity
-          style={styles.markAllBtn}
-          onPress={() => void markAllRead()}
-          disabled={unreadCount === 0}
+          style={styles.backBtn}
+          onPress={() => (selectionMode ? exitSelectionMode() : navigateBack())}
           activeOpacity={0.8}
         >
-          <Text style={[styles.markAllText, unreadCount === 0 && styles.markAllTextDisabled]}>
-            Read all
-          </Text>
+          <Ionicons
+            name={selectionMode ? 'close' : 'arrow-back'}
+            size={22}
+            color={Colors.dark}
+          />
         </TouchableOpacity>
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerTitle}>
+            {selectionMode ? `${selectedCount} selected` : 'Notifications'}
+          </Text>
+          {!selectionMode ? (
+            unreadCount > 0 ? (
+              <Text style={styles.headerSub}>{unreadCount} unread</Text>
+            ) : (
+              <Text style={styles.headerSub}>You&apos;re all caught up</Text>
+            )
+          ) : (
+            <TouchableOpacity onPress={selectAllVisible} activeOpacity={0.8}>
+              <Text style={styles.selectAllLink}>Select all on screen</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        {selectionMode ? (
+          <TouchableOpacity
+            style={styles.markAllBtn}
+            onPress={selectAllVisible}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.markAllText}>All</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={styles.markAllBtn}
+            onPress={openInboxActions}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="ellipsis-horizontal" size={20} color={Colors.primary} />
+          </TouchableOpacity>
+        )}
       </GlassSurface>
 
-      <View style={styles.filters}>
-        {FILTERS.map((entry) => {
-          const active = filter === entry.key;
-          return (
-            <TouchableOpacity key={entry.key} onPress={() => setFilter(entry.key)} activeOpacity={0.85}>
-              <GlassSurface
-                variant={active ? 'tinted' : 'light'}
-                borderRadius={999}
-                contentStyle={styles.filterPill}
-              >
-                <Text style={[styles.filterText, active && styles.filterTextActive]}>
-                  {entry.label}
-                </Text>
-              </GlassSurface>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      {!selectionMode ? (
+        <View style={styles.filters}>
+          {FILTERS.map((entry) => {
+            const active = filter === entry.key;
+            return (
+              <TouchableOpacity key={entry.key} onPress={() => setFilter(entry.key)} activeOpacity={0.85}>
+                <GlassSurface
+                  variant={active ? 'tinted' : 'light'}
+                  borderRadius={999}
+                  contentStyle={styles.filterPill}
+                >
+                  <Text style={[styles.filterText, active && styles.filterTextActive]}>
+                    {entry.label}
+                  </Text>
+                </GlassSurface>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      ) : null}
 
       <FlatList
         data={rows}
         keyExtractor={(row) => row.key}
         contentContainerStyle={[
           styles.listContent,
-          { paddingBottom: insets.bottom + 24 },
+          { paddingBottom: insets.bottom + (selectionMode ? 96 : 24) },
           rows.length === 0 && styles.listEmptyContent,
         ]}
         refreshControl={(
@@ -253,9 +395,52 @@ export default function NotificationsScreen() {
           if (row.kind === 'header') {
             return <Text style={styles.sectionLabel}>{row.label}</Text>;
           }
-          return <NotificationRow item={row.item} onPress={onPressItem} />;
+          return (
+            <NotificationRow
+              item={row.item}
+              selected={selectedIds.has(row.item.id)}
+              selectionMode={selectionMode}
+              onPress={onPressItem}
+              onLongPress={onLongPressItem}
+              onToggleSelect={toggleSelect}
+            />
+          );
         }}
       />
+
+      {selectionMode ? (
+        <GlassSurface
+          variant="light"
+          borderRadius={0}
+          style={[styles.bulkBar, { paddingBottom: insets.bottom + 10 }]}
+          contentStyle={styles.bulkBarContent}
+        >
+          <TouchableOpacity
+            style={[styles.bulkBtn, selectedCount === 0 && styles.bulkBtnDisabled]}
+            disabled={selectedCount === 0}
+            onPress={() => void runBulk('read')}
+          >
+            <Ionicons name="mail-open-outline" size={18} color={Colors.primary} />
+            <Text style={styles.bulkBtnText}>Read</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.bulkBtn, selectedCount === 0 && styles.bulkBtnDisabled]}
+            disabled={selectedCount === 0}
+            onPress={() => void runBulk('unread')}
+          >
+            <Ionicons name="mail-unread-outline" size={18} color={Colors.primary} />
+            <Text style={styles.bulkBtnText}>Unread</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.bulkBtn, selectedCount === 0 && styles.bulkBtnDisabled]}
+            disabled={selectedCount === 0}
+            onPress={() => void runBulk('delete')}
+          >
+            <Ionicons name="trash-outline" size={18} color={Colors.error} />
+            <Text style={[styles.bulkBtnText, { color: Colors.error }]}>Delete</Text>
+          </TouchableOpacity>
+        </GlassSurface>
+      ) : null}
     </ThemedScreen>
   );
 }
@@ -292,17 +477,22 @@ const styles = StyleSheet.create({
     color: Colors.muted,
     marginTop: 2,
   },
+  selectAllLink: {
+    fontSize: 12,
+    color: Colors.primary,
+    fontWeight: '600',
+    marginTop: 2,
+  },
   markAllBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   markAllText: {
     fontSize: 13,
     fontWeight: '700',
     color: Colors.primary,
-  },
-  markAllTextDisabled: {
-    color: Colors.mutedLight,
   },
   filters: {
     flexDirection: 'row',
@@ -343,9 +533,28 @@ const styles = StyleSheet.create({
   rowCard: {
     marginBottom: 2,
   },
+  rowCardSelected: {
+    borderWidth: 1.5,
+    borderColor: 'rgba(124, 58, 237, 0.35)',
+  },
   rowTop: {
     flexDirection: 'row',
     gap: 12,
+    alignItems: 'flex-start',
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 7,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 9,
+  },
+  checkboxSelected: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
   },
   iconBadge: {
     width: 40,
@@ -369,6 +578,13 @@ const styles = StyleSheet.create({
   rowTitleUnread: {
     fontWeight: '700',
   },
+  rowCategory: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.primary,
+    marginTop: 2,
+    letterSpacing: 0.2,
+  },
   unreadDot: {
     width: 8,
     height: 8,
@@ -386,6 +602,9 @@ const styles = StyleSheet.create({
     color: Colors.mutedLight,
     marginTop: 10,
     marginLeft: 52,
+  },
+  rowTimeWithCheckbox: {
+    marginLeft: 74,
   },
   loadingWrap: {
     paddingVertical: 48,
@@ -421,5 +640,32 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     color: Colors.muted,
     textAlign: 'center',
+  },
+  bulkBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(124, 58, 237, 0.08)',
+  },
+  bulkBarContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingTop: 12,
+    paddingHorizontal: Spacing.page,
+  },
+  bulkBtn: {
+    alignItems: 'center',
+    gap: 4,
+    minWidth: 72,
+  },
+  bulkBtnDisabled: {
+    opacity: 0.4,
+  },
+  bulkBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.primary,
   },
 });

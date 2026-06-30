@@ -22,6 +22,8 @@ type LoadingOverlayProps = {
   submessage?: string;
   icon?: keyof typeof Ionicons.glyphMap;
   style?: StyleProp<ViewStyle>;
+  /** Renders inside the current view tree instead of a separate Modal (use inside TransactionLockSheet). */
+  embedded?: boolean;
 };
 
 function BounceDot({ delay }: { delay: number }) {
@@ -68,12 +70,98 @@ function BounceDot({ delay }: { delay: number }) {
   );
 }
 
+function LoadingOverlayContent({
+  message,
+  submessage,
+  icon,
+  style,
+  pulse,
+  spin,
+}: {
+  message: string;
+  submessage?: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  style?: StyleProp<ViewStyle>;
+  pulse: Animated.Value;
+  spin: Animated.Value;
+}) {
+  const glowScale = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.12],
+  });
+
+  const glowOpacity = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.35, 0.65],
+  });
+
+  const ringRotate = spin.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  return (
+    <View style={[styles.backdrop, style]}>
+      <BlurView
+        intensity={40}
+        tint="dark"
+        style={StyleSheet.absoluteFill}
+        experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined}
+      />
+      <View style={styles.backdropTint} />
+
+      <Animated.View
+        style={[
+          styles.glow,
+          {
+            opacity: glowOpacity,
+            transform: [{ scale: glowScale }],
+          },
+        ]}
+      />
+
+      <GlassSurface
+        variant="light"
+        borderRadius={Radius.xl}
+        intensity={72}
+        style={styles.card}
+        contentStyle={styles.cardContent}
+      >
+        <View style={styles.iconStage}>
+          <Animated.View style={[styles.orbitRing, { transform: [{ rotate: ringRotate }] }]}>
+            <View style={styles.orbitDot} />
+          </Animated.View>
+
+          <LinearGradient
+            colors={Gradients.cardSoft as [string, string, ...string[]]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.iconBadge}
+          >
+            <Ionicons name={icon} size={26} color={Colors.white} />
+          </LinearGradient>
+        </View>
+
+        <Text style={styles.message}>{message}</Text>
+        {submessage ? <Text style={styles.submessage}>{submessage}</Text> : null}
+
+        <View style={styles.dotsRow}>
+          <BounceDot delay={0} />
+          <BounceDot delay={120} />
+          <BounceDot delay={240} />
+        </View>
+      </GlassSurface>
+    </View>
+  );
+}
+
 export function LoadingOverlay({
   visible,
   message = 'Please wait…',
   submessage,
   icon = 'sparkles',
   style,
+  embedded = false,
 }: LoadingOverlayProps) {
   const pulse = useRef(new Animated.Value(0)).current;
   const spin = useRef(new Animated.Value(0)).current;
@@ -116,85 +204,47 @@ export function LoadingOverlay({
     };
   }, [pulse, spin, visible]);
 
-  const glowScale = pulse.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 1.12],
-  });
+  if (!visible) return null;
 
-  const glowOpacity = pulse.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.35, 0.65],
-  });
+  const content = (
+    <LoadingOverlayContent
+      message={message}
+      submessage={submessage}
+      icon={icon}
+      style={style}
+      pulse={pulse}
+      spin={spin}
+    />
+  );
 
-  const ringRotate = spin.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
+  if (embedded) {
+    return (
+      <View style={styles.embeddedRoot} pointerEvents="auto">
+        {content}
+      </View>
+    );
+  }
 
   return (
     <Modal
-      visible={visible}
+      visible
       transparent
       animationType="fade"
+      presentationStyle="overFullScreen"
       statusBarTranslucent
       onRequestClose={() => {}}
     >
-      <View style={[styles.backdrop, style]}>
-        <BlurView
-          intensity={40}
-          tint="dark"
-          style={StyleSheet.absoluteFill}
-          experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined}
-        />
-        <View style={styles.backdropTint} />
-
-        <Animated.View
-          style={[
-            styles.glow,
-            {
-              opacity: glowOpacity,
-              transform: [{ scale: glowScale }],
-            },
-          ]}
-        />
-
-        <GlassSurface
-          variant="light"
-          borderRadius={Radius.xl}
-          intensity={72}
-          style={styles.card}
-          contentStyle={styles.cardContent}
-        >
-          <View style={styles.iconStage}>
-            <Animated.View style={[styles.orbitRing, { transform: [{ rotate: ringRotate }] }]}>
-              <View style={styles.orbitDot} />
-            </Animated.View>
-
-            <LinearGradient
-              colors={Gradients.cardSoft as [string, string, ...string[]]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.iconBadge}
-            >
-              <Ionicons name={icon} size={26} color={Colors.white} />
-            </LinearGradient>
-          </View>
-
-          <Text style={styles.message}>{message}</Text>
-          {submessage ? <Text style={styles.submessage}>{submessage}</Text> : null}
-
-          <View style={styles.dotsRow}>
-            <BounceDot delay={0} />
-            <BounceDot delay={120} />
-            <BounceDot delay={240} />
-          </View>
-        </GlassSurface>
-      </View>
+      {content}
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  embeddedRoot: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1000,
+    elevation: 1000,
+  },
   backdrop: {
     flex: 1,
     alignItems: 'center',

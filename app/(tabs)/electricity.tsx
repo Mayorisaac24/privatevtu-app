@@ -21,6 +21,8 @@ import {
 } from '../../src/components/purchase/ServicePurchaseUi';
 import { TransactionLockSheet } from '../../src/components/security/TransactionLockSheet';
 import type { TransactionAuthPayload } from '../../src/hooks/useTransactionLockAuth';
+import { useWalletAffordability } from '../../src/hooks/useWalletAffordability';
+import { nairaToKobo } from '../../src/lib/wallet-affordability';
 import { ScreenBody } from '../../src/components/ui/ScreenBody';
 import { DiscoPickerModal } from '../../src/components/DiscoPickerModal';
 import { DiscoLogo } from '../../src/components/DiscoLogo';
@@ -99,7 +101,6 @@ export default function ElectricityScreen() {
         if (isResponseSuccess(balRes)) setBalance(parseWalletBalanceKobo(balRes.data));
         const token = res.data?.token || res.data?.purchasedToken;
         showToast({ type: 'success', text1: 'Payment Successful! ⚡', text2: token ? `Token: ${token}` : `₦${parseFloat(amount).toLocaleString()} electricity purchased` });
-        setShowLock(false);
         setTimeout(() => {
           setMeterNumber('');
           setAmount('');
@@ -113,11 +114,16 @@ export default function ElectricityScreen() {
       }
     } catch (err: any) {
       showToast({ type: 'error', text1: 'Payment Failed', text2: err?.data?.message || err?.message || 'Please try again' });
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+      setShowLock(false);
+    }
   };
 
   const stepIndex = step === 'details' ? 0 : step === 'amount' ? 1 : 2;
   const STEPS = ['Meter', 'Amount', 'Confirm'];
+  const requiredKobo = nairaToKobo(parseFloat(amount || '0'));
+  const afford = useWalletAffordability(requiredKobo, step === 'confirm');
 
   const handleBack = useCallback(() => {
     if (showLock) {
@@ -285,13 +291,15 @@ export default function ElectricityScreen() {
                 ...(phone ? [{ label: 'Phone', value: phone }] : []),
                 { label: 'You pay', value: `₦${parseFloat(amount).toLocaleString()}`, highlight: true },
               ]}
+              walletBalanceKobo={afford.walletBalanceKobo}
+              requiredKobo={requiredKobo}
+              insufficientFunds={afford.insufficientFunds}
             />
 
             <ServiceContinueButton
-              label={`Pay ₦${parseFloat(amount || '0').toLocaleString()}`}
+              label={afford.insufficientFunds ? 'Insufficient balance' : `Pay ₦${parseFloat(amount || '0').toLocaleString()}`}
               onPress={() => setShowLock(true)}
-              disabled={loading}
-              loading={loading}
+              disabled={loading || afford.insufficientFunds}
               icon="flash"
             />
 
@@ -312,12 +320,18 @@ export default function ElectricityScreen() {
 
       <TransactionLockSheet
         visible={showLock}
-        onClose={() => setShowLock(false)}
+        onClose={() => {
+          if (loading) return;
+          setShowLock(false);
+        }}
         onAuthorized={handlePay}
         title="Confirm electricity payment"
         subtitle={`Authorize ₦${parseFloat(amount || '0').toLocaleString()} for meter ${meterNumber}`}
         amount={`₦${parseFloat(amount || '0').toLocaleString()}`}
         processing={loading}
+        processingMessage="Processing payment"
+        processingSubmessage="Purchasing electricity token for your meter"
+        processingIcon="flash-outline"
       />
     </ThemedScreen>
   );

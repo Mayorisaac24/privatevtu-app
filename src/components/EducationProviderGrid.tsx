@@ -2,20 +2,16 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Image,
   ActivityIndicator,
   StyleSheet,
   useWindowDimensions,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import type { EducationProvider } from '../lib/api';
 import {
   getEducationProviderCode,
-  getEducationProviderLogo,
   getEducationProviderShortName,
-  getEducationProviderStyle,
-  hasEducationProviderLogo,
 } from '../lib/education-providers';
+import { EducationProviderLogo } from './EducationProviderLogo';
 import { Colors, Typography, Radius } from '../theme';
 import { isAndroid } from '../lib/platform-ui';
 
@@ -38,15 +34,9 @@ function EducationChip({
   ringSize: number;
 }) {
   const code = getEducationProviderCode(provider);
-  const style = getEducationProviderStyle(code, {
-    bg: Colors.surface,
-    border: Colors.borderMid,
-    text: Colors.mid,
-  });
   const label = getEducationProviderShortName(provider);
   const innerSize = ringSize - 6;
-  const logo = getEducationProviderLogo(provider);
-  const showLogo = logo && hasEducationProviderLogo(provider);
+  const logoSize = innerSize - 4;
 
   return (
     <TouchableOpacity style={[styles.chip, styles.chipRow]} onPress={onPress} activeOpacity={0.7}>
@@ -63,30 +53,7 @@ function EducationChip({
           selected && styles.logoRingSelected,
         ]}
       >
-        <View
-          style={[
-            styles.logoInner,
-            {
-              width: innerSize,
-              height: innerSize,
-              borderRadius: innerSize / 2,
-              backgroundColor: style.bg,
-            },
-          ]}
-        >
-          {showLogo ? (
-            <Image
-              source={logo!}
-              style={{
-                width: ringSize * 0.68,
-                height: ringSize * 0.68,
-              }}
-              resizeMode="contain"
-            />
-          ) : (
-            <Ionicons name="school-outline" size={ringSize * 0.38} color={style.text} />
-          )}
-        </View>
+        <EducationProviderLogo provider={provider} size={logoSize} />
         {selected ? <View style={styles.selectedDot} /> : null}
       </View>
       <Text style={[styles.chipLabel, selected && styles.chipLabelSelected]} numberOfLines={2}>
@@ -191,11 +158,6 @@ const styles = StyleSheet.create({
           shadowOpacity: 0.18,
           shadowRadius: 4,
         }),
-  },
-  logoInner: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
   },
   selectedDot: {
     position: 'absolute',

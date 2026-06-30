@@ -1076,8 +1076,24 @@ class ApiClient {
     return this.request(`/users/me/notifications/unread-count${suffix}`);
   }
 
+  async getNotificationById(
+    notificationId: string,
+    excludeLoginDeviceId?: string,
+  ): Promise<ApiResponse<AppNotification>> {
+    const suffix = excludeLoginDeviceId
+      ? `?excludeLoginDeviceId=${encodeURIComponent(excludeLoginDeviceId)}`
+      : '';
+    return this.request(`/users/me/notifications/${notificationId}${suffix}`);
+  }
+
   async markNotificationRead(notificationId: string): Promise<ApiResponse<AppNotification>> {
     return this.request(`/users/me/notifications/${notificationId}/read`, {
+      method: 'PATCH',
+    });
+  }
+
+  async markNotificationUnread(notificationId: string): Promise<ApiResponse<AppNotification>> {
+    return this.request(`/users/me/notifications/${notificationId}/unread`, {
       method: 'PATCH',
     });
   }
@@ -1085,6 +1101,28 @@ class ApiClient {
   async markAllNotificationsRead(): Promise<ApiResponse<{ updatedCount: number }>> {
     return this.request('/users/me/notifications/read-all', {
       method: 'PATCH',
+    });
+  }
+
+  async markAllNotificationsUnread(): Promise<ApiResponse<{ updatedCount: number }>> {
+    return this.request('/users/me/notifications/unread-all', {
+      method: 'PATCH',
+    });
+  }
+
+  async deleteNotification(notificationId: string): Promise<ApiResponse<{ deleted: boolean }>> {
+    return this.request(`/users/me/notifications/${notificationId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async bulkNotificationAction(
+    notificationIds: string[],
+    action: 'read' | 'unread' | 'delete',
+  ): Promise<ApiResponse<{ affected: number }>> {
+    return this.request('/users/me/notifications/bulk', {
+      method: 'POST',
+      body: JSON.stringify({ notificationIds, action }),
     });
   }
 
@@ -1241,8 +1279,59 @@ class ApiClient {
     });
   }
 
-  async getContentPage(slug: string): Promise<ApiResponse<{ slug: string; title: string; body: string }>> {
+  async getContentPage(slug: string): Promise<ApiResponse<{ slug: string; title: string; body: string; updatedAt?: string }>> {
     return this.request(`/content/pages/${slug}`);
+  }
+
+  async getSupportConfig(): Promise<ApiResponse<import('./support').SupportConfig>> {
+    return this.request('/support/config');
+  }
+
+  async getFaq(): Promise<ApiResponse<{ categories: import('./support').FaqCategory[] }>> {
+    return this.request('/support/faq');
+  }
+
+  async getDisputes(params?: { page?: number; pageSize?: number; status?: string }): Promise<ApiResponse<{
+    disputes: import('./support').DisputeRecord[];
+    pagination: { page: number; pageSize: number; total: number; totalPages: number };
+  }>> {
+    const query = new URLSearchParams();
+    if (params?.page) query.set('page', String(params.page));
+    if (params?.pageSize) query.set('pageSize', String(params.pageSize));
+    if (params?.status) query.set('status', params.status);
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return this.request(`/disputes${suffix}`);
+  }
+
+  async getDispute(disputeId: string): Promise<ApiResponse<import('./support').DisputeRecord>> {
+    return this.request(`/disputes/${disputeId}`);
+  }
+
+  async getDisputeEligibility(transactionId: string): Promise<ApiResponse<{
+    allowed: boolean;
+    reason?: string;
+    existingDisputeId?: string;
+    existingDisputeReference?: string;
+  }>> {
+    return this.request(`/disputes/eligibility/${transactionId}`);
+  }
+
+  async createDispute(data: {
+    transactionId?: string;
+    reason: string;
+    description: string;
+  }): Promise<ApiResponse<import('./support').DisputeRecord>> {
+    return this.request('/disputes', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async addDisputeMessage(disputeId: string, body: string): Promise<ApiResponse<{ id: string; body: string }>> {
+    return this.request(`/disputes/${disputeId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ body }),
+    });
   }
 
   async getActiveAds(params: { screen?: string; channel?: 'mobile' | 'web' }): Promise<ApiResponse<{
@@ -1838,6 +1927,7 @@ class ApiClient {
     pin?: string;
     biometricToken?: string;
     deviceId?: string;
+    idempotencyKey?: string;
   }): Promise<ApiResponse<{
     reference: string;
     status: string;

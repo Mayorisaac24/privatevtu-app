@@ -46,8 +46,8 @@ export function createVioletLightColors(): ThemeColors {
 
     airtime: Palette.violet600,
     airtimeBg: Palette.violet50,
-    data: Palette.emerald600,
-    dataBg: Palette.emerald50,
+    data: Palette.violet600,
+    dataBg: Palette.violet50,
     electricity: Palette.amber600,
     electricityBg: Palette.amber50,
     cable: Palette.red600,
@@ -125,7 +125,7 @@ export function createVioletDarkColors(): ThemeColors {
     textOnHeroSubtle: Overlays.white55,
 
     airtimeBg: '#1A1030',
-    dataBg: '#0A1F18',
+    dataBg: '#1A1030',
     electricityBg: '#1F1508',
     cableBg: '#1F0A0A',
     transferBg: '#0A1428',
