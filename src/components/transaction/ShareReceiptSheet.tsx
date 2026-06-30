@@ -90,11 +90,12 @@ export function ShareReceiptSheet({ visible, transaction, onClose }: ShareReceip
       const data = buildTransactionReceiptData(transaction, config);
       setResolvedReceipt(data);
 
+      await waitForReceiptLayout();
+
       if (format === 'pdf') {
         const { shareReceiptAsPdf } = await import('../../lib/share-transaction-receipt');
-        await shareReceiptAsPdf(data, receiptTheme);
+        await shareReceiptAsPdf(data, receiptTheme, captureRef);
       } else {
-        await waitForReceiptLayout();
         const sharedAs = await shareReceiptAsImageOrPdfFallback(captureRef, data, receiptTheme);
         if (sharedAs === 'pdf') {
           showToast({

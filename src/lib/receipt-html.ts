@@ -40,6 +40,40 @@ function statusColors(tone: TransactionReceiptData['statusTone'], theme: Receipt
   }
 }
 
+/** Wraps a captured receipt PNG in minimal HTML so expo-print produces a PDF that matches the on-screen card. */
+export function buildReceiptImagePdfHtml(imageDataUri: string, theme: ReceiptTheme): string {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    @page { margin: 20px; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: ${theme.surface};
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100%;
+      padding: 20px 12px;
+    }
+    img {
+      width: 360px;
+      max-width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 20px;
+    }
+  </style>
+</head>
+<body>
+  <img src="${imageDataUri}" alt="Transaction receipt" />
+</body>
+</html>`;
+}
+
 export function buildReceiptHtml(data: TransactionReceiptData, theme: ReceiptTheme): string {
   const status = statusColors(data.statusTone, theme);
   const gradient = theme.cardGradient;

@@ -1,4 +1,4 @@
-import { Image, StyleSheet, type ImageStyle, type StyleProp } from 'react-native';
+import { Image, StyleSheet, View, type ImageStyle, type StyleProp } from 'react-native';
 
 const APP_LOGO = require('../../../assets/images/app-logo.png');
 

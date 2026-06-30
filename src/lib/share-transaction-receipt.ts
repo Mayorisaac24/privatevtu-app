@@ -2,7 +2,7 @@ import * as FileSystem from 'expo-file-system';
 import type { RefObject } from 'react';
 import { TurboModuleRegistry } from 'react-native';
 import type { View } from 'react-native';
-import { buildReceiptHtml, type ReceiptTheme } from './receipt-html';
+import { buildReceiptHtml, buildReceiptImagePdfHtml, type ReceiptTheme } from './receipt-html';
 import { sanitizeReceiptFilename, type TransactionReceiptData } from './transaction-receipt';
 
 const NATIVE_MODULE_HINT = 'Rebuild the app to enable image sharing: npx expo run:ios --device';
@@ -59,6 +59,22 @@ async function loadViewShotModule() {
   }
 }
 
+async function captureReceiptView(
+  viewRef: RefObject<View | null>,
+  result: 'tmpfile' | 'data-uri',
+): Promise<string> {
+  if (!viewRef.current) {
+    throw new Error('Receipt preview is not ready');
+  }
+
+  const { captureRef } = await loadViewShotModule();
+  return captureRef(viewRef, {
+    format: 'png',
+    quality: 1,
+    result,
+  });
+}
+
 async function shareFile(uri: string, mimeType: string): Promise<void> {
   const Sharing = await loadSharingModule();
   const available = await Sharing.isAvailableAsync();
@@ -75,9 +91,22 @@ async function shareFile(uri: string, mimeType: string): Promise<void> {
 export async function shareReceiptAsPdf(
   data: TransactionReceiptData,
   theme: ReceiptTheme,
+  viewRef?: RefObject<View | null>,
 ): Promise<void> {
   const Print = await loadPrintModule();
-  const html = buildReceiptHtml(data, theme);
+  let html = buildReceiptHtml(data, theme);
+
+  if (viewRef?.current && isViewShotNativeAvailable()) {
+    try {
+      const imageDataUri = await captureReceiptView(viewRef, 'data-uri');
+      html = buildReceiptImagePdfHtml(imageDataUri, theme);
+    } catch (error) {
+      if (!isViewShotRuntimeError(error)) {
+        throw error;
+      }
+    }
+  }
+
   const { uri } = await Print.printToFileAsync({ html });
   const filename = `receipt-${sanitizeReceiptFilename(data.reference)}.pdf`;
   const target = `${FileSystem.cacheDirectory}${filename}`;
@@ -94,12 +123,7 @@ export async function shareReceiptAsImage(
   }
 
   try {
-    const { captureRef } = await loadViewShotModule();
-    const uri = await captureRef(viewRef, {
-      format: 'png',
-      quality: 1,
-      result: 'tmpfile',
-    });
+    const uri = await captureReceiptView(viewRef, 'tmpfile');
 
     const filename = `receipt-${sanitizeReceiptFilename(reference)}.png`;
     const target = `${FileSystem.cacheDirectory}${filename}`;
