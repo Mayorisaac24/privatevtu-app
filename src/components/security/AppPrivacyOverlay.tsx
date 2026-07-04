@@ -1,9 +1,10 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Typography } from '../../theme';
+import { Typography, Overlays } from '../../theme';
 import { useColors, useGradients } from '../../theme/hooks';
 import { gradientStops, withAlpha } from '../../theme/gradient-utils';
-import { AppLogo } from '../ui/AppLogo';
+
+const APP_ICON = require('../../../assets/icon.png');
 
 type AppPrivacyOverlayProps = {
   visible: boolean;
@@ -38,7 +39,15 @@ export function AppPrivacyOverlay({ visible }: AppPrivacyOverlayProps) {
         ]}
       />
       <View style={styles.content}>
-        <AppLogo size={132} variant="onDark" />
+        <View style={styles.logoWrap}>
+          <Image
+            source={APP_ICON}
+            style={styles.logoIcon}
+            resizeMode="contain"
+            accessibilityRole="image"
+            accessibilityLabel="Datamart"
+          />
+        </View>
         <Text style={[styles.subtitle, { color: colors.textOnHeroMuted }]}>Secured session</Text>
       </View>
     </View>
@@ -73,6 +82,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 14,
+  },
+  logoWrap: {
+    padding: 14,
+    borderRadius: 28,
+    backgroundColor: Overlays.white14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Overlays.white18,
+  },
+  logoIcon: {
+    width: 88,
+    height: 88,
+    borderRadius: 20,
   },
   subtitle: {
     ...Typography.small,

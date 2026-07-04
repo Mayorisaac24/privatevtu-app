@@ -50,7 +50,7 @@ export function AppLogo({ size = BOOT_LOGO_SIZE, style, variant = 'default' }: A
 const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   logo: {},
   onDarkWrap: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: Palette.black,
