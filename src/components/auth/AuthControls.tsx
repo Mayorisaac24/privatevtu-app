@@ -34,6 +34,8 @@ export function AuthSegmentedControl<T extends string>({
   label,
   style,
 }: AuthSegmentedControlProps<T>) {
+  const styles = useStyles();
+
   return (
     <View style={style}>
       {label ? <Text style={styles.segmentLabel}>{label}</Text> : null}
