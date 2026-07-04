@@ -40,7 +40,8 @@ function ProviderChip({
   const colors = useColors();
   const code = getProviderCode(provider);
   const label = getProviderShortName(provider);
-  const innerSize = ringSize - 6;
+  const borderWidth = selected ? 2 : 1.5;
+  const logoSize = Math.round(ringSize - borderWidth * 2);
 
   return (
     <TouchableOpacity
@@ -55,12 +56,13 @@ function ProviderChip({
             width: ringSize,
             height: ringSize,
             borderRadius: ringSize / 2,
+            borderWidth,
             borderColor: selected ? colors.primary : colors.borderMid,
           },
           selected && styles.logoRingSelected,
         ]}
       >
-        <NetworkProviderLogo provider={provider} size={innerSize} />
+        <NetworkProviderLogo provider={provider} size={logoSize} />
         {selected ? <View style={styles.selectedDot} /> : null}
       </View>
       <Text
@@ -175,14 +177,12 @@ const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleS
     width: 68,
   },
   logoRing: {
-    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
     overflow: 'hidden',
   },
   logoRingSelected: {
-    borderWidth: 2,
     ...(isAndroid
       ? { elevation: 2 }
       : {

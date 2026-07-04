@@ -1,32 +1,34 @@
-import { Image, ImageSourcePropType, StyleProp, ImageStyle, StyleSheet, View } from 'react-native';
+import { Image, ImageSourcePropType, StyleProp, View, ViewStyle } from 'react-native';
 import type { AirtimeProvider } from '../lib/api';
-import { getProviderCode, getProviderLogo, getProviderStyle } from '../lib/providers';
+import { getProviderCode, getProviderLogo } from '../lib/providers';
 
 type Props = {
   provider: Pick<AirtimeProvider, 'code' | 'id' | 'imageUrl'>;
   size: number;
-  style?: StyleProp<ImageStyle>;
+  style?: StyleProp<ViewStyle>;
 };
 
-const DEFAULT_BRAND = { bg: '#FFFFFF', border: '#E2E8F0', text: '#334155' };
-
-/** Per-provider inset so square/wide assets sit uniformly inside the circular badge. */
-const LOGO_INSET_RATIO: Record<string, number> = {
-  mtn: 0.08,
-  airtel: 0.22,
-  glo: 0.04,
-  '9mobile': 0.16,
-  t2: 0.16,
+type LogoConfig = {
+  scale: number;
+  /** Fills transparent padding in non-square assets. */
+  bg?: string;
 };
 
-const DEFAULT_INSET = 0.14;
+const LOGO_CONFIG: Record<string, LogoConfig> = {
+  mtn: { scale: 1 },
+  airtel: { scale: 1.5 },
+  glo: { scale: 1.18, bg: '#008752' },
+  '9mobile': { scale: 1.22, bg: '#00A651' },
+  t2: { scale: 1.14, bg: '#F97316' },
+};
+
+const DEFAULT_CONFIG: LogoConfig = { scale: 1 };
 
 export function NetworkProviderLogo({ provider, size, style }: Props) {
   const code = getProviderCode(provider);
-  const brand = getProviderStyle(code, DEFAULT_BRAND);
-  const insetRatio = LOGO_INSET_RATIO[code] ?? DEFAULT_INSET;
-  const inset = Math.max(2, Math.round(size * insetRatio));
-  const imageSize = size - inset * 2;
+  const { scale, bg } = LOGO_CONFIG[code] ?? DEFAULT_CONFIG;
+  const dimension = size * scale;
+  const offset = (size - dimension) / 2;
 
   return (
     <View
@@ -35,20 +37,21 @@ export function NetworkProviderLogo({ provider, size, style }: Props) {
           width: size,
           height: size,
           borderRadius: size / 2,
-          backgroundColor: brand.bg,
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: brand.border,
-          alignItems: 'center',
-          justifyContent: 'center',
           overflow: 'hidden',
+          backgroundColor: bg,
         },
         style,
       ]}
     >
       <Image
         source={getProviderLogo(provider) as ImageSourcePropType}
-        style={{ width: imageSize, height: imageSize }}
-        resizeMode="contain"
+        style={{
+          width: dimension,
+          height: dimension,
+          marginLeft: offset,
+          marginTop: offset,
+        }}
+        resizeMode="cover"
       />
     </View>
   );

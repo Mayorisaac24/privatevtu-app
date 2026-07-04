@@ -423,11 +423,11 @@ export const SupportChannelColors = {
 
 /** Mobile network chip backgrounds (airtime/data grids) */
 export const NetworkProviderColors = {
-  mtn: { bg: '#FFEB3B', border: '#F9A825', text: '#78350F' },
-  glo: { bg: '#16A34A', border: '#15803D', text: '#14532D' },
-  airtel: { bg: '#FFFFFF', border: '#EF4444', text: '#7F1D1D' },
-  '9mobile': { bg: '#10B981', border: '#059669', text: '#064E3B' },
-  t2: { bg: '#F97316', border: '#EA580C', text: '#7C2D12' },
+  mtn: { bg: '#FFFDE7', border: '#FDE047', text: '#78350F' },
+  glo: { bg: '#F0FDF4', border: '#86EFAC', text: '#14532D' },
+  airtel: { bg: '#FFF5F5', border: '#FCA5A5', text: '#7F1D1D' },
+  '9mobile': { bg: '#F0FDF4', border: '#6EE7B7', text: '#064E3B' },
+  t2: { bg: '#FFF7ED', border: '#FDBA74', text: '#7C2D12' },
 } as const;
 
 /** Dispute status badge colors */

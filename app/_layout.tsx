@@ -25,7 +25,6 @@ export default function RootLayout() {
         <ThemeProvider>
         <FontBootstrap>
           <AppStatusBar />
-          <SessionBootstrap />
           <PushNotificationsBootstrap />
           <BroadcastModalHost />
           <View style={{ flex: 1 }}>
@@ -43,6 +42,7 @@ export default function RootLayout() {
               <Stack.Screen name="profile" />
             </Stack>
             <AppLockHost />
+            <SessionBootstrap />
           </View>
           <ToastProvider visibilityTime={3500} />
         </FontBootstrap>

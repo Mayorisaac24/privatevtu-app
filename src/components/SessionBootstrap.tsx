@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
-import { router, useSegments } from 'expo-router';
+import { useRootNavigationState, useSegments } from 'expo-router';
 import { api } from '../lib/api';
 import { prefetchAppData } from '../lib/dashboard-data';
 import { hydrateNotificationSettingsCache } from '../lib/notification-settings-cache';
@@ -16,6 +16,7 @@ import {
 } from '../lib/session';
 import { refreshServiceCatalogSilently } from '../lib/service-catalog-cache';
 import { syncCatalogRevision } from '../lib/catalog-revision-sync';
+import { safeReplace, setRootNavigationReady } from '../lib/navigation';
 import { useAuthStore, useSecurityStore } from '../stores';
 import { useNotificationsStore } from '../stores/notifications-store';
 import { useServiceAvailabilityStore } from '../stores/service-availability-store';
@@ -38,6 +39,8 @@ const PUBLIC_ROUTE_ROOTS = new Set(['index', 'auth', 'onboarding']);
 
 export function SessionBootstrap() {
   const segments = useSegments();
+  const rootNavigationState = useRootNavigationState();
+  const isNavigationReady = Boolean(rootNavigationState?.key);
   const segmentsRef = useRef(segments);
   segmentsRef.current = segments;
 
@@ -47,17 +50,22 @@ export function SessionBootstrap() {
   const fetchNotifications = useNotificationsStore((s) => s.fetchNotifications);
 
   useEffect(() => {
+    setRootNavigationReady(isNavigationReady);
+  }, [isNavigationReady]);
+
+  useEffect(() => {
     setSuppressSessionExpiryUi(onAuthRoute);
   }, [onAuthRoute]);
 
   useEffect(() => {
+    if (!isNavigationReady) return;
     if (isAuthenticated || onAuthRoute) return;
 
     const root = segments[0] || '';
     if (PUBLIC_ROUTE_ROOTS.has(root)) return;
 
-    router.replace('/auth/login');
-  }, [isAuthenticated, onAuthRoute, segments]);
+    safeReplace('/auth/login');
+  }, [isNavigationReady, isAuthenticated, onAuthRoute, segments]);
 
   useEffect(() => {
     if (!isAuthenticated || onAuthRoute) return;
@@ -99,7 +107,7 @@ export function SessionBootstrap() {
       if (segmentsRef.current[0] === 'auth') return;
       const copy = sessionLogoutCopy(reason);
       showToast({ type: 'info', ...copy });
-      router.replace('/auth/login');
+      safeReplace('/auth/login');
     });
   }, []);
 

@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { router } from 'expo-router';
+import { safeReplace } from '../lib/navigation';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -117,7 +118,7 @@ export default function ProfileScreen() {
             // proceed with local logout
           }
           logout();
-          router.replace('/auth/login');
+          safeReplace('/auth/login');
         },
       },
     ]);
