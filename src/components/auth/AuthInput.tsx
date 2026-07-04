@@ -1,11 +1,10 @@
 import React, { useRef, useState } from 'react';
 import {
-  View, TextInput, Text, TouchableOpacity, Pressable, ViewStyle, TextStyle, TextInputProps,
+  View, TextInput, Text, TouchableOpacity, Pressable, ViewStyle, TextStyle, TextInputProps, StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Radius, Typography } from '../../theme';
+import { Radius, Typography, Overlays, useThemedStyles } from '../../theme';
 import { isAndroid, platformInputText, AUTH_FIELD_HEIGHT } from '../../lib/platform-ui';
-
 
 interface AuthInputProps extends TextInputProps {
   label?: string;
@@ -23,12 +22,13 @@ export function AuthInput({
   onFocus, onBlur,
   ...props
 }: AuthInputProps) {
+  const styles = useStyles();
   const inputRef = useRef<TextInput>(null);
   const [focused, setFocused] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const isPassword = secureTextEntry;
 
-  const borderColor = error ? Colors.error : focused ? Colors.primary : Colors.border;
+  const borderColor = error ? styles.colors.error : focused ? styles.colors.primary : styles.colors.border;
 
   const focusInput = () => {
     inputRef.current?.focus();
@@ -54,7 +54,7 @@ export function AuthInput({
           <TextInput
             ref={inputRef}
             style={[styles.input, inputStyle]}
-            placeholderTextColor={Colors.mutedLight}
+            placeholderTextColor={styles.colors.mutedLight}
             underlineColorAndroid="transparent"
             onFocus={(e) => {
               setFocused(true);
@@ -69,7 +69,7 @@ export function AuthInput({
           />
           {isPassword ? (
             <TouchableOpacity onPress={() => setShowPw(!showPw)} style={styles.trailing}>
-              <Ionicons name={showPw ? 'eye-off-outline' : 'eye-outline'} size={20} color={Colors.muted} />
+              <Ionicons name={showPw ? 'eye-off-outline' : 'eye-outline'} size={20} color={styles.colors.muted} />
             </TouchableOpacity>
           ) : null}
           {rightIcon && !isPassword ? <View style={styles.trailing}>{rightIcon}</View> : null}
@@ -77,7 +77,7 @@ export function AuthInput({
       </Pressable>
       {error ? (
         <View style={styles.errorRow}>
-          <Ionicons name="alert-circle-outline" size={13} color={Colors.error} />
+          <Ionicons name="alert-circle-outline" size={13} color={styles.colors.error} />
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : hint ? (
@@ -87,71 +87,59 @@ export function AuthInput({
   );
 }
 
-const styles = {
-  label: {
-    ...Typography.smallMed,
-    fontSize: 14,
-    color: Colors.dark,
-    marginBottom: isAndroid ? 8 : 9,
-    fontWeight: '600' as const,
-    ...(isAndroid ? { includeFontPadding: false } : null),
-  },
-  field: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    borderRadius: Radius.lg,
-    backgroundColor: Colors.surface,
-    paddingHorizontal: isAndroid ? 14 : 16,
-    minHeight: AUTH_FIELD_HEIGHT,
-  },
-  fieldFocused: {
-    backgroundColor: Colors.white,
-  },
-  fieldError: {
-    backgroundColor: Colors.errorLight,
-  },
-  iconChip: {
-    width: isAndroid ? 32 : 36,
-    height: isAndroid ? 32 : 36,
-    borderRadius: isAndroid ? 10 : 11,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    backgroundColor: Colors.white,
-    marginRight: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  iconChipFocused: {
-    backgroundColor: Colors.primaryMuted,
-    borderColor: 'rgba(124, 58, 237, 0.18)',
-  },
-  input: {
-    flex: 1,
-    fontSize: isAndroid ? 15 : 16,
-    color: Colors.dark,
-    paddingVertical: isAndroid ? 0 : 14,
-    fontWeight: '500' as const,
-    ...platformInputText,
-  },
-  trailing: {
-    padding: 4,
-    marginLeft: 8,
-  },
-  errorRow: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: 5,
-    marginTop: 7,
-  },
-  errorText: {
-    ...Typography.caption,
-    color: Colors.error,
-    fontSize: 12,
-  },
-  hint: {
-    ...Typography.caption,
-    color: Colors.muted,
-    marginTop: 7,
-    fontSize: 12,
-  },
+const createStyles = (colors: import('../../theme/types').ThemeColors) => {
+  const sheet = StyleSheet.create({
+    label: {
+      ...Typography.smallMed,
+      fontSize: 14,
+      color: colors.dark,
+      marginBottom: isAndroid ? 8 : 9,
+      fontWeight: '600',
+      ...(isAndroid ? { includeFontPadding: false } : {}),
+    },
+    field: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderRadius: Radius.lg,
+      backgroundColor: colors.surface,
+      paddingHorizontal: isAndroid ? 14 : 16,
+      minHeight: AUTH_FIELD_HEIGHT,
+    },
+    fieldFocused: {
+      backgroundColor: colors.inputFilled,
+    },
+    fieldError: {
+      backgroundColor: colors.errorLight,
+    },
+    iconChip: {
+      width: isAndroid ? 32 : 36,
+      height: isAndroid ? 32 : 36,
+      borderRadius: isAndroid ? 10 : 11,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surfaceAlt,
+      marginRight: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    iconChipFocused: {
+      backgroundColor: colors.primaryMuted,
+      borderColor: Overlays.borderPrimary18,
+    },
+    input: {
+      flex: 1,
+      fontSize: isAndroid ? 15 : 16,
+      color: colors.dark,
+      ...platformInputText,
+    },
+    trailing: { paddingLeft: 8 },
+    errorRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },
+    errorText: { ...Typography.caption, color: colors.error },
+    hint: { ...Typography.caption, color: colors.muted, marginTop: 6 },
+  });
+  return { ...sheet, colors };
 };
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

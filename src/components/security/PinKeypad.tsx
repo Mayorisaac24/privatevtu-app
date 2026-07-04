@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../../theme';
+import {Colors , Palette, FormColors, BRAND, Overlays, useThemedStyles } from '../../theme';
 import { isAndroid } from '../../lib/platform-ui';
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'bio', '0', 'back'] as const;
@@ -42,6 +42,8 @@ export function PinDots({
   variant = 'light',
   size = 'md',
 }: PinDotsProps) {
+  const styles = useStyles();
+
   const isDark = variant === 'dark';
   const dotSize = size === 'lg' ? 16 : 14;
   const coreSize = size === 'lg' ? 7 : 6;
@@ -101,6 +103,8 @@ export function PinKeypad({
   showStatus = true,
   loadingLabel = 'Verifying PIN…',
 }: PinKeypadProps) {
+  const styles = useStyles();
+
   const isDark = variant === 'dark';
   const minimal = keyVariant === 'minimal' && !isDark;
   const busy = disabled || isLoading || loading;
@@ -219,7 +223,7 @@ export function PinKeypad({
 
 const KEY_SIZE = isAndroid ? 72 : 76;
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   wrap: {
     width: '100%',
     alignItems: 'center',
@@ -240,23 +244,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dotDark: {
-    borderColor: 'rgba(255,255,255,0.35)',
+    borderColor: Overlays.glassShine,
     backgroundColor: 'transparent',
   },
   dotLight: {
-    borderColor: Colors.borderMid,
+    borderColor: colors.borderMid,
     backgroundColor: 'transparent',
   },
   dotDarkFilled: {
-    borderColor: Colors.white,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderColor: colors.white,
+    backgroundColor: Overlays.white18,
   },
   dotLightFilled: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primaryMuted,
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryMuted,
   },
   dotActive: {
-    borderColor: Colors.primary,
+    borderColor: colors.primary,
     borderWidth: 2,
   },
   dotCore: {
@@ -265,10 +269,10 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   dotCoreDark: {
-    backgroundColor: Colors.white,
+    backgroundColor: colors.card,
   },
   dotCoreLight: {
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
   },
   loadingRow: {
     flexDirection: 'row',
@@ -285,10 +289,10 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.muted,
+    color: colors.muted,
   },
   loadingTextDark: {
-    color: 'rgba(255,255,255,0.72)',
+    color: Overlays.white72,
   },
   grid: {
     width: '100%',
@@ -313,23 +317,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   keyDark: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: Overlays.white10,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
+    borderColor: Overlays.white16,
   },
   keyLight: {
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.12)',
+    borderColor: Overlays.darkAmbientPrimary,
   },
   keyMinimal: {
-    backgroundColor: Colors.white,
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.08)',
+    borderColor: Overlays.violet08,
     ...(isAndroid
       ? { elevation: 2 }
       : {
-          shadowColor: Colors.primaryDeep,
+          shadowColor: colors.primaryDeep,
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.06,
           shadowRadius: 8,
@@ -344,10 +348,14 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   keyTextDark: {
-    color: Colors.white,
+    color: colors.white,
   },
   keyTextLight: {
-    color: Colors.primaryDeep,
+    color: colors.primaryDeep,
     fontWeight: '500',
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

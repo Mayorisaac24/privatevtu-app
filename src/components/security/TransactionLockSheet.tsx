@@ -13,9 +13,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTransactionLockAuth, type TransactionAuthPayload } from '../../hooks/useTransactionLockAuth';
 import { getBiometricCapability } from '../../lib/biometric-auth';
 import { useStatusBarStyle } from '../../hooks/useStatusBarStyle';
-import { Colors, Radius, Shadow, Spacing, Typography } from '../../theme';
+import {Colors, Radius, Shadow, Spacing, Typography , Overlays, useThemedStyles } from '../../theme';
 import { useColors, useGradients } from '../../theme/hooks';
-import { gradientStops } from '../../theme/gradient-utils';
+import { gradientStops, withAlpha } from '../../theme/gradient-utils';
 import { PinDots, PinKeypad } from './PinKeypad';
 import { isAndroid } from '../../lib/platform-ui';
 import { showToast } from '../ui/Toast';
@@ -52,6 +52,8 @@ export function TransactionLockSheet({
   processingSubmessage,
   processingIcon = 'sparkles',
 }: TransactionLockSheetProps) {
+  const styles = useStyles();
+
   useStatusBarStyle('light');
   const insets = useSafeAreaInsets();
   const colors = useColors();
@@ -232,7 +234,7 @@ export function TransactionLockSheet({
           <View style={styles.heroTopRow}>
             <View style={styles.heroTopSpacer} />
             <View style={styles.secureChip}>
-              <Ionicons name="shield-checkmark" size={12} color="rgba(255,255,255,0.9)" />
+              <Ionicons name="shield-checkmark" size={12} color={Overlays.white90} />
               <Text style={styles.secureChipText}>Secure payment</Text>
             </View>
             <TouchableOpacity
@@ -263,7 +265,7 @@ export function TransactionLockSheet({
 
           {recipient ? (
             <View style={styles.recipientRow}>
-              <Ionicons name="call-outline" size={13} color="rgba(255,255,255,0.72)" />
+              <Ionicons name="call-outline" size={13} color={Overlays.white72} />
               <Text style={styles.recipientText} numberOfLines={1}>
                 {recipient}
               </Text>
@@ -272,7 +274,7 @@ export function TransactionLockSheet({
         </LinearGradient>
 
         <LinearGradient
-          colors={gradientStops([gradients.header[1], colors.pageBg])}
+          colors={gradientStops([colors.card, colors.pageBg])}
           style={styles.bodyFade}
         >
           <View style={styles.pinSection}>
@@ -341,7 +343,7 @@ export function TransactionLockSheet({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors, gradients: import('../../theme/types').ThemeGradients) => StyleSheet.create({
   root: {
     flex: 1,
   },
@@ -360,7 +362,7 @@ const styles = StyleSheet.create({
     width: 150,
     height: 150,
     borderRadius: 75,
-    backgroundColor: 'rgba(139, 92, 246, 0.24)',
+    backgroundColor: withAlpha(gradients.hero[2], 0.24),
   },
   heroMeshSecondary: {
     position: 'absolute',
@@ -369,7 +371,7 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: 'rgba(99, 102, 241, 0.18)',
+    backgroundColor: withAlpha(gradients.hero[0], 0.16),
   },
   heroTopRow: {
     width: '100%',
@@ -389,20 +391,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11,
     paddingVertical: 5,
     borderRadius: Radius.full,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: Overlays.white12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: Overlays.white14,
   },
   secureChipText: {
     ...Typography.caption,
-    color: 'rgba(255,255,255,0.88)',
+    color: Overlays.white88,
     fontWeight: '600',
   },
   closeBtn: {
     width: 40,
     height: 40,
     borderRadius: 14,
-    backgroundColor: Colors.white,
+    backgroundColor: colors.card,
     alignItems: 'center',
     justifyContent: 'center',
     ...Shadow.sm,
@@ -410,7 +412,7 @@ const styles = StyleSheet.create({
   heroIconRing: {
     padding: 3,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: Overlays.white14,
     marginTop: 2,
     zIndex: 1,
   },
@@ -424,14 +426,14 @@ const styles = StyleSheet.create({
   heroAmount: {
     fontSize: 36,
     fontWeight: '800',
-    color: Colors.white,
+    color: colors.white,
     letterSpacing: -1,
     marginTop: 4,
     zIndex: 1,
   },
   heroTitle: {
     ...Typography.bodyMed,
-    color: 'rgba(255,255,255,0.92)',
+    color: Overlays.white92,
     fontWeight: '600',
     textAlign: 'center',
     maxWidth: 300,
@@ -445,13 +447,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: Radius.full,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: Overlays.white10,
     maxWidth: '100%',
     zIndex: 1,
   },
   recipientText: {
     ...Typography.small,
-    color: 'rgba(255,255,255,0.78)',
+    color: Overlays.white78,
     fontWeight: '500',
     flexShrink: 1,
   },
@@ -519,3 +521,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

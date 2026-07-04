@@ -15,13 +15,15 @@ import { router } from 'expo-router';
 import { ProfileSubScreen } from '../../src/components/profile/ProfileSubScreen';
 import { GlassCard } from '../../src/components/ui/GlassCard';
 import { useSupportFaq } from '../../src/hooks/useSupportContent';
-import { Colors, Radius } from '../../src/theme';
+import {Colors, Radius, useThemedStyles } from '../../src/theme';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
 function FaqAccordion({ item }: { item: { id: string; question: string; answer: string } }) {
+  const styles = useStyles();
+
   const [open, setOpen] = useState(false);
 
   return (
@@ -44,6 +46,8 @@ function FaqAccordion({ item }: { item: { id: string; question: string; answer: 
 }
 
 export default function HelpScreen() {
+  const styles = useStyles();
+
   const { intro, categories, loading } = useSupportFaq();
   const [query, setQuery] = useState('');
 
@@ -119,37 +123,37 @@ export default function HelpScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../src/theme/types').ThemeColors) => StyleSheet.create({
   searchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: Colors.white,
+    backgroundColor: colors.card,
     borderRadius: Radius.lg,
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.borderSubtle,
+    borderColor: colors.borderSubtle,
   },
-  searchInput: { flex: 1, fontSize: 15, color: Colors.dark },
+  searchInput: { flex: 1, fontSize: 15, color: colors.dark },
   introCard: { gap: 4 },
-  introText: { fontSize: 14, lineHeight: 22, color: Colors.mid },
+  introText: { fontSize: 14, lineHeight: 22, color: colors.mid },
   categoryBlock: { gap: 8, marginTop: 4 },
   categoryTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.muted,
+    color: colors.muted,
     letterSpacing: 0.4,
     marginLeft: 4,
     marginTop: 8,
   },
   faqItem: { padding: 14, gap: 10 },
   faqHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  faqQuestion: { flex: 1, fontSize: 15, fontWeight: '600', color: Colors.dark, lineHeight: 21 },
-  faqAnswer: { fontSize: 14, lineHeight: 22, color: Colors.muted },
+  faqQuestion: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.dark, lineHeight: 21 },
+  faqAnswer: { fontSize: 14, lineHeight: 22, color: colors.muted },
   emptyCard: { alignItems: 'center', paddingVertical: 32, gap: 8 },
-  emptyTitle: { fontSize: 16, fontWeight: '700', color: Colors.dark },
-  emptySub: { fontSize: 13, color: Colors.muted, textAlign: 'center' },
+  emptyTitle: { fontSize: 16, fontWeight: '700', color: colors.dark },
+  emptySub: { fontSize: 13, color: colors.muted, textAlign: 'center' },
   supportBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -158,9 +162,9 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingVertical: 14,
     borderRadius: Radius.lg,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
   },
-  supportBtnText: { fontSize: 15, fontWeight: '700', color: Colors.white },
+  supportBtnText: { fontSize: 15, fontWeight: '700', color: colors.white },
   disputeLink: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -168,5 +172,9 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 10,
   },
-  disputeLinkText: { fontSize: 13, fontWeight: '600', color: Colors.primary },
+  disputeLinkText: { fontSize: 13, fontWeight: '600', color: colors.primary },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

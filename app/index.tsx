@@ -3,11 +3,13 @@ import { View, Image, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { resolveBootDestination } from '../src/lib/boot-navigation';
 import { ScreenStatusBar } from '../src/hooks/useStatusBarStyle';
-import { Colors, FontFamily } from '../src/theme';
+import { Colors, FontFamily, useThemedStyles } from '../src/theme';
 
 const APP_ICON = require('../assets/icon.png');
 
 export default function BootScreen() {
+  const styles = useStyles();
+
   useEffect(() => {
     void (async () => {
       const destination = await resolveBootDestination();
@@ -38,10 +40,10 @@ export default function BootScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../src/theme/types').ThemeColors) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: Colors.white,
+    backgroundColor: colors.card,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 32,
@@ -55,7 +57,7 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 22,
     fontWeight: '800',
-    color: Colors.dark,
+    color: colors.dark,
     fontFamily: FontFamily.bold,
     letterSpacing: -0.3,
   },
@@ -63,3 +65,7 @@ const styles = StyleSheet.create({
     marginTop: 28,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

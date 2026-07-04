@@ -13,7 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatCurrency, type DataPlan } from '../lib/api';
-import { Colors, Radius, Typography } from '../theme';
+import {Colors, Radius, Typography , Overlays, useThemedStyles } from '../theme';
 import { useColors } from '../theme/hooks';
 
 type Props = {
@@ -35,6 +35,7 @@ function PlanPickerRow({
   selected: boolean;
   onPress: () => void;
 }) {
+  const styles = useStyles();
   const colors = useColors();
 
   return (
@@ -78,6 +79,8 @@ export function DataPlanPickerSheet({
   onClose,
   onSelect,
 }: Props) {
+  const styles = useStyles();
+
   const insets = useSafeAreaInsets();
   const colors = useColors();
   const [search, setSearch] = useState('');
@@ -176,6 +179,8 @@ export function DataPlanSelectField({
   disabled = false,
   onPress,
 }: DataPlanSelectFieldProps) {
+  const styles = useStyles();
+
   const colors = useColors();
 
   return (
@@ -225,10 +230,10 @@ export function DataPlanSelectField({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    backgroundColor: Overlays.rgba15_23_42_045,
   },
   sheet: {
     maxHeight: '78%',
@@ -242,7 +247,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(15, 23, 42, 0.12)',
+    backgroundColor: Overlays.rgba15_23_42_012,
     marginBottom: 12,
   },
   header: {
@@ -351,7 +356,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -381,3 +386,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

@@ -18,7 +18,7 @@ import {
   getPermanentVirtualAccounts,
   type WalletFundingSnapshot,
 } from '../lib/wallet-funding-cache';
-import { Colors } from '../theme';
+import {Colors , Overlays, useThemedStyles } from '../theme';
 import { GlassSurface } from './ui/GlassSurface';
 import { BankLogo } from './BankLogo';
 import { showToast } from './ui/Toast';
@@ -72,6 +72,7 @@ function AccountSlide({
   width: number;
   onCopy: (accountNumber: string) => void;
 }) {
+  const styles = useStyles();
   const bank = resolveAccountBank(account, banks);
   const canCopy = account.accountNumber.length > 0;
 
@@ -123,6 +124,8 @@ export function WalletAccountCard({
   onPressFund,
   compact = true,
 }: WalletAccountCardProps) {
+  const styles = useStyles();
+
   const [activeIndex, setActiveIndex] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
 
@@ -259,7 +262,7 @@ export function WalletAccountCard({
   return null;
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   cardBody: {
     padding: CARD_PAD,
   },
@@ -280,14 +283,14 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 8,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
   title: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.dark,
+    color: colors.dark,
     letterSpacing: -0.2,
     flexShrink: 1,
   },
@@ -295,13 +298,13 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: colors.primaryLight,
   },
   fundIconBtn: {
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -320,7 +323,7 @@ const styles = StyleSheet.create({
   bankName: {
     fontSize: 12,
     fontWeight: '500',
-    color: Colors.muted,
+    color: colors.muted,
   },
   accountRow: {
     flexDirection: 'row',
@@ -330,7 +333,7 @@ const styles = StyleSheet.create({
   accountNumber: {
     fontSize: 18,
     fontWeight: '700',
-    color: Colors.dark,
+    color: colors.dark,
     letterSpacing: 0.6,
     flexShrink: 1,
   },
@@ -338,7 +341,7 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 8,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -352,26 +355,30 @@ const styles = StyleSheet.create({
     width: 5,
     height: 5,
     borderRadius: 2.5,
-    backgroundColor: 'rgba(124, 58, 237, 0.2)',
+    backgroundColor: Overlays.rgba124_58_237_02,
   },
   dotActive: {
     width: 14,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
   },
   setupSub: {
     fontSize: 12,
-    color: Colors.muted,
+    color: colors.muted,
     fontWeight: '400',
     lineHeight: 17,
   },
   foot: {
     fontSize: 10,
-    color: Colors.mutedLight,
+    color: colors.mutedLight,
     fontWeight: '400',
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.borderSubtle,
+    borderTopColor: colors.borderSubtle,
     lineHeight: 14,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

@@ -32,7 +32,7 @@ import {
   resolveLoginTwoFactorChallenge,
   stashTwoFactorLoginChallenge,
 } from '../../src/lib/two-factor-login';
-import { Colors, Spacing, Typography } from '../../src/theme';
+import {Colors, Spacing, Typography , Overlays, useThemedStyles } from '../../src/theme';
 import { useGradients } from '../../src/theme/hooks';
 import { useLayout } from '../../src/lib/platform-ui';
 import { OtpHelperTip, OtpResendButton, PremiumOtpInput } from '../../src/components/security/PremiumOtpInput';
@@ -84,6 +84,8 @@ function resolveInitialChallenge(
 }
 
 export default function Verify2FAScreen() {
+  const styles = useStyles();
+
   const params = useLocalSearchParams<{
     userId: string;
     method?: string;
@@ -327,10 +329,10 @@ export default function Verify2FAScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../src/theme/types').ThemeColors) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: Colors.pageBg,
+    backgroundColor: colors.pageBg,
   },
   flex: {
     flex: 1,
@@ -348,7 +350,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+    backgroundColor: Overlays.white14,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -357,29 +359,29 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
   card: {
-    backgroundColor: Colors.white,
+    backgroundColor: colors.card,
     borderRadius: 24,
     paddingHorizontal: 20,
     paddingTop: 24,
     paddingBottom: 28,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.borderSubtle,
+    borderColor: colors.borderSubtle,
   },
   eyebrow: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.primary,
+    color: colors.primary,
     marginBottom: 6,
   },
   title: {
     ...Typography.h2,
     fontSize: 24,
-    color: Colors.dark,
+    color: colors.dark,
     marginBottom: 8,
   },
   subtitle: {
     ...Typography.small,
-    color: Colors.muted,
+    color: colors.muted,
     lineHeight: 21,
     marginBottom: 20,
   },
@@ -391,15 +393,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.14)',
+    borderColor: Overlays.borderPrimary14,
     marginBottom: 8,
   },
   methodPillText: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.primary,
+    color: colors.primary,
   },
   verifyBtn: {
     marginTop: 12,
@@ -407,7 +409,7 @@ const styles = StyleSheet.create({
   dismissHint: {
     marginTop: 8,
     fontSize: 12,
-    color: Colors.mutedLight,
+    color: colors.mutedLight,
     textAlign: 'center',
   },
   loadingRow: {
@@ -419,6 +421,10 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     ...Typography.small,
-    color: Colors.muted,
+    color: colors.muted,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

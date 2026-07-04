@@ -17,7 +17,7 @@ import {
 } from '../../src/lib/biometric-settings-cache';
 import { getBiometricCredentials } from '../../src/lib/security-storage';
 import { showToast } from '../../src/components/ui/Toast';
-import { Colors, Radius } from '../../src/theme';
+import {Colors, Radius , Palette, FormColors, BRAND, Overlays, useThemedStyles } from '../../src/theme';
 import type { SecurityPrefs } from '../../src/lib/security-storage';
 
 
@@ -31,6 +31,8 @@ function syncUserBiometricFlag(
 }
 
 export default function BiometricSettingsScreen() {
+  const styles = useStyles();
+
   const user = useAuthStore((s) => s.user);
   const updateUser = useAuthStore((s) => s.updateUser);
   const prefs = useSecurityStore((s) => s.prefs);
@@ -256,6 +258,7 @@ function ToggleRow({
   onValueChange: (v: boolean) => void;
   disabled?: boolean;
 }) {
+  const styles = useStyles();
   return (
     <View style={styles.row}>
       <View style={styles.rowText}>
@@ -267,13 +270,13 @@ function ToggleRow({
         onValueChange={onValueChange}
         disabled={disabled}
         trackColor={{ false: Colors.borderMid, true: Colors.primary }}
-        thumbColor="#fff"
+        thumbColor={Palette.white}
       />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../src/theme/types').ThemeColors) => StyleSheet.create({
   card: { overflow: 'hidden' },
   row: {
     flexDirection: 'row',
@@ -284,7 +287,11 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   rowText: { flex: 1 },
-  rowTitle: { fontSize: 15, fontWeight: '600', color: Colors.dark },
-  rowSub: { fontSize: 13, color: Colors.muted, marginTop: 2 },
-  divider: { height: StyleSheet.hairlineWidth, backgroundColor: Colors.border, marginLeft: 16 },
+  rowTitle: { fontSize: 15, fontWeight: '600', color: colors.dark },
+  rowSub: { fontSize: 13, color: colors.muted, marginTop: 2 },
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 16 },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

@@ -9,7 +9,7 @@ import {
   type TextInputProps,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Radius, Typography } from '../../theme';
+import {Colors, Radius, Typography , Palette, FormColors, BRAND, Overlays, useThemedStyles } from '../../theme';
 
 const BOX_SIZE = 46;
 const BOX_GAP = 8;
@@ -26,6 +26,7 @@ type PremiumOtpInputProps = {
 
 export const PremiumOtpInput = React.forwardRef<TextInput, PremiumOtpInputProps>(
   function PremiumOtpInput({ value, onChange, onComplete, autoFocus = true }, ref) {
+    const styles = useStyles();
     const inputRef = useRef<TextInput>(null);
     const digits = value.padEnd(6, ' ').split('').slice(0, 6);
     const activeIndex = Math.min(value.length, 5);
@@ -96,7 +97,7 @@ export const PremiumOtpInput = React.forwardRef<TextInput, PremiumOtpInputProps>
   },
 );
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   wrap: {
     alignItems: 'center',
     gap: 8,
@@ -118,24 +119,24 @@ const styles = StyleSheet.create({
     height: ROW_HEIGHT,
     borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: Colors.borderSubtle,
-    backgroundColor: '#FAFBFC',
+    borderColor: colors.borderSubtle,
+    backgroundColor: colors.formBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
   boxActive: {
-    borderColor: Colors.primary,
-    backgroundColor: '#FAF5FF',
+    borderColor: colors.primary,
+    backgroundColor: colors.pinFilled,
     borderWidth: 2,
   },
   boxFilled: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primaryMuted,
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryMuted,
   },
   digit: {
     fontSize: 20,
     fontWeight: '800',
-    color: Colors.dark,
+    color: colors.dark,
     letterSpacing: -0.5,
   },
   overlayInput: {
@@ -150,12 +151,18 @@ const styles = StyleSheet.create({
   },
   tapHint: {
     fontSize: 12,
-    color: Colors.mutedLight,
+    color: colors.mutedLight,
     textAlign: 'center',
   },
 });
 
+function useStyles() {
+  return useThemedStyles(createStyles);
+}
+
 export function OtpHelperTip({ text }: { text: string }) {
+  const helperStyles = useThemedStyles(createHelperStyles);
+
   return (
     <View style={helperStyles.tipRow}>
       <View style={helperStyles.tipIcon}>
@@ -175,6 +182,8 @@ export function OtpResendButton({
   disabled?: boolean;
   label?: string;
 }) {
+  const helperStyles = useThemedStyles(createHelperStyles);
+
   return (
     <TouchableOpacity
       style={helperStyles.resendBtn}
@@ -188,7 +197,7 @@ export function OtpResendButton({
   );
 }
 
-const helperStyles = StyleSheet.create({
+const createHelperStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   resendBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -200,11 +209,11 @@ const helperStyles = StyleSheet.create({
   },
   resendText: {
     ...Typography.bodyMed,
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: '600',
   },
   resendTextDisabled: {
-    color: Colors.mutedLight,
+    color: colors.mutedLight,
   },
   tipRow: {
     flexDirection: 'row',
@@ -213,22 +222,22 @@ const helperStyles = StyleSheet.create({
     marginTop: 12,
     padding: 14,
     borderRadius: Radius.md,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.12)',
+    borderColor: Overlays.darkAmbientPrimary,
   },
   tipIcon: {
     width: 28,
     height: 28,
     borderRadius: 10,
-    backgroundColor: Colors.white,
+    backgroundColor: colors.card,
     alignItems: 'center',
     justifyContent: 'center',
   },
   tipText: {
     flex: 1,
     ...Typography.small,
-    color: Colors.muted,
+    color: colors.muted,
     lineHeight: 20,
   },
 });

@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { GlassCard } from '../ui/GlassCard';
 import { OtpHelperTip, OtpResendButton, PremiumOtpInput } from './PremiumOtpInput';
 import type { TwoFactorMethodType } from '../../lib/api';
-import { Colors, Radius } from '../../theme';
+import {Colors, Radius, useThemedStyles } from '../../theme';
 import { useColors } from '../../theme/hooks';
 import { SERVICE_ICON } from '../../lib/service-catalog-ui';
 
@@ -40,6 +40,8 @@ export function Disable2FAVerifyCard({
   onResend,
   resendDisabled,
 }: Props) {
+  const styles = useStyles();
+
   const meta = METHOD_META[method];
   const colors = useColors();
   const otpInputRef = useRef<TextInput>(null);
@@ -103,9 +105,9 @@ export function Disable2FAVerifyCard({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   card: {
-    backgroundColor: Colors.white,
+    backgroundColor: colors.card,
     paddingHorizontal: 20,
     paddingTop: 18,
     paddingBottom: 22,
@@ -139,20 +141,20 @@ const styles = StyleSheet.create({
   eyebrow: {
     fontSize: 11,
     fontWeight: '800',
-    color: Colors.primary,
+    color: colors.primary,
     letterSpacing: 0.6,
     textTransform: 'uppercase',
   },
   stepTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: Colors.dark,
+    color: colors.dark,
     textAlign: 'center',
     letterSpacing: -0.3,
   },
   stepSubtitle: {
     fontSize: 13,
-    color: Colors.muted,
+    color: colors.muted,
     textAlign: 'center',
     lineHeight: 19,
   },
@@ -176,7 +178,7 @@ const styles = StyleSheet.create({
   methodChipText: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.dark,
+    color: colors.dark,
   },
   notice: {
     flexDirection: 'row',
@@ -192,3 +194,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

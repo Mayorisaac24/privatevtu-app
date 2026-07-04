@@ -1,6 +1,10 @@
-import { ReactNode } from 'react';
+import { ReactNode, useMemo } from 'react';
+import { Overlays } from '../../theme/colors/app-colors';
+import { withAlpha } from '../../theme/gradient-utils';
 import { Platform, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { BlurView } from 'expo-blur';
+import { useColors, useTheme } from '../../theme/hooks';
+import type { ThemeColors } from '../../theme/types';
 
 export type GlassVariant = 'light' | 'tinted' | 'dark' | 'solid';
 
@@ -13,39 +17,46 @@ type GlassSurfaceProps = {
   borderRadius?: number;
 };
 
-const VARIANTS: Record<
-  GlassVariant,
-  { tint: 'light' | 'dark' | 'default'; overlay: string; border: string; intensity: number; blur: boolean }
-> = {
-  light: {
-    tint: 'light',
-    overlay: 'rgba(255, 255, 255, 0.94)',
-    border: 'rgba(15, 23, 42, 0.06)',
-    intensity: 16,
-    blur: true,
-  },
-  tinted: {
-    tint: 'light',
-    overlay: 'rgba(252, 251, 255, 0.92)',
-    border: 'rgba(124, 58, 237, 0.08)',
-    intensity: 14,
-    blur: true,
-  },
-  dark: {
-    tint: 'dark',
-    overlay: 'rgba(26, 10, 60, 0.82)',
-    border: 'rgba(255, 255, 255, 0.14)',
-    intensity: 20,
-    blur: true,
-  },
-  solid: {
-    tint: 'light',
-    overlay: '#FFFFFF',
-    border: 'rgba(15, 23, 42, 0.06)',
-    intensity: 0,
-    blur: false,
-  },
+type GlassPreset = {
+  tint: 'light' | 'dark' | 'default';
+  overlay: string;
+  border: string;
+  intensity: number;
+  blur: boolean;
 };
+
+function buildPresets(colors: ThemeColors, isDark: boolean): Record<GlassVariant, GlassPreset> {
+  return {
+    light: {
+      tint: isDark ? 'dark' : 'light',
+      overlay: isDark ? colors.surface : colors.glassOverlay,
+      border: colors.glassBorder,
+      intensity: isDark ? 0 : 16,
+      blur: !isDark,
+    },
+    tinted: {
+      tint: isDark ? 'dark' : 'light',
+      overlay: isDark ? colors.surfaceAlt : colors.glassOverlay,
+      border: isDark ? colors.glassBorder : colors.border,
+      intensity: isDark ? 0 : 14,
+      blur: !isDark,
+    },
+    dark: {
+      tint: 'dark',
+      overlay: withAlpha(colors.primaryDeep, 0.82),
+      border: withAlpha(colors.white, 0.16),
+      intensity: 0,
+      blur: false,
+    },
+    solid: {
+      tint: isDark ? 'dark' : 'light',
+      overlay: colors.card,
+      border: colors.glassBorder,
+      intensity: 0,
+      blur: false,
+    },
+  };
+}
 
 export function GlassSurface({
   children,
@@ -55,9 +66,11 @@ export function GlassSurface({
   intensity,
   borderRadius = 16,
 }: GlassSurfaceProps) {
-  const preset = VARIANTS[variant];
+  const colors = useColors();
+  const { isDark } = useTheme();
+  const presets = useMemo(() => buildPresets(colors, isDark), [colors, isDark]);
+  const preset = presets[variant];
   const blurIntensity = intensity ?? preset.intensity;
-  // BlurView is unreliable on some Android devices — use solid overlay instead.
   const useBlur = preset.blur && blurIntensity > 0 && Platform.OS === 'ios';
 
   return (
@@ -107,7 +120,7 @@ const styles = StyleSheet.create({
     left: 12,
     right: 12,
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+    backgroundColor: Overlays.glassShine,
   },
   content: {
     position: 'relative',

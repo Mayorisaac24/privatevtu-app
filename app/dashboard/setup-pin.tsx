@@ -10,12 +10,14 @@ import { showToast } from '../../src/components/ui/Toast';
 import { useAuthStore } from '../../src/stores';
 import { useStatusBarStyle } from '../../src/hooks/useStatusBarStyle';
 import { useKeyboardInsets } from '../../src/hooks/useKeyboardInsets';
-import { Colors, Typography } from '../../src/theme';
+import {Colors, Typography , Overlays, useThemedStyles } from '../../src/theme';
 import { GlassSurface } from '../../src/components/ui/GlassSurface';
 import { KeyboardDismissView } from '../../src/components/ui/KeyboardDismissView';
 import { hiddenNumericInputStyle } from '../../src/lib/platform-ui';
 
 export default function SetupPinScreen() {
+  const styles = useStyles();
+
   useStatusBarStyle('light');
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
@@ -132,8 +134,8 @@ export default function SetupPinScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.primaryDeep },
+const createStyles = (colors: import('../../src/theme/types').ThemeColors) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.primaryDeep },
   flex: { flex: 1 },
   scroll: { flexGrow: 1 },
   hero: { paddingTop: 80, paddingBottom: 36, alignItems: 'center' },
@@ -142,26 +144,26 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: Colors.success,
+    backgroundColor: colors.success,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
-    shadowColor: Colors.success,
+    shadowColor: colors.success,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.35,
     shadowRadius: 16,
     elevation: 8,
   },
-  heroTitle: { ...Typography.h2, color: Colors.white, marginBottom: 8 },
-  heroSub: { ...Typography.small, color: 'rgba(255,255,255,0.7)', textAlign: 'center', paddingHorizontal: 40 },
+  heroTitle: { ...Typography.h2, color: colors.white, marginBottom: 8 },
+  heroSub: { ...Typography.small, color: Overlays.rgba255_255_255_07, textAlign: 'center', paddingHorizontal: 40 },
   card: { flex: 1, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
   cardContent: { paddingTop: 44, paddingBottom: 48, alignItems: 'center' },
   stepRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  stepDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: Colors.border },
-  stepDotActive: { backgroundColor: Colors.primary },
-  stepLine: { width: 44, height: 2, backgroundColor: Colors.border, marginHorizontal: 8 },
-  stepLineDone: { backgroundColor: Colors.primary },
-  stepLabel: { ...Typography.caption, color: Colors.muted, marginBottom: 40 },
+  stepDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.border },
+  stepDotActive: { backgroundColor: colors.primary },
+  stepLine: { width: 44, height: 2, backgroundColor: colors.border, marginHorizontal: 8 },
+  stepLineDone: { backgroundColor: colors.primary },
+  stepLabel: { ...Typography.caption, color: colors.muted, marginBottom: 40 },
   pinTapArea: { alignItems: 'center' },
   pinDots: { flexDirection: 'row', gap: 20, marginBottom: 28 },
   dot: {
@@ -169,14 +171,18 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
     borderWidth: 2.5,
-    borderColor: Colors.borderMid,
+    borderColor: colors.borderMid,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  dotFilled: { borderColor: Colors.primary, backgroundColor: Colors.primaryMuted },
-  dotInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.primary },
+  dotFilled: { borderColor: colors.primary, backgroundColor: colors.primaryMuted },
+  dotInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary },
   hiddenInput: hiddenNumericInputStyle,
   loadRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  loadText: { ...Typography.small, color: Colors.muted },
-  tapHint: { ...Typography.caption, color: Colors.borderMid, marginTop: 24 },
+  loadText: { ...Typography.small, color: colors.muted },
+  tapHint: { ...Typography.caption, color: colors.borderMid, marginTop: 24 },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

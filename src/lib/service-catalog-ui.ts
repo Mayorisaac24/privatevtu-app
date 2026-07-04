@@ -122,15 +122,13 @@ export const SERVICE_CATALOG_GROUPS: Array<{ title: string; items: ServiceCatalo
 export const HOME_QUICK_ACTIONS: Array<{
   title: string;
   icon: string;
-  color: string;
-  bg: string;
   route: string;
   serviceCode?: ServiceCode;
 }> = [
-  { title: 'Airtime', icon: 'phone-portrait-outline', ...SERVICE_ICON, route: '/services/airtime', serviceCode: SERVICE_CODES.airtime },
-  { title: 'Data', icon: 'wifi-outline', ...SERVICE_ICON, route: '/services/data', serviceCode: SERVICE_CODES.data },
-  { title: 'Electric', icon: 'flash-outline', ...SERVICE_ICON, route: '/services/electricity', serviceCode: SERVICE_CODES.electricity },
-  { title: 'Cable TV', icon: 'tv-outline', ...SERVICE_ICON, route: '/services/cable', serviceCode: SERVICE_CODES.cable },
-  { title: 'Education', icon: 'school-outline', ...SERVICE_ICON, route: '/services/education', serviceCode: SERVICE_CODES.education },
-  { title: 'More', icon: 'grid-outline', ...SERVICE_ICON, route: 'TAB:services' },
+  { title: 'Airtime', icon: 'phone-portrait-outline', route: '/services/airtime', serviceCode: SERVICE_CODES.airtime },
+  { title: 'Data', icon: 'wifi-outline', route: '/services/data', serviceCode: SERVICE_CODES.data },
+  { title: 'Electric', icon: 'flash-outline', route: '/services/electricity', serviceCode: SERVICE_CODES.electricity },
+  { title: 'Cable TV', icon: 'tv-outline', route: '/services/cable', serviceCode: SERVICE_CODES.cable },
+  { title: 'Education', icon: 'school-outline', route: '/services/education', serviceCode: SERVICE_CODES.education },
+  { title: 'More', icon: 'grid-outline', route: 'TAB:services' },
 ];

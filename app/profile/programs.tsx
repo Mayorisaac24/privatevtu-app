@@ -24,8 +24,14 @@ import {
 } from '../../src/lib/api';
 import type { TransactionAuthPayload } from '../../src/hooks/useTransactionLockAuth';
 import { useWalletStore } from '../../src/stores';
-import { Colors, Radius, Spacing } from '../../src/theme';
+import {Colors, Radius, Spacing, useThemedStyles } from '../../src/theme';
 import { showToast } from '../../src/components/ui/Toast';
+import {
+  getProgramsData,
+  peekProgramsCache,
+  pullToRefreshPrograms,
+  preloadProgramsData,
+} from '../../src/lib/programs-cache';
 
 function formatNaira(amount: number) {
   return `₦${amount.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
@@ -42,35 +48,43 @@ function formatUpgradeStatus(status: string) {
 }
 
 export default function ProgramsScreen() {
+  const styles = useStyles();
+
   const balanceKobo = useWalletStore((s) => s.balance);
-  const [loading, setLoading] = useState(true);
-  const [currentType, setCurrentType] = useState<UserTypeSnapshot | null>(null);
-  const [programs, setPrograms] = useState<UpgradeProgram[]>([]);
-  const [history, setHistory] = useState<UserTypeUpgradeRecord[]>([]);
+  const initialCache = peekProgramsCache();
+  const [loading, setLoading] = useState(!initialCache);
+  const [currentType, setCurrentType] = useState<UserTypeSnapshot | null>(() => initialCache?.currentType ?? null);
+  const [programs, setPrograms] = useState<UpgradeProgram[]>(() => initialCache?.programs ?? []);
+  const [history, setHistory] = useState<UserTypeUpgradeRecord[]>(() => initialCache?.history ?? []);
   const [selectedProgram, setSelectedProgram] = useState<UpgradeProgram | null>(null);
   const [showAuth, setShowAuth] = useState(false);
   const [processing, setProcessing] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [typeRes, programsRes, historyRes] = await Promise.all([
-        api.getMyUserType(),
-        api.getUpgradePrograms(),
-        api.getUserTypeUpgrades(),
-      ]);
-      if (isResponseSuccess(typeRes) && typeRes.data) setCurrentType(typeRes.data);
-      else if (!isResponseSuccess(typeRes)) {
-        showToast({ type: 'error', text1: 'Could not load current plan', text2: typeRes.message });
-      }
-      if (isResponseSuccess(programsRes) && programsRes.data) setPrograms(programsRes.data);
-      if (isResponseSuccess(historyRes) && historyRes.data) setHistory(historyRes.data);
-    } catch {
-      showToast({ type: 'error', text1: 'Could not load programs' });
-    } finally {
-      setLoading(false);
-    }
+  const applySnapshot = useCallback((snapshot: NonNullable<ReturnType<typeof peekProgramsCache>>) => {
+    setCurrentType(snapshot.currentType);
+    setPrograms(snapshot.programs);
+    setHistory(snapshot.history);
   }, []);
+
+  const load = useCallback(async (options?: { force?: boolean; showSpinner?: boolean }) => {
+    const showSpinner = options?.showSpinner ?? !peekProgramsCache();
+    if (showSpinner) setLoading(true);
+    try {
+      const snapshot = options?.force
+        ? await pullToRefreshPrograms()
+        : await getProgramsData();
+      if (snapshot) applySnapshot(snapshot);
+      else if (!peekProgramsCache()) {
+        showToast({ type: 'error', text1: 'Could not load programs' });
+      }
+    } catch {
+      if (!peekProgramsCache()) {
+        showToast({ type: 'error', text1: 'Could not load programs' });
+      }
+    } finally {
+      if (showSpinner) setLoading(false);
+    }
+  }, [applySnapshot]);
 
   useFocusEffect(
     useCallback(() => {
@@ -97,7 +111,7 @@ export default function ProgramsScreen() {
         if (isResponseSuccess(balRes)) {
           useWalletStore.getState().setBalance(parseWalletBalanceKobo(balRes.data));
         }
-        await load();
+        await load({ force: true, showSpinner: false });
       } else {
         showToast({ type: 'error', text1: 'Upgrade failed', text2: res.message });
       }
@@ -250,13 +264,13 @@ export default function ProgramsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../src/theme/types').ThemeColors) => StyleSheet.create({
   loader: { marginTop: 24 },
   stack: { gap: Spacing.md },
   sectionLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.muted,
+    color: colors.muted,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
     marginBottom: 6,
@@ -264,18 +278,18 @@ const styles = StyleSheet.create({
   currentName: {
     fontSize: 20,
     fontWeight: '800',
-    color: Colors.dark,
+    color: colors.dark,
   },
   currentDesc: {
     marginTop: 6,
     fontSize: 13,
     lineHeight: 20,
-    color: Colors.mid,
+    color: colors.mid,
   },
   sectionTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.mid,
+    color: colors.mid,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
     marginTop: 4,
@@ -288,7 +302,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 14,
     lineHeight: 21,
-    color: Colors.mid,
+    color: colors.mid,
   },
   programRow: {
     flexDirection: 'row',
@@ -299,27 +313,27 @@ const styles = StyleSheet.create({
   programName: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.dark,
+    color: colors.dark,
   },
   programDesc: {
     fontSize: 13,
     lineHeight: 19,
-    color: Colors.mid,
+    color: colors.mid,
   },
   programPrice: {
     marginTop: 4,
     fontSize: 15,
     fontWeight: '700',
-    color: Colors.primary,
+    color: colors.primary,
   },
   upgradeBtn: {
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: Radius.md,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
   },
   upgradeBtnText: {
-    color: Colors.white,
+    color: colors.white,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -331,22 +345,26 @@ const styles = StyleSheet.create({
   historyTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.dark,
+    color: colors.dark,
   },
   historyMeta: {
     marginTop: 2,
     fontSize: 12,
-    color: Colors.muted,
+    color: colors.muted,
   },
   historyFailure: {
     marginTop: 4,
     fontSize: 12,
-    color: Colors.error,
+    color: colors.error,
     lineHeight: 17,
   },
   historyAmount: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.dark,
+    color: colors.dark,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

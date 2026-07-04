@@ -22,8 +22,8 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
+        <ThemeProvider>
         <FontBootstrap>
-          <ThemeProvider>
           <AppStatusBar />
           <SessionBootstrap />
           <PushNotificationsBootstrap />
@@ -45,8 +45,8 @@ export default function RootLayout() {
             <AppLockHost />
           </View>
           <ToastProvider visibilityTime={3500} />
-          </ThemeProvider>
         </FontBootstrap>
+        </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

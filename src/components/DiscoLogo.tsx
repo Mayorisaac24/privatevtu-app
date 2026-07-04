@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { View, Image, StyleSheet } from 'react-native';
 import type { ElectricityProvider } from '../lib/api';
 import { getDiscoLogo } from '../lib/disco-providers';
-import { Colors } from '../theme';
+import {Colors , Overlays, useThemedStyles } from '../theme';
 
 type Props = {
   provider: Pick<ElectricityProvider, 'code' | 'id' | 'name' | 'imageUrl' | 'updatedAt'>;
@@ -10,6 +10,8 @@ type Props = {
 };
 
 export function DiscoLogo({ provider, size = 36 }: Props) {
+  const styles = useStyles();
+
   const source = useMemo(
     () => getDiscoLogo(provider),
     [provider.code, provider.id, provider.imageUrl, provider.updatedAt],
@@ -44,13 +46,17 @@ export function DiscoLogo({ provider, size = 36 }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   wrap: {
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(124, 58, 237, 0.18)',
+    borderColor: Overlays.borderPrimary18,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

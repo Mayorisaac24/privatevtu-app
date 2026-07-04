@@ -17,54 +17,66 @@ import {
   isResponseSuccess,
   type ApiAccessSnapshot,
 } from '../../src/lib/api';
-import { Colors, Radius, Spacing } from '../../src/theme';
+import {Colors, Radius, Spacing, useThemedStyles } from '../../src/theme';
 import { showToast } from '../../src/components/ui/Toast';
+import {
+  getApiAccessData,
+  peekApiAccessCache,
+  pullToRefreshApiAccess,
+  readApiAccessFormState,
+} from '../../src/lib/api-access-cache';
 
 const SERVICE_OPTIONS = ['airtime', 'data', 'electricity', 'cable', 'betting'] as const;
 const FORMAT_OPTIONS = [
-  { value: 'PLATFORM' as const, label: 'Platform JSON', desc: 'Native PrivateVTU response format' },
+  { value: 'PLATFORM' as const, label: 'Platform JSON', desc: 'Native Datamart response format' },
   { value: 'MSORG' as const, label: 'MSORG compatible', desc: 'Drop-in for MSORG integrators' },
 ];
 
 export default function ApiAccessScreen() {
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [snapshot, setSnapshot] = useState<ApiAccessSnapshot | null>(null);
-  const [clientName, setClientName] = useState('');
-  const [responseFormat, setResponseFormat] = useState<'PLATFORM' | 'MSORG'>('PLATFORM');
-  const [allowedServices, setAllowedServices] = useState<string[]>([...SERVICE_OPTIONS]);
-  const [webhookUrl, setWebhookUrl] = useState('');
-  const [userNote, setUserNote] = useState('');
+  const styles = useStyles();
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await api.getMyApiAccess();
-      if (isResponseSuccess(res) && res.data) {
-        setSnapshot(res.data);
-        if (res.data.activeClient) {
-          setClientName(res.data.activeClient.name || '');
-          setResponseFormat(res.data.activeClient.responseFormat);
-          setAllowedServices(
-            res.data.activeClient.allowedServices?.length
-              ? res.data.activeClient.allowedServices
-              : [...SERVICE_OPTIONS],
-          );
-          setWebhookUrl(res.data.activeClient.webhookUrl || '');
-        } else if (res.data.pending) {
-          setClientName(res.data.pending.clientName);
-          setResponseFormat(res.data.pending.requestedResponseFormat);
-          setAllowedServices(res.data.pending.requestedAllowedServices);
-          setWebhookUrl(res.data.pending.requestedWebhookUrl || '');
-          setUserNote(res.data.pending.userNote || '');
-        }
-      }
-    } catch {
-      showToast({ type: 'error', text1: 'Could not load API access status' });
-    } finally {
-      setLoading(false);
+  const initialCache = peekApiAccessCache();
+  const initialForm = initialCache ? readApiAccessFormState(initialCache) : null;
+  const [loading, setLoading] = useState(!initialCache);
+  const [submitting, setSubmitting] = useState(false);
+  const [snapshot, setSnapshot] = useState<ApiAccessSnapshot | null>(() => initialCache);
+  const [clientName, setClientName] = useState(() => initialForm?.clientName ?? '');
+  const [responseFormat, setResponseFormat] = useState<'PLATFORM' | 'MSORG'>(() => initialForm?.responseFormat ?? 'PLATFORM');
+  const [allowedServices, setAllowedServices] = useState<string[]>(() => initialForm?.allowedServices ?? [...SERVICE_OPTIONS]);
+  const [webhookUrl, setWebhookUrl] = useState(() => initialForm?.webhookUrl ?? '');
+  const [userNote, setUserNote] = useState(() => initialForm?.userNote ?? '');
+
+  const applySnapshot = useCallback((data: ApiAccessSnapshot) => {
+    setSnapshot(data);
+    const form = readApiAccessFormState(data);
+    if (form) {
+      setClientName(form.clientName);
+      setResponseFormat(form.responseFormat);
+      setAllowedServices(form.allowedServices);
+      setWebhookUrl(form.webhookUrl);
+      setUserNote(form.userNote);
     }
   }, []);
+
+  const load = useCallback(async (options?: { force?: boolean; showSpinner?: boolean }) => {
+    const showSpinner = options?.showSpinner ?? !peekApiAccessCache();
+    if (showSpinner) setLoading(true);
+    try {
+      const data = options?.force
+        ? await pullToRefreshApiAccess()
+        : await getApiAccessData();
+      if (data) applySnapshot(data);
+      else if (!peekApiAccessCache()) {
+        showToast({ type: 'error', text1: 'Could not load API access status' });
+      }
+    } catch {
+      if (!peekApiAccessCache()) {
+        showToast({ type: 'error', text1: 'Could not load API access status' });
+      }
+    } finally {
+      if (showSpinner) setLoading(false);
+    }
+  }, [applySnapshot]);
 
   useFocusEffect(
     useCallback(() => {
@@ -110,7 +122,7 @@ export default function ApiAccessScreen() {
             ? 'Your pending request has been updated'
             : 'An admin will review your API access request',
         });
-        await load();
+        await load({ force: true, showSpinner: false });
       } else {
         showToast({ type: 'error', text1: 'Request failed', text2: res.message });
       }
@@ -133,7 +145,7 @@ export default function ApiAccessScreen() {
         setClientName('');
         setUserNote('');
         setWebhookUrl('');
-        await load();
+        await load({ force: true, showSpinner: false });
       } else {
         showToast({ type: 'error', text1: 'Could not cancel request', text2: res.message });
       }
@@ -163,7 +175,7 @@ export default function ApiAccessScreen() {
           text1: 'Settings saved',
           text2: `Response format is now ${responseFormat}`,
         });
-        await load();
+        await load({ force: true, showSpinner: false });
       } else {
         showToast({ type: 'error', text1: 'Could not save settings', text2: res.message });
       }
@@ -402,13 +414,13 @@ export default function ApiAccessScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../src/theme/types').ThemeColors) => StyleSheet.create({
   loader: { marginTop: 24 },
   stack: { gap: Spacing.md },
   sectionTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: Colors.dark,
+    color: colors.dark,
     marginBottom: 6,
   },
   statusHeader: {
@@ -420,35 +432,35 @@ const styles = StyleSheet.create({
   statusTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.dark,
+    color: colors.dark,
   },
   meta: {
     fontSize: 13,
     lineHeight: 20,
-    color: Colors.mid,
+    color: colors.mid,
   },
   hint: {
     marginTop: 10,
     fontSize: 12,
     lineHeight: 18,
-    color: Colors.muted,
+    color: colors.muted,
   },
   fieldLabel: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.mid,
+    color: colors.mid,
     marginBottom: 8,
   },
   fieldGap: { marginTop: 14 },
   input: {
     borderWidth: 1,
-    borderColor: Colors.borderMid,
+    borderColor: colors.borderMid,
     borderRadius: Radius.md,
     paddingHorizontal: 12,
     paddingVertical: 12,
     fontSize: 14,
-    color: Colors.dark,
-    backgroundColor: Colors.surface,
+    color: colors.dark,
+    backgroundColor: colors.surface,
   },
   textArea: {
     minHeight: 88,
@@ -461,19 +473,19 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: Radius.md,
     borderWidth: 1,
-    borderColor: Colors.borderMid,
+    borderColor: colors.borderMid,
     marginBottom: 8,
   },
   formatOptionSelected: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primaryMuted,
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryMuted,
   },
   formatRadio: {
     width: 18,
     height: 18,
     borderRadius: 9,
     borderWidth: 2,
-    borderColor: Colors.primary,
+    borderColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 2,
@@ -482,17 +494,17 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
   },
   formatLabel: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.dark,
+    color: colors.dark,
   },
   formatDesc: {
     marginTop: 2,
     fontSize: 12,
-    color: Colors.muted,
+    color: colors.muted,
     lineHeight: 17,
   },
   chipRow: {
@@ -505,21 +517,21 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: Radius.full,
     borderWidth: 1,
-    borderColor: Colors.borderMid,
-    backgroundColor: Colors.surface,
+    borderColor: colors.borderMid,
+    backgroundColor: colors.surface,
   },
   chipActive: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primaryMuted,
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryMuted,
   },
   chipText: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.mid,
+    color: colors.mid,
     textTransform: 'capitalize',
   },
   chipTextActive: {
-    color: Colors.primary,
+    color: colors.primary,
   },
   cancelBtn: {
     marginTop: 12,
@@ -528,17 +540,21 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: Radius.md,
     borderWidth: 1,
-    borderColor: Colors.error,
+    borderColor: colors.error,
   },
   cancelBtnText: {
-    color: Colors.error,
+    color: colors.error,
     fontSize: 13,
     fontWeight: '600',
   },
   rejectedTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.error,
+    color: colors.error,
     marginBottom: 6,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

@@ -12,9 +12,11 @@ import { ProfileSubScreen } from '../../../src/components/profile/ProfileSubScre
 import { GlassCard } from '../../../src/components/ui/GlassCard';
 import { disputeStatusColor, disputeStatusLabel } from '../../../src/lib/support';
 import { useDisputesList } from '../../../src/hooks/useSupportContent';
-import { Colors, Radius } from '../../../src/theme';
+import { Colors, Radius, useThemedStyles } from '../../../src/theme';
 
 export default function DisputesListScreen() {
+  const styles = useStyles();
+
   const { items, loading, refreshing, refresh } = useDisputesList();
 
   return (
@@ -71,27 +73,31 @@ export default function DisputesListScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../../src/theme/types').ThemeColors) => StyleSheet.create({
   list: { gap: 10 },
   row: { gap: 6 },
   rowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
-  ref: { fontSize: 14, fontWeight: '700', color: Colors.dark },
+  ref: { fontSize: 14, fontWeight: '700', color: colors.dark },
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
   badgeText: { fontSize: 10, fontWeight: '700' },
-  reason: { fontSize: 13, color: Colors.mid, textTransform: 'capitalize' },
-  tx: { fontSize: 12, color: Colors.muted },
-  date: { fontSize: 11, color: Colors.mutedLight, marginTop: 2 },
+  reason: { fontSize: 13, color: colors.mid, textTransform: 'capitalize' },
+  tx: { fontSize: 12, color: colors.muted },
+  date: { fontSize: 11, color: colors.mutedLight, marginTop: 2 },
   empty: { alignItems: 'center', paddingVertical: 36, gap: 8 },
-  emptyTitle: { fontSize: 16, fontWeight: '700', color: Colors.dark },
-  emptySub: { fontSize: 13, color: Colors.muted, textAlign: 'center', paddingHorizontal: 20 },
+  emptyTitle: { fontSize: 16, fontWeight: '700', color: colors.dark },
+  emptySub: { fontSize: 13, color: colors.muted, textAlign: 'center', paddingHorizontal: 20 },
   createBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     borderRadius: Radius.lg,
     paddingVertical: 14,
   },
-  createBtnText: { color: Colors.white, fontSize: 15, fontWeight: '700' },
+  createBtnText: { color: colors.white, fontSize: 15, fontWeight: '700' },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

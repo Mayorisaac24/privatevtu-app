@@ -44,7 +44,7 @@ import {
 import { refreshDashboardData } from '../../src/lib/dashboard-data';
 import { formatAccountNumberDisplay } from '../../src/lib/transfer-banks';
 import { useWalletStore } from '../../src/stores';
-import { Colors, Spacing, Shadow, Radius } from '../../src/theme';
+import {Colors, Spacing, Shadow, Radius , Palette, FormColors, BRAND, Overlays, useThemedStyles } from '../../src/theme';
 import { useGradients, useColors } from '../../src/theme/hooks';
 import { gradientStops } from '../../src/theme/gradient-utils';
 import { showToast } from '../../src/components/ui/Toast';
@@ -100,6 +100,8 @@ function formatExpiry(expiresAt?: string | null): string {
 }
 
 function FundWalletScreen() {
+  const styles = useStyles();
+
   useStatusBarStyle('light');
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
@@ -947,7 +949,7 @@ function FundWalletScreen() {
           </View>
           <View style={styles.balPill}>
             <View style={styles.balPillIcon}>
-              <Ionicons name="wallet-outline" size={14} color="#E9D5FF" />
+              <Ionicons name="wallet-outline" size={14} color={Palette.heroTextMuted} />
             </View>
             <View>
               <Text style={styles.balLabel}>Balance</Text>
@@ -1149,6 +1151,8 @@ function FundWalletScreen() {
 }
 
 export default function FundWalletRoute() {
+  const styles = useStyles();
+
   return (
     <ServiceGate serviceCode={SERVICE_CODES.walletFund} title="Wallet funding">
       <FundWalletScreen />
@@ -1156,7 +1160,7 @@ export default function FundWalletRoute() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../src/theme/types').ThemeColors) => StyleSheet.create({
   flex: { flex: 1 },
   contentCurve: {
     height: 22,
@@ -1176,7 +1180,7 @@ const styles = StyleSheet.create({
     width: 140,
     height: 140,
     borderRadius: 70,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: Overlays.white06,
   },
   headerBlob2: {
     position: 'absolute',
@@ -1185,52 +1189,52 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: Overlays.rgba255_255_255_004,
   },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   backBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: Overlays.white12,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: Overlays.white08,
   },
   headerText: { flex: 1 },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: Colors.white, letterSpacing: -0.3 },
-  headerSub: { fontSize: 13, color: 'rgba(255,255,255,0.68)', marginTop: 3 },
+  headerTitle: { fontSize: 20, fontWeight: '700', color: colors.white, letterSpacing: -0.3 },
+  headerSub: { fontSize: 13, color: Overlays.white68, marginTop: 3 },
   balPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: Overlays.white12,
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: Overlays.white10,
   },
   balPillIcon: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: Overlays.white10,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  balLabel: { fontSize: 10, color: 'rgba(255,255,255,0.55)', fontWeight: '600' },
-  balText: { fontSize: 13, fontWeight: '700', color: Colors.white },
+  balLabel: { fontSize: 10, color: Overlays.white55, fontWeight: '600' },
+  balText: { fontSize: 13, fontWeight: '700', color: colors.white },
   loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   emptyWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32, gap: 8 },
-  emptyTitle: { fontSize: 16, fontWeight: '700', color: Colors.dark },
-  emptySub: { fontSize: 13, color: Colors.muted, textAlign: 'center' },
+  emptyTitle: { fontSize: 16, fontWeight: '700', color: colors.dark },
+  emptySub: { fontSize: 13, color: colors.muted, textAlign: 'center' },
   scroll: { paddingHorizontal: Spacing.page, paddingTop: 4, paddingBottom: 16, gap: 16 },
   sectionEyebrow: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.muted,
+    color: colors.muted,
     letterSpacing: 0.6,
     textTransform: 'uppercase',
     marginBottom: -6,
@@ -1253,7 +1257,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 3,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     borderTopLeftRadius: Radius.lg,
     borderTopRightRadius: Radius.lg,
   },
@@ -1261,7 +1265,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: Colors.pageBg,
+    backgroundColor: colors.pageBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1271,80 +1275,80 @@ const styles = StyleSheet.create({
     borderRadius: 17,
   },
   methodIconRingActive: {
-    backgroundColor: '#EDE9FE',
+    backgroundColor: colors.inputFilled,
   },
-  methodTabLabel: { fontSize: 13, fontWeight: '700', color: Colors.mid },
+  methodTabLabel: { fontSize: 13, fontWeight: '700', color: colors.mid },
   methodTabLabelCompact: { fontSize: 12 },
-  methodTabLabelActive: { color: Colors.primary },
-  methodTabSub: { fontSize: 10, color: Colors.muted, lineHeight: 14 },
+  methodTabLabelActive: { color: colors.primary },
+  methodTabSub: { fontSize: 10, color: colors.muted, lineHeight: 14 },
   methodTabSubCompact: { fontSize: 9, lineHeight: 13 },
-  methodTabSubActive: { color: '#7C6A9E' },
+  methodTabSubActive: { color: Palette.methodTabSub },
   card: {
     gap: 10,
   },
   fieldLabel: {
-    fontSize: 11, fontWeight: '700', color: Colors.muted,
+    fontSize: 11, fontWeight: '700', color: colors.muted,
     letterSpacing: 0.5, textTransform: 'uppercase',
   },
   amountWrap: {
     flexDirection: 'row', alignItems: 'center',
-    borderWidth: 1.5, borderColor: 'rgba(124, 58, 237, 0.35)',
-    borderRadius: 16, backgroundColor: '#FAF5FF',
+    borderWidth: 1.5, borderColor: colors.borderMid,
+    borderRadius: 16, backgroundColor: colors.card,
     paddingHorizontal: 18, height: 68, gap: 6,
   },
-  nairaSign: { fontSize: 24, fontWeight: '700', color: Colors.primary },
-  amountInput: { flex: 1, fontSize: 30, fontWeight: '800', color: Colors.heroDark, paddingVertical: 0 },
-  minHint: { fontSize: 11, color: Colors.mutedLight },
+  nairaSign: { fontSize: 24, fontWeight: '700', color: colors.primary },
+  amountInput: { flex: 1, fontSize: 30, fontWeight: '800', color: colors.dark, paddingVertical: 0 },
+  minHint: { fontSize: 11, color: colors.mutedLight },
   quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
   quickBtn: {
     width: '31%', paddingVertical: 10, borderRadius: 12,
-    backgroundColor: Colors.pageBg, borderWidth: StyleSheet.hairlineWidth, borderColor: Colors.borderSubtle,
+    backgroundColor: colors.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderSubtle,
     alignItems: 'center',
   },
-  quickBtnActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  quickText: { fontSize: 13, fontWeight: '600', color: Colors.mid },
-  quickTextActive: { color: Colors.white },
+  quickBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  quickText: { fontSize: 13, fontWeight: '600', color: colors.mid },
+  quickTextActive: { color: colors.white },
   infoBanner: {
     flexDirection: 'row', gap: 10, alignItems: 'flex-start',
-    backgroundColor: '#F5F3FF', borderRadius: 16, padding: 14,
-    borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(124, 58, 237, 0.12)',
+    backgroundColor: colors.primaryMuted, borderRadius: 16, padding: 14,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderSubtle,
   },
-  infoText: { flex: 1, fontSize: 13, color: '#5B21B6', lineHeight: 19 },
+  infoText: { flex: 1, fontSize: 13, color: colors.darkAlt, lineHeight: 19 },
   verifyCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
   },
-  verifyTitle: { fontSize: 14, fontWeight: '700', color: Colors.dark },
-  verifySub: { fontSize: 11, color: Colors.muted, marginTop: 2 },
+  verifyTitle: { fontSize: 14, fontWeight: '700', color: colors.dark },
+  verifySub: { fontSize: 11, color: colors.muted, marginTop: 2 },
   accountHero: {
-    backgroundColor: Colors.pageBg, borderRadius: 16, padding: 18,
-    alignItems: 'center', borderWidth: StyleSheet.hairlineWidth, borderColor: Colors.borderSubtle,
+    backgroundColor: colors.pageBg, borderRadius: 16, padding: 18,
+    alignItems: 'center', borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderSubtle,
   },
-  accountNumber: { fontSize: 28, fontWeight: '800', color: Colors.heroDark, letterSpacing: 1 },
-  accountBank: { fontSize: 14, fontWeight: '600', color: Colors.mid, marginTop: 6 },
-  accountName: { fontSize: 12, color: Colors.muted, marginTop: 4 },
-  accountHint: { fontSize: 13, color: Colors.muted, lineHeight: 19 },
+  accountNumber: { fontSize: 28, fontWeight: '800', color: colors.dark, letterSpacing: 1 },
+  accountBank: { fontSize: 14, fontWeight: '600', color: colors.mid, marginTop: 6 },
+  accountName: { fontSize: 12, color: colors.muted, marginTop: 4 },
+  accountHint: { fontSize: 13, color: colors.muted, lineHeight: 19 },
   secondaryBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     paddingVertical: 14, borderRadius: 14,
-    backgroundColor: '#F5F3FF', borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(124, 58, 237, 0.2)',
+    backgroundColor: colors.primaryMuted, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderSubtle,
   },
-  secondaryBtnText: { fontSize: 14, fontWeight: '700', color: Colors.primary },
+  secondaryBtnText: { fontSize: 14, fontWeight: '700', color: colors.primary },
   sentPaymentBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     paddingVertical: 14, borderRadius: 14, marginTop: 4,
-    backgroundColor: Colors.successLight,
-    borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(22, 163, 74, 0.2)',
+    backgroundColor: colors.successLight,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: Overlays.rgba22_163_74_02,
   },
-  sentPaymentBtnText: { fontSize: 14, fontWeight: '700', color: Colors.success },
+  sentPaymentBtnText: { fontSize: 14, fontWeight: '700', color: colors.success },
   linkBtn: { alignItems: 'center', paddingVertical: 8 },
-  linkBtnText: { fontSize: 13, fontWeight: '600', color: Colors.primary },
+  linkBtnText: { fontSize: 13, fontWeight: '600', color: colors.primary },
   staticAccountCard: {
-    backgroundColor: Colors.white,
+    backgroundColor: colors.card,
     borderRadius: Radius.lg,
     paddingVertical: 14,
     paddingHorizontal: 14,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.borderSubtle,
+    borderColor: colors.borderSubtle,
     ...Shadow.sm,
   },
   staticAccountCardGap: { marginTop: 12 },
@@ -1357,9 +1361,9 @@ const styles = StyleSheet.create({
     width: isAndroid ? 48 : 56,
     height: isAndroid ? 48 : 56,
     borderRadius: isAndroid ? 14 : 16,
-    backgroundColor: Colors.white,
+    backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.1)',
+    borderColor: colors.borderSubtle,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1367,7 +1371,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 14,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1388,7 +1392,7 @@ const styles = StyleSheet.create({
   staticBankLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.muted,
+    color: colors.muted,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -1399,41 +1403,41 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: Radius.full,
-    backgroundColor: Colors.successLight,
+    backgroundColor: colors.successLight,
     flexShrink: 0,
   },
   staticReadyDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: Colors.success,
+    backgroundColor: colors.success,
   },
   staticReadyText: {
     fontSize: 10,
     fontWeight: '700',
-    color: Colors.successDark,
+    color: colors.successDark,
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
   staticAccountNumber: textStyle({
     fontSize: isAndroid ? 16 : 19,
     fontWeight: isAndroid ? '700' : '800',
-    color: Colors.heroDark,
+    color: colors.dark,
     letterSpacing: isAndroid ? 0.1 : 0.35,
   }),
   staticAccountName: {
     flex: 1,
     fontSize: 12,
     fontWeight: '500',
-    color: Colors.muted,
+    color: colors.muted,
   },
   staticCopyIconBtn: {
     width: isAndroid ? 36 : 40,
     height: isAndroid ? 36 : 40,
     borderRadius: isAndroid ? 10 : 12,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.12)',
+    borderColor: Overlays.darkAmbientPrimary,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -1447,18 +1451,18 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
   accountsRefreshTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: Colors.dark,
+    color: colors.dark,
   },
   accountsRefreshMessage: {
     fontSize: 13,
-    color: Colors.muted,
+    color: colors.muted,
     textAlign: 'center',
     lineHeight: 19,
     maxWidth: 300,
@@ -1466,23 +1470,23 @@ const styles = StyleSheet.create({
   bvnGateLoading: { alignItems: 'center', paddingVertical: 40 },
   bvnGateIcon: {
     width: 56, height: 56, borderRadius: 28,
-    backgroundColor: '#F5F3FF', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: colors.primaryMuted, alignItems: 'center', justifyContent: 'center',
     alignSelf: 'center',
   },
-  bvnGateTitle: { fontSize: 18, fontWeight: '700', color: Colors.dark, textAlign: 'center' },
-  bvnGateMessage: { fontSize: 14, color: Colors.muted, lineHeight: 21, textAlign: 'center' },
+  bvnGateTitle: { fontSize: 18, fontWeight: '700', color: colors.dark, textAlign: 'center' },
+  bvnGateMessage: { fontSize: 14, color: colors.muted, lineHeight: 21, textAlign: 'center' },
   bvnGatePrimary: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: Colors.primary, borderRadius: 14, paddingVertical: 15, marginTop: 4,
+    backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 15, marginTop: 4,
   },
-  bvnGatePrimaryText: { fontSize: 15, fontWeight: '700', color: Colors.white },
+  bvnGatePrimaryText: { fontSize: 15, fontWeight: '700', color: colors.white },
   bvnGateSecondary: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: '#F5F3FF', borderRadius: 14, paddingVertical: 15,
-    borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(124, 58, 237, 0.25)',
+    backgroundColor: colors.primaryMuted, borderRadius: 14, paddingVertical: 15,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: Overlays.rgba124_58_237_025,
   },
-  bvnGateSecondaryText: { fontSize: 15, fontWeight: '700', color: Colors.primary },
-  bvnGateNote: { fontSize: 12, color: Colors.muted, textAlign: 'center' },
+  bvnGateSecondaryText: { fontSize: 15, fontWeight: '700', color: colors.primary },
+  bvnGateNote: { fontSize: 12, color: colors.muted, textAlign: 'center' },
   bankRowWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 6 },
   bankChip: {
     width: '47%',
@@ -1492,9 +1496,9 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.white,
+    backgroundColor: colors.card,
     borderWidth: 1.5,
-    borderColor: Colors.borderSubtle,
+    borderColor: colors.borderSubtle,
     gap: 10,
     position: 'relative',
     ...Shadow.sm,
@@ -1503,12 +1507,12 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: Colors.pageBg,
+    backgroundColor: colors.pageBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
   bankLogoWrapActive: {
-    backgroundColor: '#EDE9FE',
+    backgroundColor: colors.inputFilled,
   },
   bankCheckBadge: {
     position: 'absolute',
@@ -1517,26 +1521,26 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   bankChipActive: {
-    backgroundColor: '#FAF5FF',
-    borderColor: Colors.primary,
+    backgroundColor: colors.pinFilled,
+    borderColor: colors.primary,
     ...Shadow.md,
   },
-  bankChipText: { fontSize: 13, fontWeight: '600', color: Colors.mid, textAlign: 'center' },
-  bankChipTextActive: { color: Colors.primary },
+  bankChipText: { fontSize: 13, fontWeight: '600', color: colors.mid, textAlign: 'center' },
+  bankChipTextActive: { color: colors.primary },
   dynamicHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   expiryBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: Colors.warningLight, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8,
+    backgroundColor: colors.warningLight, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8,
   },
-  expiryText: { fontSize: 11, fontWeight: '600', color: Colors.warningDark },
+  expiryText: { fontSize: 11, fontWeight: '600', color: colors.warningDark },
   footer: {
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.borderSubtle,
+    borderTopColor: colors.borderSubtle,
   },
   ctaDisabled: { opacity: 0.72 },
   secureRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12 },
@@ -1544,9 +1548,13 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: '#F5F3FF',
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  secureNote: { fontSize: 11, color: Colors.muted },
+  secureNote: { fontSize: 11, color: colors.muted },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

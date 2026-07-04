@@ -1,4 +1,6 @@
+import { useThemedStyles } from '../../theme/hooks';
 import { Image, StyleSheet, View, type ImageStyle, type StyleProp } from 'react-native';
+import { Palette, Overlays, FormColors, BRAND } from '../../theme/colors/app-colors';
 
 const APP_LOGO = require('../../../assets/images/app-logo.png');
 
@@ -13,6 +15,8 @@ type AppLogoProps = {
 };
 
 export function AppLogo({ size = BOOT_LOGO_SIZE, style, variant = 'default' }: AppLogoProps) {
+  const styles = useStyles();
+
   const image = (
     <Image
       source={APP_LOGO}
@@ -43,16 +47,20 @@ export function AppLogo({ size = BOOT_LOGO_SIZE, style, variant = 'default' }: A
   return image;
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   logo: {},
   onDarkWrap: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.card,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
+    shadowColor: Palette.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.12,
     shadowRadius: 4,
     elevation: 2,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import { StyleProp, ViewStyle } from 'react-native';
 import { GlassSurface, type GlassVariant } from './GlassSurface';
+import { useCardGlassVariant } from '../../theme/hooks';
 
 type GlassCardProps = {
   children: ReactNode;
@@ -13,15 +14,18 @@ type GlassCardProps = {
 
 export function GlassCard({
   children,
-  variant = 'light',
+  variant,
   borderRadius = 16,
   style,
   contentStyle,
   padding = 16,
 }: GlassCardProps) {
+  const defaultVariant = useCardGlassVariant();
+  const resolvedVariant = variant ?? defaultVariant;
+
   return (
     <GlassSurface
-      variant={variant}
+      variant={resolvedVariant}
       borderRadius={borderRadius}
       style={style}
       contentStyle={[{ padding }, contentStyle]}

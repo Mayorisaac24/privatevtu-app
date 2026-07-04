@@ -18,7 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNotificationsStore } from '../stores/notifications-store';
 import { type AppNotification, type AppNotificationType } from '../lib/api';
-import { Colors, Spacing, getNotificationTypePalette, useColors } from '../theme';
+import {Colors, Spacing, getNotificationTypePalette, useColors , Overlays, useThemedStyles } from '../theme';
 import { ThemedScreen } from '../components/ui/ThemedScreen';
 import { GlassCard } from '../components/ui/GlassCard';
 import { GlassSurface } from '../components/ui/GlassSurface';
@@ -88,6 +88,7 @@ function NotificationRow({
   onLongPress: (item: AppNotification) => void;
   onToggleSelect: (item: AppNotification) => void;
 }) {
+  const styles = useStyles();
   const colors = useColors();
   const palette = getNotificationTypePalette(item.type, colors);
 
@@ -140,6 +141,8 @@ type ListRow =
   | { kind: 'item'; key: string; item: AppNotification };
 
 export default function NotificationsScreen() {
+  const styles = useStyles();
+
   const insets = useSafeAreaInsets();
   const {
     items,
@@ -445,10 +448,10 @@ export default function NotificationsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   headerShell: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(124, 58, 237, 0.08)',
+    borderBottomColor: Overlays.violet08,
   },
   headerContent: {
     flexDirection: 'row',
@@ -463,23 +466,23 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(124, 58, 237, 0.08)',
+    backgroundColor: Overlays.violet08,
   },
   headerCenter: { flex: 1 },
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: Colors.dark,
+    color: colors.dark,
     letterSpacing: -0.3,
   },
   headerSub: {
     fontSize: 12,
-    color: Colors.muted,
+    color: colors.muted,
     marginTop: 2,
   },
   selectAllLink: {
     fontSize: 12,
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: '600',
     marginTop: 2,
   },
@@ -492,7 +495,7 @@ const styles = StyleSheet.create({
   markAllText: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.primary,
+    color: colors.primary,
   },
   filters: {
     flexDirection: 'row',
@@ -508,10 +511,10 @@ const styles = StyleSheet.create({
   filterText: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.muted,
+    color: colors.muted,
   },
   filterTextActive: {
-    color: Colors.primary,
+    color: colors.primary,
   },
   listContent: {
     paddingHorizontal: Spacing.page,
@@ -524,7 +527,7 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.muted,
+    color: colors.muted,
     letterSpacing: 0.4,
     marginTop: 8,
     marginBottom: 2,
@@ -535,7 +538,7 @@ const styles = StyleSheet.create({
   },
   rowCardSelected: {
     borderWidth: 1.5,
-    borderColor: 'rgba(124, 58, 237, 0.35)',
+    borderColor: Overlays.violet35,
   },
   rowTop: {
     flexDirection: 'row',
@@ -547,14 +550,14 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 7,
     borderWidth: 1.5,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 9,
   },
   checkboxSelected: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   iconBadge: {
     width: 40,
@@ -573,7 +576,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.dark,
+    color: colors.dark,
   },
   rowTitleUnread: {
     fontWeight: '700',
@@ -581,7 +584,7 @@ const styles = StyleSheet.create({
   rowCategory: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.primary,
+    color: colors.primary,
     marginTop: 2,
     letterSpacing: 0.2,
   },
@@ -589,17 +592,17 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
   },
   rowMessage: {
     fontSize: 13,
     lineHeight: 18,
-    color: Colors.muted,
+    color: colors.muted,
     marginTop: 4,
   },
   rowTime: {
     fontSize: 11,
-    color: Colors.mutedLight,
+    color: colors.mutedLight,
     marginTop: 10,
     marginLeft: 52,
   },
@@ -613,7 +616,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 13,
-    color: Colors.muted,
+    color: colors.muted,
   },
   emptyCard: {
     alignItems: 'center',
@@ -625,7 +628,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 18,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,
@@ -633,12 +636,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.dark,
+    color: colors.dark,
   },
   emptySub: {
     fontSize: 13,
     lineHeight: 18,
-    color: Colors.muted,
+    color: colors.muted,
     textAlign: 'center',
   },
   bulkBar: {
@@ -647,7 +650,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(124, 58, 237, 0.08)',
+    borderTopColor: Overlays.violet08,
   },
   bulkBarContent: {
     flexDirection: 'row',
@@ -666,6 +669,10 @@ const styles = StyleSheet.create({
   bulkBtnText: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.primary,
+    color: colors.primary,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

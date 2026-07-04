@@ -1,10 +1,10 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { useState } from 'react';
-import { router } from 'expo-router';
+import { useState, useEffect } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/lib/api';
 import { showToast } from '../../src/components/ui/Toast';
-import { Colors, Radius, Typography } from '../../src/theme';
+import {Colors, Radius, Typography, useThemedStyles } from '../../src/theme';
 import { AuthShell, AuthCardHeader, AuthSecurityFooter } from '../../src/components/auth/AuthShell';
 import { AuthInput } from '../../src/components/auth/AuthInput';
 import {
@@ -23,10 +23,20 @@ const PW_RULES = [
 ];
 
 export default function RegisterScreen() {
+  const styles = useStyles();
+
+  const { ref } = useLocalSearchParams<{ ref?: string }>();
   const [form, setForm] = useState({ firstName:'', lastName:'', email:'', phone:'', password:'', confirmPassword:'', referralCode:'' });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [showReferral, setShowReferral] = useState(false);
+
+  useEffect(() => {
+    if (typeof ref === 'string' && ref.trim()) {
+      setShowReferral(true);
+      setForm((current) => ({ ...current, referralCode: ref.trim() }));
+    }
+  }, [ref]);
 
   const set = (k: keyof typeof form) => (v: string) => {
     setForm((f) => ({ ...f, [k]: v }));
@@ -57,13 +67,36 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     if (!validate()) return;
+
+    const referralCode = form.referralCode.trim();
+    if (referralCode) {
+      try {
+        const validation = await api.validateReferralCode(referralCode);
+        if (!validation.success || !validation.data?.valid) {
+          setFieldErrors((errs) => ({
+            ...errs,
+            referralCode: 'This referral code is not valid. Remove it to continue without a referral.',
+          }));
+          setShowReferral(true);
+          return;
+        }
+      } catch {
+        setFieldErrors((errs) => ({
+          ...errs,
+          referralCode: 'Could not verify referral code. Check your connection and try again.',
+        }));
+        setShowReferral(true);
+        return;
+      }
+    }
+
     setIsLoading(true);
     try {
       const res = await api.initiateRegistration({
         firstName: form.firstName.trim(), lastName: form.lastName.trim(),
         email: form.email.trim(), phone: form.phone.trim(),
         password: form.password,
-        referralCode: form.referralCode || undefined,
+        referralCode: referralCode || undefined,
       });
       if (res.success) {
         showToast({ type: 'success', text1: 'OTP Sent', text2: `Check ${form.email} for your verification code` });
@@ -204,6 +237,7 @@ export default function RegisterScreen() {
           placeholder="Enter referral code"
           value={form.referralCode}
           onChangeText={set('referralCode')}
+          error={fieldErrors.referralCode}
           leftIcon={<Ionicons name="gift-outline" size={18} color={Colors.primary} />}
           containerStyle={{ marginTop: -4 }}
         />
@@ -229,23 +263,23 @@ export default function RegisterScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../src/theme/types').ThemeColors) => StyleSheet.create({
   nameRow: { flexDirection: 'row' },
   strengthRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  strengthBar: { flex: 1, height: 4, backgroundColor: Colors.border, borderRadius: 2, overflow: 'hidden' },
+  strengthBar: { flex: 1, height: 4, backgroundColor: colors.border, borderRadius: 2, overflow: 'hidden' },
   strengthFill: { height: '100%', borderRadius: 2 },
   strengthLabel: { ...Typography.captionMed },
   pwRules: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: Radius.md,
     padding: 12,
     gap: 6,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   pwRule: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  pwRuleText: { ...Typography.caption, color: Colors.muted },
+  pwRuleText: { ...Typography.caption, color: colors.muted },
   referralToggle: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -255,8 +289,12 @@ const styles = StyleSheet.create({
   },
   referralToggleText: {
     ...Typography.bodyMed,
-    color: Colors.primary,
+    color: colors.primary,
     flex: 1,
     fontWeight: '600',
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

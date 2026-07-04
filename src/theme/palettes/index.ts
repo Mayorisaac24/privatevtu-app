@@ -1,4 +1,5 @@
 import type { ThemeDefinition, ThemeId } from '../types';
+import { Palette } from '../colors/app-colors';
 import {
   createVioletLightColors,
   createVioletLightGradients,
@@ -7,8 +8,9 @@ import {
   createFamilyLightColors,
   createFamilyDarkColors,
   createFamilyGradients,
+  createFamilyLightGradients,
+  createFamilyDarkGradients,
 } from '../colors/semantic';
-import { Palette } from '../colors/palette';
 
 function def(
   id: ThemeId,
@@ -53,9 +55,9 @@ export const THEME_DEFINITIONS: ThemeDefinition[] = [
     'light',
     'Midnight Light',
     'Cool navy tones with crisp clarity',
-    ['#1E3A5F', '#3B82F6', '#F8FAFC'],
+    [Palette.midnightPrimary, Palette.midnightAccent, Palette.slate50],
     createFamilyLightColors('midnight'),
-    createFamilyGradients('midnight', 'light'),
+    createFamilyLightGradients('midnight'),
   ),
   def(
     'midnight-dark',
@@ -63,9 +65,9 @@ export const THEME_DEFINITIONS: ThemeDefinition[] = [
     'dark',
     'Midnight Dark',
     'Deep oceanic night with blue glow',
-    ['#060B12', '#3B82F6', Palette.midnightPage],
+    [Palette.midnightHeroDark, Palette.midnightAccent, Palette.midnightPage],
     createFamilyDarkColors('midnight'),
-    createFamilyGradients('midnight', 'dark'),
+    createFamilyDarkGradients('midnight'),
   ),
   def(
     'ocean-light',
@@ -75,7 +77,7 @@ export const THEME_DEFINITIONS: ThemeDefinition[] = [
     'Fresh teal and cyan premium banking',
     [Palette.oceanAccent, Palette.oceanAccentLight, Palette.oceanPage],
     createFamilyLightColors('ocean'),
-    createFamilyGradients('ocean', 'light'),
+    createFamilyLightGradients('ocean'),
   ),
   def(
     'ocean-dark',
@@ -83,9 +85,9 @@ export const THEME_DEFINITIONS: ThemeDefinition[] = [
     'dark',
     'Ocean Dark',
     'Abyssal teal depths',
-    ['#021018', Palette.oceanAccentLight, Palette.oceanDarkPage],
+    [Palette.oceanDarkHero, Palette.oceanAccentLight, Palette.oceanDarkPage],
     createFamilyDarkColors('ocean'),
-    createFamilyGradients('ocean', 'dark'),
+    createFamilyDarkGradients('ocean'),
   ),
   def(
     'emerald-light',
@@ -93,9 +95,9 @@ export const THEME_DEFINITIONS: ThemeDefinition[] = [
     'light',
     'Royal Emerald',
     'Wealth-inspired green with gold hints',
-    [Palette.emeraldAccent, '#34D399', Palette.emeraldPage],
+    [Palette.emeraldAccent, Palette.emerald400, Palette.emeraldPage],
     createFamilyLightColors('emerald'),
-    createFamilyGradients('emerald', 'light'),
+    createFamilyLightGradients('emerald'),
   ),
   def(
     'emerald-dark',
@@ -103,9 +105,9 @@ export const THEME_DEFINITIONS: ThemeDefinition[] = [
     'dark',
     'Emerald Noir',
     'Deep forest green elegance',
-    ['#021208', '#34D399', Palette.emeraldDarkPage],
+    [Palette.emeraldDarkHero, Palette.emerald400, Palette.emeraldDarkPage],
     createFamilyDarkColors('emerald'),
-    createFamilyGradients('emerald', 'dark'),
+    createFamilyDarkGradients('emerald'),
   ),
   def(
     'rose-light',
@@ -115,7 +117,7 @@ export const THEME_DEFINITIONS: ThemeDefinition[] = [
     'Warm rose with luxury accents',
     [Palette.roseAccent, Palette.roseAccentLight, Palette.rosePage],
     createFamilyLightColors('rose'),
-    createFamilyGradients('rose', 'light'),
+    createFamilyLightGradients('rose'),
   ),
   def(
     'rose-dark',
@@ -123,9 +125,9 @@ export const THEME_DEFINITIONS: ThemeDefinition[] = [
     'dark',
     'Rose Noir',
     'Dark plum with rose gold glow',
-    ['#0A0408', Palette.roseAccentLight, Palette.roseDarkPage],
+    [Palette.roseDarkHero, Palette.roseAccentLight, Palette.roseDarkPage],
     createFamilyDarkColors('rose'),
-    createFamilyGradients('rose', 'dark'),
+    createFamilyDarkGradients('rose'),
   ),
 ];
 

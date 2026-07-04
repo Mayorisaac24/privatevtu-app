@@ -20,12 +20,14 @@ import {
   type DisputeRecord,
   type DisputeStatus,
 } from '../../../src/lib/support';
-import { Colors, Radius } from '../../../src/theme';
+import { Colors, Radius , Palette, FormColors, BRAND, Overlays, useThemedStyles } from '../../../src/theme';
 import { showToast } from '../../../src/components/ui/Toast';
 
 const CLOSED: DisputeStatus[] = ['RESOLVED', 'REJECTED', 'CLOSED'];
 
 export default function DisputeDetailScreen() {
+  const styles = useStyles();
+
   const { id } = useLocalSearchParams<{ id: string }>();
   const [dispute, setDispute] = useState<DisputeRecord | null>(null);
   const [loading, setLoading] = useState(true);
@@ -145,31 +147,31 @@ export default function DisputeDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../../src/theme/types').ThemeColors) => StyleSheet.create({
   summary: { gap: 8 },
   statusPill: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
   statusText: { fontSize: 11, fontWeight: '700' },
   agentRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
-  agentText: { fontSize: 13, fontWeight: '600', color: Colors.primary },
-  reason: { fontSize: 15, fontWeight: '700', color: Colors.dark, textTransform: 'capitalize' },
-  txMeta: { fontSize: 12, color: Colors.muted },
+  agentText: { fontSize: 13, fontWeight: '600', color: colors.primary },
+  reason: { fontSize: 15, fontWeight: '700', color: colors.dark, textTransform: 'capitalize' },
+  txMeta: { fontSize: 12, color: colors.muted },
   resolutionBox: {
     marginTop: 6,
     padding: 10,
     borderRadius: 12,
-    backgroundColor: 'rgba(5, 150, 105, 0.08)',
+    backgroundColor: Overlays.rgba5_150_105_008,
     gap: 4,
   },
-  resolutionLabel: { fontSize: 11, fontWeight: '700', color: '#059669' },
-  resolutionText: { fontSize: 13, lineHeight: 19, color: Colors.mid },
-  sectionLabel: { fontSize: 12, fontWeight: '700', color: Colors.muted, marginTop: 12, marginBottom: 8, marginLeft: 2 },
+  resolutionLabel: { fontSize: 11, fontWeight: '700', color: Palette.emerald600 },
+  resolutionText: { fontSize: 13, lineHeight: 19, color: colors.mid },
+  sectionLabel: { fontSize: 12, fontWeight: '700', color: colors.muted, marginTop: 12, marginBottom: 8, marginLeft: 2 },
   thread: { gap: 10 },
   bubble: { borderRadius: 16, padding: 12, maxWidth: '92%' },
-  bubbleUser: { alignSelf: 'flex-end', backgroundColor: Colors.primaryMuted },
-  bubbleAdmin: { alignSelf: 'flex-start', backgroundColor: Colors.white, borderWidth: StyleSheet.hairlineWidth, borderColor: Colors.borderSubtle },
-  bubbleMeta: { fontSize: 10, fontWeight: '700', color: Colors.muted, marginBottom: 4 },
-  bubbleBody: { fontSize: 14, lineHeight: 20, color: Colors.dark },
-  bubbleTime: { fontSize: 10, color: Colors.mutedLight, marginTop: 6 },
+  bubbleUser: { alignSelf: 'flex-end', backgroundColor: colors.primaryMuted },
+  bubbleAdmin: { alignSelf: 'flex-start', backgroundColor: colors.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderSubtle },
+  bubbleMeta: { fontSize: 10, fontWeight: '700', color: colors.muted, marginBottom: 4 },
+  bubbleBody: { fontSize: 14, lineHeight: 20, color: colors.dark },
+  bubbleTime: { fontSize: 10, color: colors.mutedLight, marginTop: 6 },
   replyBox: { flexDirection: 'row', gap: 8, marginTop: 14, alignItems: 'flex-end' },
   replyInput: {
     flex: 1,
@@ -177,21 +179,25 @@ const styles = StyleSheet.create({
     maxHeight: 120,
     borderRadius: Radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.borderSubtle,
-    backgroundColor: Colors.white,
+    borderColor: colors.borderSubtle,
+    backgroundColor: colors.card,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
-    color: Colors.dark,
+    color: colors.dark,
   },
   sendBtn: {
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   closedNote: { flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 12 },
-  closedText: { flex: 1, fontSize: 12, color: Colors.muted, lineHeight: 17 },
+  closedText: { flex: 1, fontSize: 12, color: colors.muted, lineHeight: 17 },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

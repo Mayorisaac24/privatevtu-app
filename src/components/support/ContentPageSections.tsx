@@ -2,7 +2,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { GlassCard } from '../ui/GlassCard';
 import { type ContentSection } from '../../lib/content-page';
-import { Colors, Radius } from '../../theme';
+import {Colors, Radius, useThemedStyles } from '../../theme';
 
 const SECTION_ICONS: Array<keyof typeof Ionicons.glyphMap> = [
   'document-text-outline',
@@ -28,6 +28,8 @@ type ContentPageSectionsProps = {
 };
 
 export function ContentPageSections({ sections }: ContentPageSectionsProps) {
+  const styles = useStyles();
+
   if (!sections.length) {
     return (
       <GlassCard variant="light" borderRadius={Radius.lg} padding={18} contentStyle={styles.emptyCard}>
@@ -85,7 +87,7 @@ export function ContentPageSections({ sections }: ContentPageSectionsProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   stack: { gap: 12 },
   sectionCard: { overflow: 'hidden' },
   sectionHeader: {
@@ -96,13 +98,13 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.borderSubtle,
+    borderBottomColor: colors.borderSubtle,
   },
   sectionIcon: {
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -110,14 +112,14 @@ const styles = StyleSheet.create({
   sectionIndex: {
     fontSize: 11,
     fontWeight: '600',
-    color: Colors.mutedLight,
+    color: colors.mutedLight,
     letterSpacing: 0.4,
     textTransform: 'uppercase',
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.dark,
+    color: colors.dark,
     letterSpacing: -0.2,
   },
   sectionBody: {
@@ -128,7 +130,7 @@ const styles = StyleSheet.create({
   paragraph: {
     fontSize: 14,
     lineHeight: 23,
-    color: Colors.mid,
+    color: colors.mid,
   },
   bulletList: { gap: 8, marginTop: 2 },
   bulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
@@ -136,16 +138,20 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     marginTop: 8,
   },
   bulletText: {
     flex: 1,
     fontSize: 14,
     lineHeight: 22,
-    color: Colors.mid,
+    color: colors.mid,
   },
   emptyCard: { alignItems: 'center', paddingVertical: 32, gap: 8 },
-  emptyTitle: { fontSize: 16, fontWeight: '700', color: Colors.dark },
-  emptySub: { fontSize: 13, color: Colors.muted, textAlign: 'center', lineHeight: 20 },
+  emptyTitle: { fontSize: 16, fontWeight: '700', color: colors.dark },
+  emptySub: { fontSize: 13, color: colors.muted, textAlign: 'center', lineHeight: 20 },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

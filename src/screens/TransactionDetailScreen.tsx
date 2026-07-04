@@ -18,10 +18,10 @@ import { api, formatCurrencyVisible, isResponseSuccess, type Transaction } from 
 import { findCachedTransaction } from '../lib/transaction-cache';
 import { BankLogo } from '../components/BankLogo';
 import { formatAccountNumberDisplay, resolveTransferBankForDisplay } from '../lib/transfer-banks';
-import { getProviderLogo } from '../lib/providers';
+import { NetworkProviderLogo } from '../components/NetworkProviderLogo';
 import { getEducationProviderLogo, hasEducationProviderLogo } from '../lib/education-providers';
 import { getBettingPlatformLogo, hasBettingPlatformLogo } from '../lib/betting-platforms';
-import { Colors, Gradients, Radius, Shadow, Spacing, Typography } from '../theme';
+import {Colors, Gradients, Radius, Shadow, Spacing, Typography , Palette, FormColors, BRAND, Overlays, useThemedStyles } from '../theme';
 import { Skeleton } from '../components/ui/Skeleton';
 import {
   enrichTransaction,
@@ -40,7 +40,7 @@ import { GlassCard } from '../components/ui/GlassCard';
 import { GlassSurface } from '../components/ui/GlassSurface';
 import { ShareReceiptSheet } from '../components/transaction/ShareReceiptSheet';
 const TIMELINE_BRAND = Colors.primary;
-const TIMELINE_BRAND_RING = 'rgba(124, 58, 237, 0.2)';
+const TIMELINE_BRAND_RING = Overlays.rgba124_58_237_02;
 const TIMELINE_BRAND_LINE = Colors.primaryLight;
 
 type Props = {
@@ -110,6 +110,7 @@ function DetailRow({
   mono?: boolean;
   isLast?: boolean;
 }) {
+  const styles = useStyles();
   return (
     <View style={[styles.detailRow, isLast && styles.detailRowLast]}>
       <Text style={styles.detailLabel}>{label}</Text>
@@ -152,6 +153,8 @@ function TimelineStep({
   isLast?: boolean;
   accentColor: string;
 }) {
+  const styles = useStyles();
+
   const pending = !completed && !active && !failed;
   const dotColor = failed
     ? Colors.error
@@ -159,7 +162,7 @@ function TimelineStep({
       ? accentColor
       : Colors.borderMid;
   const ringColor = failed
-    ? 'rgba(239, 68, 68, 0.18)'
+    ? Overlays.rgba239_68_68_018
     : completed || active
       ? TIMELINE_BRAND_RING
       : 'transparent';
@@ -198,6 +201,8 @@ function TimelineStep({
 }
 
 function TransactionDetailSkeleton({ topInset }: { topInset: number }) {
+  const styles = useStyles();
+
   return (
     <View style={styles.skeletonWrap}>
       <Skeleton width="100%" height={220 + topInset} borderRadius={0} />
@@ -229,6 +234,8 @@ function TransactionDetailSkeleton({ topInset }: { topInset: number }) {
 }
 
 function TransactionAvatar({ tx, size = 64, onDark }: { tx: ReturnType<typeof enrichTransaction>; size?: number; onDark?: boolean }) {
+  const styles = useStyles();
+
   const visual = getTransactionVisual(tx);
   const bankCode = readMetaString(tx.metadata, 'bankCode') || tx.logoKey || '';
   const bankName = readMetaString(tx.metadata, 'bankName');
@@ -268,7 +275,7 @@ function TransactionAvatar({ tx, size = 64, onDark }: { tx: ReturnType<typeof en
         );
       }
       return (
-        <View style={[wrapStyle, { backgroundColor: onDark ? 'rgba(255,255,255,0.16)' : Colors.primaryMuted }]}>
+        <View style={[wrapStyle, { backgroundColor: onDark ? Overlays.white16 : Colors.primaryMuted }]}>
           <Ionicons name="trophy-outline" size={size * 0.38} color={onDark ? Colors.white : Colors.primary} />
         </View>
       );
@@ -296,30 +303,31 @@ function TransactionAvatar({ tx, size = 64, onDark }: { tx: ReturnType<typeof en
     if (tx.type === 'AIRTIME' || tx.type === 'DATA') {
       return (
         <View style={wrapStyle}>
-          <Image
-            source={getProviderLogo({ code: visual.providerCode, id: visual.providerCode, imageUrl: providerImageUrl }) as ImageSourcePropType}
-            style={{ width: size - 12, height: size - 12, borderRadius: 10 }}
-            resizeMode="contain"
+          <NetworkProviderLogo
+            provider={{ code: visual.providerCode, id: visual.providerCode, imageUrl: providerImageUrl }}
+            size={size}
           />
         </View>
       );
     }
 
     return (
-      <View style={[wrapStyle, { backgroundColor: onDark ? 'rgba(255,255,255,0.16)' : visual.bgColor }]}>
+      <View style={[wrapStyle, { backgroundColor: onDark ? Overlays.white16 : visual.bgColor }]}>
         <Ionicons name={visual.icon as any} size={size * 0.38} color={onDark ? Colors.white : visual.iconColor} />
       </View>
     );
   }
 
   return (
-    <View style={[wrapStyle, { backgroundColor: onDark ? 'rgba(255,255,255,0.16)' : visual.bgColor }]}>
+    <View style={[wrapStyle, { backgroundColor: onDark ? Overlays.white16 : visual.bgColor }]}>
       <Ionicons name={visual.icon as any} size={size * 0.38} color={onDark ? Colors.white : visual.iconColor} />
     </View>
   );
 }
 
 function SectionHeader({ icon, title }: { icon: keyof typeof Ionicons.glyphMap; title: string }) {
+  const styles = useStyles();
+
   return (
     <View style={styles.sectionHeader}>
       <View style={styles.sectionIconWrap}>
@@ -336,6 +344,8 @@ const DISPUTABLE_TYPES = new Set([
 ]);
 
 export default function TransactionDetailScreen({ id }: Props) {
+  const styles = useStyles();
+
   const insets = useSafeAreaInsets();
   const gradients = useGradients();
   const [transaction, setTransaction] = useState<Transaction | null>(() => findCachedTransaction(id));
@@ -540,7 +550,7 @@ export default function TransactionDetailScreen({ id }: Props) {
           <Text style={styles.heroWhen}>{when}</Text>
 
           <View style={styles.heroTypePill}>
-            <Ionicons name={typeMeta.icon as any} size={12} color="rgba(255,255,255,0.9)" />
+            <Ionicons name={typeMeta.icon as any} size={12} color={Overlays.white90} />
             <Text style={styles.heroTypeText}>{formatPaymentMethod(tx.type)}</Text>
           </View>
 
@@ -676,7 +686,7 @@ export default function TransactionDetailScreen({ id }: Props) {
               })}
             >
               <GlassCard borderRadius={Radius.xl} padding={16} contentStyle={styles.disputeCard}>
-                <Ionicons name="alert-circle-outline" size={20} color="#D97706" />
+                <Ionicons name="alert-circle-outline" size={20} color={Palette.amber600} />
                 <View style={styles.disputeCopy}>
                   <Text style={styles.disputeTitle}>Report an issue</Text>
                   <Text style={styles.disputeSub}>Open a dispute if this transaction did not go as expected</Text>
@@ -697,11 +707,11 @@ export default function TransactionDetailScreen({ id }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   centered: { justifyContent: 'center' },
   headerShell: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
+    borderBottomColor: colors.border,
   },
   header: {
     flexDirection: 'row',
@@ -716,9 +726,9 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.surfaceAlt,
+    backgroundColor: colors.surfaceAlt,
   },
-  headerTitle: { ...Typography.h4, color: Colors.dark },
+  headerTitle: { ...Typography.h4, color: colors.dark },
   shareBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -726,11 +736,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: Radius.full,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
   },
-  shareBtnDisabled: { backgroundColor: Colors.surfaceAlt },
-  shareText: { ...Typography.captionMed, color: Colors.primary },
-  shareTextDisabled: { color: Colors.mutedLight },
+  shareBtnDisabled: { backgroundColor: colors.surfaceAlt },
+  shareText: { ...Typography.captionMed, color: colors.primary },
+  shareTextDisabled: { color: colors.mutedLight },
   disputeCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -738,8 +748,8 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   disputeCopy: { flex: 1, gap: 2 },
-  disputeTitle: { ...Typography.captionMed, color: Colors.dark, fontWeight: '700' },
-  disputeSub: { ...Typography.small, color: Colors.muted },
+  disputeTitle: { ...Typography.captionMed, color: colors.dark, fontWeight: '700' },
+  disputeSub: { ...Typography.small, color: colors.muted },
   content: { paddingBottom: 40 },
   skeletonWrap: { flex: 1 },
   skeletonBody: { marginTop: -18, paddingHorizontal: Spacing.page, gap: 14 },
@@ -758,7 +768,7 @@ const styles = StyleSheet.create({
     width: 130,
     height: 130,
     borderRadius: 65,
-    backgroundColor: 'rgba(255,255,255,0.07)',
+    backgroundColor: Overlays.white07,
   },
   heroBlob2: {
     position: 'absolute',
@@ -767,7 +777,7 @@ const styles = StyleSheet.create({
     width: 88,
     height: 88,
     borderRadius: 44,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: Overlays.rgba255_255_255_005,
   },
   heroAvatar: {
     alignItems: 'center',
@@ -776,29 +786,29 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   heroAvatarOnDark: {
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: Overlays.white14,
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.28)',
+    borderColor: Overlays.white28,
     ...Shadow.sm,
   },
   heroAmount: {
     fontSize: 36,
     fontWeight: '800',
-    color: Colors.white,
+    color: colors.white,
     letterSpacing: -0.8,
     marginBottom: 6,
   },
   heroTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: 'rgba(255,255,255,0.95)',
+    color: Overlays.white95,
     textAlign: 'center',
     lineHeight: 20,
     maxWidth: '92%',
   },
   heroWhen: {
     ...Typography.caption,
-    color: 'rgba(255,255,255,0.72)',
+    color: Overlays.white72,
     textAlign: 'center',
     marginTop: 4,
   },
@@ -810,14 +820,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: Radius.full,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: Overlays.white12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
+    borderColor: Overlays.white18,
   },
   heroTypeText: {
     fontSize: 11,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.9)',
+    color: Overlays.white90,
     letterSpacing: 0.2,
   },
   heroStatusWrap: { marginTop: 14 },
@@ -828,15 +838,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: Radius.full,
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: Overlays.white16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
+    borderColor: Overlays.rgba255_255_255_022,
   },
   heroStatusDot: { width: 8, height: 8, borderRadius: 4 },
   heroStatusText: {
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.white,
+    color: colors.white,
     letterSpacing: 0.2,
   },
   bodyStack: {
@@ -857,26 +867,26 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 10,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sectionTitle: { ...Typography.h4, color: Colors.dark },
+  sectionTitle: { ...Typography.h4, color: colors.dark },
   recipientCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     padding: 12,
     borderRadius: Radius.lg,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.borderSubtle,
+    borderColor: colors.borderSubtle,
   },
   recipientLogo: {
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -885,25 +895,25 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
   recipientInfo: { flex: 1, gap: 2 },
   recipientLabel: {
     ...Typography.label,
-    color: Colors.muted,
+    color: colors.muted,
     fontSize: 9,
   },
   recipientName: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.dark,
+    color: colors.dark,
     lineHeight: 18,
   },
   recipientMeta: {
     fontSize: 12,
-    color: Colors.muted,
+    color: colors.muted,
     fontWeight: '500',
     marginTop: 1,
   },
@@ -911,34 +921,34 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cardDivider: {
     height: 1,
-    backgroundColor: Colors.surfaceAlt,
+    backgroundColor: colors.surfaceAlt,
     marginVertical: 14,
   },
   detailRow: {
     paddingVertical: 11,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.surfaceAlt,
+    borderBottomColor: colors.surfaceAlt,
     gap: 5,
   },
   detailRowLast: {
     borderBottomWidth: 0,
     paddingBottom: 0,
   },
-  detailLabel: { ...Typography.label, color: Colors.muted, fontSize: 9 },
+  detailLabel: { ...Typography.label, color: colors.muted, fontSize: 9 },
   detailValueWrap: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 10,
   },
-  detailValue: { flex: 1, ...Typography.bodyMed, color: Colors.dark, lineHeight: 20 },
-  detailValueMono: { ...Typography.mono, fontSize: 12, color: Colors.mid },
+  detailValue: { flex: 1, ...Typography.bodyMed, color: colors.dark, lineHeight: 20 },
+  detailValueMono: { ...Typography.mono, fontSize: 12, color: colors.mid },
   copyBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -946,10 +956,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: Radius.full,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
   },
   copyBtnPressed: { opacity: 0.75 },
-  copyText: { ...Typography.captionMed, color: Colors.primary },
+  copyText: { ...Typography.captionMed, color: colors.primary },
   timelineStep: { flexDirection: 'row', gap: 12, minHeight: 68 },
   timelineRail: { width: 28, alignItems: 'center' },
   timelineDotRing: {
@@ -969,15 +979,15 @@ const styles = StyleSheet.create({
   timelineLine: {
     width: 2,
     flex: 1,
-    backgroundColor: Colors.borderMid,
+    backgroundColor: colors.borderMid,
     marginTop: 4,
     borderRadius: 1,
   },
   timelineBody: { flex: 1, paddingBottom: 14 },
   timelineBodyLast: { paddingBottom: 0 },
-  timelineTitle: { ...Typography.smallMed, color: Colors.dark, fontWeight: '700' },
-  timelineTitleMuted: { color: Colors.mutedLight },
-  timelineSub: { ...Typography.caption, color: Colors.muted, marginTop: 3, lineHeight: 17 },
+  timelineTitle: { ...Typography.smallMed, color: colors.dark, fontWeight: '700' },
+  timelineTitleMuted: { color: colors.mutedLight },
+  timelineSub: { ...Typography.caption, color: colors.muted, marginTop: 3, lineHeight: 17 },
   emptyState: {
     flex: 1,
     alignItems: 'center',
@@ -989,19 +999,23 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: Colors.surfaceAlt,
+    backgroundColor: colors.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
   },
-  emptyTitle: { ...Typography.h4, color: Colors.dark },
-  emptySub: { ...Typography.small, color: Colors.muted, textAlign: 'center', lineHeight: 18 },
+  emptyTitle: { ...Typography.h4, color: colors.dark },
+  emptySub: { ...Typography.small, color: colors.muted, textAlign: 'center', lineHeight: 18 },
   backLink: {
     marginTop: 12,
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: Radius.full,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
   },
-  backLinkText: { color: Colors.primary, fontWeight: '700', fontSize: 14 },
+  backLinkText: { color: colors.primary, fontWeight: '700', fontSize: 14 },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

@@ -4,7 +4,9 @@ import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { api } from './api';
 import { getStableDeviceId } from './device-id';
+import { peekNotificationSettings } from './notification-settings-cache';
 import { APP_NOTIFICATION_CHANNEL_ID, APP_NOTIFICATION_SOUND } from '../constants/notifications';
+import { BRAND } from '../theme/colors/app-colors';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -33,12 +35,22 @@ export async function registerPushNotifications(): Promise<boolean> {
     return false;
   }
 
+  const cachedSettings = peekNotificationSettings();
+  if (
+    cachedSettings
+    && !cachedSettings.pushNotificationsEnabled
+    && !cachedSettings.marketingPushNotificationsEnabled
+  ) {
+    console.warn('[Push] Skipped — user disabled all push categories');
+    return false;
+  }
+
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync(APP_NOTIFICATION_CHANNEL_ID, {
       name: 'Datamart Alerts',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#7C3AED',
+      lightColor: BRAND.notificationLight,
       sound: APP_NOTIFICATION_SOUND,
     });
   }

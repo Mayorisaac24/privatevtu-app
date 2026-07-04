@@ -1,4 +1,5 @@
-import { api, isResponseSuccess, parseWalletBalanceKobo } from './api';
+import { api, ApiError, isResponseSuccess, parseWalletBalanceKobo } from './api';
+import { useAuthStore } from '../stores/auth-store';
 import {
   computeHomeDashboardStats,
   type HomeDashboardStats,
@@ -105,9 +106,14 @@ export function preloadHistoryData(): void {
   }, HISTORY_PRELOAD_DELAY_MS);
 }
 
+function isAuthRequestFailure(err: unknown): boolean {
+  return err instanceof ApiError && (err.statusCode === 401 || err.statusCode === 403);
+}
+
 async function fetchHomeSnapshot() {
   const { setBalance, setHomeTransactions, setDataHydrated, bumpDashboardVersion } = useWalletStore.getState();
   let balanceLoaded = false;
+  let authFailed = false;
 
   const loadBalance = async (): Promise<void> => {
     for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -118,7 +124,11 @@ async function fetchHomeSnapshot() {
           balanceLoaded = true;
           return;
         }
-      } catch {
+      } catch (err) {
+        if (isAuthRequestFailure(err)) {
+          authFailed = true;
+          return;
+        }
         // Retry once after pool congestion clears.
       }
       if (attempt === 0) {
@@ -134,9 +144,17 @@ async function fetchHomeSnapshot() {
       const transactions = txRes.data?.transactions ?? [];
       setHomeTransactions(transactions);
     }
+  }).catch((err) => {
+    if (isAuthRequestFailure(err)) {
+      authFailed = true;
+    }
   });
 
   await Promise.allSettled([balanceTask, txTask]);
+
+  if (authFailed || !useAuthStore.getState().isAuthenticated) {
+    return;
+  }
 
   if (balanceLoaded) {
     if (!useWalletStore.getState().dataHydrated) {
@@ -150,6 +168,7 @@ async function fetchHomeSnapshot() {
 
   // Keep the home skeleton visible and retry after other startup calls finish.
   setTimeout(() => {
+    if (!useAuthStore.getState().isAuthenticated) return;
     void refreshDashboardData({ force: true });
   }, 2000);
 }

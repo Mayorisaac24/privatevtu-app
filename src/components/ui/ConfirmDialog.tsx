@@ -7,7 +7,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { GlassModal } from './GlassModal';
 import { GradientButton } from './GradientButton';
-import { Colors, Radius } from '../../theme';
+import {Colors, Radius , Palette, FormColors, BRAND, Overlays, useThemedStyles } from '../../theme';
 import { CTA_BUTTON_HEIGHT } from '../../lib/platform-ui';
 
 
@@ -34,6 +34,8 @@ export function ConfirmDialog({
   icon = 'help-circle-outline',
   loading = false,
 }: ConfirmDialogProps) {
+  const styles = useStyles();
+
   return (
     <GlassModal visible={visible} onClose={onClose} align="center" contentStyle={styles.content}>
       <View style={styles.iconWrap}>
@@ -66,7 +68,7 @@ export function ConfirmDialog({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   content: {
     alignItems: 'center',
     paddingTop: 24,
@@ -77,7 +79,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 18,
-    backgroundColor: 'rgba(124, 58, 237, 0.12)',
+    backgroundColor: Overlays.darkAmbientPrimary,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,
@@ -85,13 +87,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '800',
-    color: Colors.dark,
+    color: colors.dark,
     textAlign: 'center',
     letterSpacing: -0.3,
   },
   message: {
     fontSize: 14,
-    color: Colors.muted,
+    color: colors.muted,
     textAlign: 'center',
     lineHeight: 20,
     paddingHorizontal: 4,
@@ -109,8 +111,8 @@ const styles = StyleSheet.create({
     minHeight: CTA_BUTTON_HEIGHT,
     borderRadius: Radius.lg,
     borderWidth: 1.5,
-    borderColor: 'rgba(15, 23, 42, 0.1)',
-    backgroundColor: '#F8FAFC',
+    borderColor: Overlays.rgba15_23_42_01,
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 12,
@@ -118,9 +120,13 @@ const styles = StyleSheet.create({
   cancelText: {
     fontSize: 15,
     fontWeight: '600',
-    color: Colors.muted,
+    color: colors.muted,
   },
   confirmWrap: {
     flex: 1,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

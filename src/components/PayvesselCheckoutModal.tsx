@@ -14,7 +14,7 @@ import {
   PAYVESSEL_CHECKOUT_USER_ERROR,
   sanitizePayvesselCheckoutError,
 } from '../lib/payvessel-checkout-errors';
-import { Colors } from '../theme';
+import {Colors , Palette, FormColors, BRAND, Overlays, useThemedStyles } from '../theme';
 import { GlassSurface } from './ui/GlassSurface';
 
 const CHECKOUT_URL = 'https://checkout.payvessel.com';
@@ -81,6 +81,8 @@ export function PayvesselCheckoutModal({
   onPreparing,
   onPrepared,
 }: Props) {
+  const styles = useStyles();
+
   const webViewRef = useRef<WebView>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
@@ -231,11 +233,11 @@ export function PayvesselCheckoutModal({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.pageBg },
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.pageBg },
   headerShell: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(15, 23, 42, 0.08)',
+    borderBottomColor: colors.borderSubtle,
   },
   header: {
     flexDirection: 'row',
@@ -244,9 +246,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 14,
   },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: Colors.dark },
+  headerTitle: { fontSize: 17, fontWeight: '700', color: colors.dark },
   body: { flex: 1 },
-  webview: { flex: 1, backgroundColor: Colors.white },
+  webview: { flex: 1, backgroundColor: colors.card },
   centered: {
     flex: 1,
     justifyContent: 'center',
@@ -254,18 +256,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     gap: 12,
   },
-  errorTitle: { fontSize: 18, fontWeight: '700', color: Colors.dark, marginTop: 4 },
-  errorMessage: { fontSize: 14, color: Colors.muted, textAlign: 'center', lineHeight: 21 },
+  errorTitle: { fontSize: 18, fontWeight: '700', color: colors.dark, marginTop: 4 },
+  errorMessage: { fontSize: 14, color: colors.muted, textAlign: 'center', lineHeight: 21 },
   retryBtn: {
     marginTop: 8,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     paddingVertical: 14,
     paddingHorizontal: 28,
     borderRadius: 14,
     minWidth: 160,
     alignItems: 'center',
   },
-  retryText: { color: Colors.white, fontWeight: '700', fontSize: 15 },
+  retryText: { color: colors.white, fontWeight: '700', fontSize: 15 },
   closeBtn: { paddingVertical: 10 },
-  closeText: { color: Colors.muted, fontWeight: '600', fontSize: 14 },
+  closeText: { color: colors.muted, fontWeight: '600', fontSize: 14 },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

@@ -1,15 +1,18 @@
 import { useCallback, useEffect } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { useStatusBarStore, type StatusBarIconStyle } from '../stores/status-bar-store';
+import { useThemeStore } from '../theme/theme-store';
 
 /** Set status bar icon color while this screen is focused (expo-router screens). */
 export function useStatusBarStyle(style: StatusBarIconStyle) {
   const setStyle = useStatusBarStore((s) => s.setStyle);
+  const themeStyle = useThemeStore((s) => s.colors.statusBarStyle);
 
   useFocusEffect(
     useCallback(() => {
       setStyle(style);
-    }, [style, setStyle]),
+      return () => setStyle(themeStyle);
+    }, [style, setStyle, themeStyle]),
   );
 }
 

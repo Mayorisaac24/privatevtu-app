@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { FaceLivenessResult } from '../lib/face-liveness-types';
 import { isVisionCameraNativeAvailable, resetVisionCameraAvailabilityCache } from '../lib/vision-camera-available';
-import { Colors, Radius } from '../theme';
+import {Colors, Radius , Palette, FormColors, BRAND, Overlays, useThemedStyles } from '../theme';
 
 const LazyFaceLivenessScanner = lazy(async () => {
   const mod = await import('./SpokenFaceLivenessScanner');
@@ -21,6 +21,7 @@ type Props = {
 };
 
 function RebuildRequiredModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
 
   return (
@@ -52,6 +53,8 @@ export function FaceLivenessScannerGate({
   onClose,
   onComplete,
 }: Props) {
+  const styles = useStyles();
+
   const [nativeReady, setNativeReady] = useState(() => isVisionCameraNativeAvailable());
   const [shouldMountScanner, setShouldMountScanner] = useState(false);
 
@@ -105,15 +108,15 @@ export function FaceLivenessScannerGate({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    backgroundColor: Overlays.rgba15_23_42_055,
     justifyContent: 'flex-end',
     paddingHorizontal: 16,
   },
   card: {
-    backgroundColor: Colors.white,
+    backgroundColor: colors.card,
     borderRadius: 20,
     padding: 20,
     gap: 10,
@@ -122,24 +125,24 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 16,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
   title: {
     fontSize: 18,
     fontWeight: '800',
-    color: Colors.dark,
+    color: colors.dark,
   },
   body: {
     fontSize: 14,
-    color: Colors.muted,
+    color: colors.muted,
     lineHeight: 20,
   },
   code: {
     fontSize: 12,
-    color: Colors.primaryDeep,
-    backgroundColor: '#FAF5FF',
+    color: colors.primaryDeep,
+    backgroundColor: colors.pinFilled,
     padding: 12,
     borderRadius: Radius.lg,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
@@ -147,20 +150,24 @@ const styles = StyleSheet.create({
   },
   btn: {
     marginTop: 4,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     borderRadius: Radius.full,
     paddingVertical: 14,
     alignItems: 'center',
   },
   btnText: {
-    color: Colors.white,
+    color: colors.white,
     fontWeight: '700',
     fontSize: 15,
   },
   loadingBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    backgroundColor: Overlays.rgba15_23_42_045,
     alignItems: 'center',
     justifyContent: 'center',
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

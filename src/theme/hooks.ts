@@ -40,3 +40,12 @@ export function useThemedStyles<T>(factory: (colors: ThemeColors, gradients: The
   const gradients = useGradients();
   return useMemo(() => factory(colors, gradients), [colors, gradients, factory]);
 }
+
+/** Card-style glass: frosted in light mode, solid surface in dark mode. */
+export function useCardGlassVariant(): 'light' | 'solid' {
+  const { isDark } = useTheme();
+  return isDark ? 'solid' : 'light';
+}
+
+/** Alias for `useThemedStyles` — use when defining screen/component style factories. */
+export const createThemedStyles = useThemedStyles;

@@ -12,12 +12,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/lib/api';
 import { useAuthStore } from '../../src/stores';
 import { showToast } from '../../src/components/ui/Toast';
-import { Colors, Typography } from '../../src/theme';
+import {Colors, Typography, useThemedStyles } from '../../src/theme';
 import { AuthShell, AuthCardHeader, AuthHeroIcon } from '../../src/components/auth/AuthShell';
 import { AuthGradientButton } from '../../src/components/auth/AuthControls';
 import { PremiumOtpInput } from '../../src/components/security/PremiumOtpInput';
 
 export default function VerifyOTPScreen() {
+  const styles = useStyles();
+
   const { email, type } = useLocalSearchParams<{ email: string; type: string }>();
   const { setUser } = useAuthStore();
   const [otp, setOtp] = useState('');
@@ -131,7 +133,7 @@ export default function VerifyOTPScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../src/theme/types').ThemeColors) => StyleSheet.create({
   loadRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -142,7 +144,7 @@ const styles = StyleSheet.create({
   },
   loadText: {
     ...Typography.small,
-    color: Colors.muted,
+    color: colors.muted,
   },
   resendBtn: {
     flexDirection: 'row',
@@ -157,10 +159,14 @@ const styles = StyleSheet.create({
   },
   resendText: {
     ...Typography.bodyMed,
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: '600',
   },
   resendTextDisabled: {
-    color: Colors.muted,
+    color: colors.muted,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

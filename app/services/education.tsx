@@ -6,7 +6,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { api, formatCurrency, isResponseSuccess, parseWalletBalanceKobo, type EducationPlan } from '../../src/lib/api';
 import { useWalletStore } from '../../src/stores';
-import { Colors, Typography, Radius } from '../../src/theme';
+import {Colors, Typography, Radius, useThemedStyles } from '../../src/theme';
 import { showToast } from '../../src/components/ui/Toast';
 import { ServiceScreenHeader } from '../../src/components/ServiceScreenHeader';
 import { useHardwareBack } from '../../src/hooks/useHardwareBack';
@@ -30,6 +30,8 @@ import { getEducationProviderDisplayName, getEducationProviderLogo } from '../..
 import { useCachedEducationPlans, useCachedEducationProviders } from '../../src/hooks/useEducationCatalog';
 
 function EducationScreen() {
+  const styles = useStyles();
+
   const { balance, setBalance } = useWalletStore();
   const { providers, loading: loadingProviders } = useCachedEducationProviders();
   const [selectedProvider, setSelectedProvider] = useState('');
@@ -325,6 +327,8 @@ function EducationScreen() {
 }
 
 export default function EducationRoute() {
+  const styles = useStyles();
+
   return (
     <ServiceGate serviceCode={SERVICE_CODES.education} title="Education">
       <EducationScreen />
@@ -332,63 +336,67 @@ export default function EducationRoute() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../src/theme/types').ThemeColors) => StyleSheet.create({
   stack: { gap: 14, paddingBottom: 24 },
   loadRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, justifyContent: 'center' },
-  loadText: { ...Typography.small, color: Colors.muted },
+  loadText: { ...Typography.small, color: colors.muted },
   planList: { gap: 8 },
   planItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: Radius.md,
     padding: 14,
     borderWidth: 1.5,
     borderColor: 'transparent',
   },
   planItemActive: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primaryMuted,
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryMuted,
   },
   planLeft: { flex: 1, paddingRight: 10 },
   planRight: { alignItems: 'flex-end', gap: 4 },
-  planName: { ...Typography.smallMed, color: Colors.dark, marginBottom: 4 },
-  planNameActive: { color: Colors.primary },
+  planName: { ...Typography.smallMed, color: colors.dark, marginBottom: 4 },
+  planNameActive: { color: colors.primary },
   planMeta: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  planMetaText: { ...Typography.caption, color: Colors.muted, textTransform: 'capitalize' },
-  planPrice: { ...Typography.bodyMed, color: Colors.dark, fontWeight: '700' },
-  planPriceActive: { color: Colors.primary },
+  planMetaText: { ...Typography.caption, color: colors.muted, textTransform: 'capitalize' },
+  planPrice: { ...Typography.bodyMed, color: colors.dark, fontWeight: '700' },
+  planPriceActive: { color: colors.primary },
   input: {
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: Radius.md,
     paddingHorizontal: 14,
     paddingVertical: 12,
     ...Typography.body,
-    color: Colors.dark,
-    backgroundColor: Colors.white,
+    color: colors.dark,
+    backgroundColor: colors.card,
     marginBottom: 10,
   },
   verifyBtn: {
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     borderRadius: Radius.md,
     paddingVertical: 12,
     alignItems: 'center',
     marginBottom: 8,
   },
-  verifyBtnText: { color: Colors.white, fontWeight: '700' },
+  verifyBtnText: { color: colors.white, fontWeight: '700' },
   customerBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: Colors.successLight,
+    backgroundColor: colors.successLight,
     borderRadius: Radius.md,
     padding: 10,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: Colors.success + '33',
+    borderColor: colors.success + '33',
   },
-  customerText: { ...Typography.smallMed, color: Colors.successDark },
-  muted: { ...Typography.body, color: Colors.muted, textAlign: 'center', paddingVertical: 12 },
+  customerText: { ...Typography.smallMed, color: colors.successDark },
+  muted: { ...Typography.body, color: colors.muted, textAlign: 'center', paddingVertical: 12 },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

@@ -14,11 +14,13 @@ import { ProfileSubScreen } from '../../../src/components/profile/ProfileSubScre
 import { GlassCard } from '../../../src/components/ui/GlassCard';
 import { api, isResponseSuccess } from '../../../src/lib/api';
 import { DISPUTE_REASONS, type DisputeReason } from '../../../src/lib/support';
-import { Colors, Radius } from '../../../src/theme';
+import { Colors, Radius , Palette, FormColors, BRAND, Overlays, useThemedStyles } from '../../../src/theme';
 import { showToast } from '../../../src/components/ui/Toast';
 import { useNotificationsStore } from '../../../src/stores/notifications-store';
 
 export default function NewDisputeScreen() {
+  const styles = useStyles();
+
   const { transactionId } = useLocalSearchParams<{ transactionId?: string }>();
   const [reason, setReason] = useState<DisputeReason>('NOT_RECEIVED');
   const [description, setDescription] = useState('');
@@ -88,7 +90,7 @@ export default function NewDisputeScreen() {
     >
       {transactionId && eligibility && !eligibility.allowed ? (
         <GlassCard variant="light" contentStyle={styles.warnCard}>
-          <Ionicons name="warning-outline" size={20} color="#D97706" />
+          <Ionicons name="warning-outline" size={20} color={Palette.amber600} />
           <Text style={styles.warnText}>{eligibility.reason}</Text>
         </GlassCard>
       ) : null}
@@ -127,10 +129,10 @@ export default function NewDisputeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../../src/theme/types').ThemeColors) => StyleSheet.create({
   warnCard: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', marginBottom: 8 },
-  warnText: { flex: 1, fontSize: 13, color: '#92400E', lineHeight: 18 },
-  label: { fontSize: 13, fontWeight: '700', color: Colors.muted, marginTop: 8, marginBottom: 8, marginLeft: 2 },
+  warnText: { flex: 1, fontSize: 13, color: Palette.amber700, lineHeight: 18 },
+  label: { fontSize: 13, fontWeight: '700', color: colors.muted, marginTop: 8, marginBottom: 8, marginLeft: 2 },
   reasonList: { gap: 8 },
   reasonRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
   radio: {
@@ -138,34 +140,38 @@ const styles = StyleSheet.create({
     height: 18,
     borderRadius: 9,
     borderWidth: 2,
-    borderColor: Colors.borderSubtle,
+    borderColor: colors.borderSubtle,
     marginTop: 2,
   },
-  radioActive: { borderColor: Colors.primary, backgroundColor: Colors.primary },
+  radioActive: { borderColor: colors.primary, backgroundColor: colors.primary },
   reasonBody: { flex: 1, gap: 2 },
-  reasonTitle: { fontSize: 14, fontWeight: '700', color: Colors.dark },
-  reasonHint: { fontSize: 12, color: Colors.muted, lineHeight: 17 },
+  reasonTitle: { fontSize: 14, fontWeight: '700', color: colors.dark },
+  reasonHint: { fontSize: 12, color: colors.muted, lineHeight: 17 },
   textarea: {
     minHeight: 140,
     borderRadius: Radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.borderSubtle,
-    backgroundColor: Colors.white,
+    borderColor: colors.borderSubtle,
+    backgroundColor: colors.card,
     padding: 14,
     fontSize: 14,
     lineHeight: 21,
-    color: Colors.dark,
+    color: colors.dark,
   },
-  hint: { fontSize: 11, color: Colors.mutedLight, marginTop: 6, marginLeft: 2 },
+  hint: { fontSize: 11, color: colors.mutedLight, marginTop: 6, marginLeft: 2 },
   submitBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     borderRadius: Radius.lg,
     paddingVertical: 14,
   },
   submitBtnDisabled: { opacity: 0.7 },
-  submitText: { color: Colors.white, fontSize: 15, fontWeight: '700' },
+  submitText: { color: colors.white, fontSize: 15, fontWeight: '700' },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

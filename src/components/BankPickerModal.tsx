@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { FundingBank } from '../lib/api';
 import { getBankDisplayName } from '../lib/funding-banks';
 import { BankLogo } from './BankLogo';
-import { Colors } from '../theme';
+import {Colors, useThemedStyles } from '../theme';
 import { GlassModal } from './ui/GlassModal';
 
 
@@ -28,6 +28,8 @@ export function BankPickerModal({
   onClose,
   onSelect,
 }: Props) {
+  const styles = useStyles();
+
   return (
     <GlassModal visible={visible} onClose={onClose}>
       <View style={styles.header}>
@@ -65,10 +67,10 @@ export function BankPickerModal({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title: { fontSize: 18, fontWeight: '700', color: Colors.dark },
-  subtitle: { fontSize: 13, color: Colors.muted, lineHeight: 19 },
+  title: { fontSize: 18, fontWeight: '700', color: colors.dark },
+  subtitle: { fontSize: 13, color: colors.muted, lineHeight: 19 },
   loadingWrap: { paddingVertical: 28, alignItems: 'center' },
   list: { gap: 10, marginTop: 4 },
   bankRow: {
@@ -80,6 +82,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   bankText: { flex: 1 },
-  bankName: { fontSize: 15, fontWeight: '700', color: Colors.dark },
-  bankCode: { fontSize: 11, color: Colors.muted, marginTop: 2 },
+  bankName: { fontSize: 15, fontWeight: '700', color: colors.dark },
+  bankCode: { fontSize: 11, color: colors.muted, marginTop: 2 },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

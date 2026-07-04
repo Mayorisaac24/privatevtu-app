@@ -2,7 +2,7 @@ import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, BackHandler, RefreshControl,
 } from 'react-native';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, memo, type ReactNode } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,8 +20,7 @@ import {
 import { useAuthStore } from '../../src/stores';
 import { useStatusBarStyle } from '../../src/hooks/useStatusBarStyle';
 import { useKeyboardInsets } from '../../src/hooks/useKeyboardInsets';
-import { Colors, Radius, Shadow, Spacing, Gradients } from '../../src/theme';
-import { KeyboardDismissView } from '../../src/components/ui/KeyboardDismissView';
+import {Colors, Radius, Shadow, Spacing, Gradients , Palette, FormColors, BRAND, Overlays, useColors, useThemedStyles } from '../../src/theme';
 import { showToast } from '../../src/components/ui/Toast';
 import { navigateBack } from '../../src/lib/navigation';
 import { hiddenNumericInputStyle } from '../../src/lib/platform-ui';
@@ -74,6 +73,8 @@ type Step = 'status' | 'tier2' | 'phone-verify' | 'phone-otp' | 'tier3' | 'tier3
 const MAX_KYC_IMAGE_BYTES = 5 * 1024 * 1024;
 
 function docReviewStatusStyle(status?: string) {
+  const styles = useStyles();
+
   const tone = getKycDocumentStatusStyle(status);
   if (tone === 'approved') return styles.docReviewStatusApproved;
   if (tone === 'rejected') return styles.docReviewStatusRejected;
@@ -81,15 +82,18 @@ function docReviewStatusStyle(status?: string) {
   return styles.docReviewStatusMuted;
 }
 
-const TIER_META: Record<string, {
-  icon: keyof typeof Ionicons.glyphMap;
-  accent: string;
-  accentBg: string;
-}> = {
-  TIER_1: { icon: 'phone-portrait-outline', accent: Colors.primary, accentBg: Colors.primaryMuted },
-  TIER_2: { icon: 'finger-print-outline', accent: Colors.primary, accentBg: Colors.primaryMuted },
-  TIER_3: { icon: 'shield-checkmark-outline', accent: Colors.primary, accentBg: Colors.primaryMuted },
-};
+function getTierMeta(colors: import('../../src/theme/types').ThemeColors, tier: string) {
+  const base = {
+    TIER_1: { icon: 'phone-portrait-outline' as const },
+    TIER_2: { icon: 'finger-print-outline' as const },
+    TIER_3: { icon: 'shield-checkmark-outline' as const },
+  }[tier] ?? { icon: 'shield-outline' as const };
+  return {
+    ...base,
+    accent: colors.primary,
+    accentBg: colors.primaryMuted,
+  };
+}
 
 function tierProgress(currentTier: string): number {
   if (currentTier === 'TIER_3') return 100;
@@ -140,6 +144,8 @@ function LimitRow({
   limits: { daily: string; monthly: string; single: string };
   dimmed?: boolean;
 }) {
+  const styles = useStyles();
+
   const valueStyle = dimmed ? styles.limitValueDimmed : undefined;
   return (
     <View style={[styles.limitsRow, dimmed && styles.limitsRowDimmed]}>
@@ -161,6 +167,8 @@ function LimitRow({
   );
 }
 
+const MemoLimitRow = memo(LimitRow);
+
 const REQ_COMPACT_LABELS: Record<string, string> = {
   id: 'Gov ID',
   proof_of_address: 'Address proof',
@@ -174,6 +182,9 @@ function RequirementPills({
   requirements: Array<{ id: string; label: string; completed: boolean }>;
   dimmed?: boolean;
 }) {
+  const styles = useStyles();
+  const colors = useColors();
+
   if (!requirements.length) return null;
 
   const singleRow = requirements.length <= 3;
@@ -194,7 +205,7 @@ function RequirementPills({
           <Ionicons
             name={req.completed ? 'checkmark-circle' : 'ellipse-outline'}
             size={singleRow ? 12 : 14}
-            color={req.completed ? Colors.primary : dimmed ? Colors.mutedLight : Colors.primaryLight}
+            color={req.completed ? colors.primaryLight : dimmed ? colors.mid : colors.primaryLight}
           />
           <Text
             style={[
@@ -216,6 +227,8 @@ function RequirementPills({
   );
 }
 
+const MemoRequirementPills = memo(RequirementPills);
+
 function TierRail({
   isComplete,
   isCurrent,
@@ -229,6 +242,8 @@ function TierRail({
   level: number;
   isLast?: boolean;
 }) {
+  const styles = useStyles();
+
   return (
     <View style={styles.rail}>
       <View style={[
@@ -252,6 +267,8 @@ function TierRail({
   );
 }
 
+const MemoTierRail = memo(TierRail);
+
 function TierStep({
   tierKey,
   tier,
@@ -271,7 +288,9 @@ function TierStep({
   disabled?: boolean;
   isLast?: boolean;
 }) {
-  const meta = TIER_META[tierKey] ?? TIER_META.TIER_1;
+  const styles = useStyles();
+  const colors = useColors();
+  const meta = getTierMeta(colors, tierKey);
   const level = Number(tierKey.replace('TIER_', ''));
   const currentIdx = tierIndex(currentTier);
   const isLocked = level > currentIdx + 1 && !showVerified;
@@ -282,7 +301,7 @@ function TierStep({
 
   return (
     <View style={styles.stepRow}>
-      <TierRail
+      <MemoTierRail
         isComplete={isComplete}
         isCurrent={isCurrent}
         isLocked={isLocked}
@@ -291,7 +310,7 @@ function TierStep({
       />
 
       <GlassCard
-        variant={isComplete ? 'tinted' : 'light'}
+        variant="solid"
         borderRadius={Radius.lg}
         padding={16}
         style={[
@@ -302,25 +321,17 @@ function TierStep({
         ]}
         contentStyle={styles.tierPanelContent}
       >
-        {isCurrent && (
-          <>
-            <LinearGradient
-              colors={['rgba(124, 58, 237, 0.07)', 'transparent']}
-              style={styles.tierPanelGlow}
-            />
-            <View style={styles.tierPanelAccent} />
-          </>
-        )}
+        {isCurrent ? <View style={styles.tierPanelAccent} /> : null}
 
         <View style={styles.tierPanelHeader}>
           <View style={[
             styles.tierPanelIcon,
-            { backgroundColor: isLocked ? '#F1F5F9' : meta.accentBg },
+            { backgroundColor: isLocked ? colors.surfaceAlt : meta.accentBg },
           ]}>
             <Ionicons
               name={meta.icon}
               size={22}
-              color={isLocked ? Colors.mutedLight : meta.accent}
+              color={isLocked ? colors.mid : meta.accent}
             />
           </View>
           <View style={styles.tierPanelHeaderText}>
@@ -330,7 +341,7 @@ function TierStep({
               </Text>
               {isComplete && (
                 <View style={styles.doneBadge}>
-                  <Ionicons name="checkmark-circle" size={13} color={Colors.primary} />
+                  <Ionicons name="checkmark-circle" size={13} color={colors.primaryLight} />
                   <Text style={styles.doneBadgeText}>Verified</Text>
                 </View>
               )}
@@ -351,20 +362,20 @@ function TierStep({
         {stepRequirements.length > 0 && (
           <View style={styles.reqSection}>
             <Text style={styles.reqSectionLabel}>Requirements</Text>
-            <RequirementPills requirements={stepRequirements} dimmed={isLocked} />
+            <MemoRequirementPills requirements={stepRequirements} dimmed={isLocked} />
           </View>
         )}
 
         {showLimits && tier?.limits && (
           <View style={styles.limitsSection}>
             <Text style={styles.reqSectionLabel}>Transaction limits</Text>
-            <LimitRow limits={tier.limits} dimmed={isLocked} />
+            <MemoLimitRow limits={tier.limits} dimmed={isLocked} />
           </View>
         )}
 
         {isLocked && (
           <View style={styles.lockedHint}>
-            <Ionicons name="lock-closed-outline" size={13} color={Colors.mutedLight} />
+            <Ionicons name="lock-closed-outline" size={13} color={colors.mid} />
             <Text style={styles.lockedHintText}>Complete the previous tier to unlock</Text>
           </View>
         )}
@@ -383,6 +394,8 @@ function TierStep({
     </View>
   );
 }
+
+const MemoTierStep = memo(TierStep);
 
 const STEP_HEADER: Record<Step, string> = {
   status: 'Verify your identity to unlock limits',
@@ -404,6 +417,8 @@ function FormField({
   counter?: string;
   children: ReactNode;
 }) {
+  const styles = useStyles();
+
   return (
     <View style={styles.fieldWrap}>
       <View style={styles.fieldLabelRow}>
@@ -435,6 +450,7 @@ function FormSelectField({
   disabled?: boolean;
   onPress: () => void;
 }) {
+  const styles = useStyles();
   return (
     <FormField label={label} icon={icon}>
       <TouchableOpacity
@@ -471,6 +487,7 @@ function KycUploadTile({
   onGallery?: () => void;
   onClear: () => void;
 }) {
+  const styles = useStyles();
   return (
     <View style={styles.uploadWrap}>
       <View style={styles.uploadLabelRow}>
@@ -520,6 +537,8 @@ function KycUploadTile({
 }
 
 function Tier3Progress({ currentStep }: { currentStep: 'address' | 'documents' }) {
+  const styles = useStyles();
+
   const stepIndex = currentStep === 'address' ? 0 : 1;
 
   return (
@@ -548,6 +567,8 @@ function DocStatusBanner({
   subtitle: string;
   tone: 'pending' | 'rejected';
 }) {
+  const styles = useStyles();
+
   return (
     <View style={[styles.docStatusBanner, tone === 'rejected' ? styles.docStatusBannerRejected : styles.docStatusBannerPending]}>
       <Ionicons
@@ -570,6 +591,7 @@ function OtpInput({
   value: string;
   onChange: (v: string) => void;
 }) {
+  const styles = useStyles();
   const inputRef = useRef<TextInput>(null);
   const digits = value.padEnd(6, ' ').split('').slice(0, 6);
   const activeIndex = Math.min(value.length, 5);
@@ -624,11 +646,15 @@ function FormShell({
   perks?: string[];
   children: ReactNode;
 }) {
+  const styles = useStyles();
+  const colors = useColors();
+  const gradients = useGradients();
+
   return (
     <View style={styles.formShell}>
       <View style={styles.formHero}>
         <LinearGradient
-          colors={[Colors.heroDark, '#2E1065', '#4C1D95']}
+          colors={gradientStops(gradients.heroAuth)}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.formHeroGradient}
@@ -638,15 +664,15 @@ function FormShell({
             <Text style={styles.formStepBadgeText}>{stepBadge}</Text>
           </View>
           <View style={styles.formHeroIconRing}>
-            <LinearGradient colors={gradientStops([Gradients.button[0], Gradients.button[1]])} style={styles.formHeroIcon}>
-              <Ionicons name={icon} size={22} color={Colors.white} />
+            <LinearGradient colors={gradientStops([gradients.button[0], gradients.button[1]])} style={styles.formHeroIcon}>
+              <Ionicons name={icon} size={22} color={colors.white} />
             </LinearGradient>
           </View>
           <Text style={styles.formTitle}>{title}</Text>
           <Text style={styles.formSub} numberOfLines={2}>{subtitle}</Text>
           {perks && perks.length > 0 && (
             <View style={styles.formPerkChip}>
-              <Ionicons name="checkmark-circle" size={11} color={Colors.primaryLight} />
+              <Ionicons name="checkmark-circle" size={11} color={colors.primaryLight} />
               <Text style={styles.formPerkText} numberOfLines={1}>{perks.join(' · ')}</Text>
             </View>
           )}
@@ -664,6 +690,10 @@ function FormShell({
 }
 
 export default function KycScreen() {
+  const styles = useStyles();
+  const colors = useColors();
+  const gradients = useGradients();
+
   useStatusBarStyle('light');
   const insets = useSafeAreaInsets();
   const { keyboardVisible, keyboardHeight } = useKeyboardInsets();
@@ -1568,7 +1598,7 @@ export default function KycScreen() {
     return (
       <View style={styles.overview}>
         {bvnDone && (
-          <GlassCard borderRadius={Radius.lg} padding={14} variant="tinted" contentStyle={styles.perkBanner}>
+          <GlassCard borderRadius={Radius.lg} padding={14} variant="solid" contentStyle={styles.perkBanner}>
             <View style={styles.perkIcon}>
               <Ionicons name="wallet" size={18} color={Colors.primary} />
             </View>
@@ -1582,7 +1612,7 @@ export default function KycScreen() {
 
         <Text style={styles.pathLabel}>Your verification path</Text>
 
-        <TierStep
+        <MemoTierStep
           tierKey="TIER_1"
           tier={tiers.TIER_1}
           currentTier={currentTier}
@@ -1592,7 +1622,7 @@ export default function KycScreen() {
           disabled={submitting}
         />
 
-        <TierStep
+        <MemoTierStep
           tierKey="TIER_2"
           tier={tiers.TIER_2}
           currentTier={currentTier}
@@ -1601,7 +1631,7 @@ export default function KycScreen() {
           showVerified={['TIER_2', 'TIER_3'].includes(currentTier)}
         />
 
-        <TierStep
+        <MemoTierStep
           tierKey="TIER_3"
           tier={tiers.TIER_3}
           currentTier={currentTier}
@@ -1612,7 +1642,7 @@ export default function KycScreen() {
         />
 
         {currentTier === 'TIER_2' && isTier3SubmissionActive(tier3DocSummary) ? (
-          <GlassCard borderRadius={Radius.lg} padding={14} variant="tinted" contentStyle={styles.reviewBanner}>
+          <GlassCard borderRadius={Radius.lg} padding={14} variant="solid" contentStyle={styles.reviewBanner}>
             <View style={styles.perkIcon}>
               <Ionicons
                 name={tier3DocSummary.anyRejected ? 'alert-circle-outline' : 'time-outline'}
@@ -1636,9 +1666,9 @@ export default function KycScreen() {
   };
 
   return (
-    <ThemedScreen>
+    <ThemedScreen withAmbient={false}>
       <LinearGradient
-        colors={[Colors.heroDark, '#2E1065', '#4C1D95']}
+        colors={gradientStops(gradients.heroAuth)}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.header, { paddingTop: insets.top + 8 }]}
@@ -1659,14 +1689,14 @@ export default function KycScreen() {
           <View style={styles.headerProgress}>
             <View style={styles.headerProgressTop}>
               <View style={styles.headerTierPill}>
-                <Ionicons name="shield-checkmark" size={14} color="#E9D5FF" />
+                <Ionicons name="shield-checkmark" size={14} color={Palette.heroTextMuted} />
                 <Text style={styles.headerTierText}>{getKycTierLabel(currentTier)}</Text>
               </View>
               <Text style={styles.headerPct}>{progress}%</Text>
             </View>
             <View style={styles.progressTrack}>
               <LinearGradient
-                colors={gradientStops([Colors.primaryLight, Colors.primary])}
+                colors={gradientStops([colors.primaryLight, colors.primary])}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={[styles.progressFill, { width: `${progress}%` }]}
@@ -1685,7 +1715,7 @@ export default function KycScreen() {
             <Text style={styles.loadingText}>Loading verification status…</Text>
           </View>
         ) : (
-          <KeyboardDismissView style={styles.flex}>
+          <View style={styles.flex}>
             <ScrollView
               contentContainerStyle={[
                 styles.scroll,
@@ -1697,6 +1727,9 @@ export default function KycScreen() {
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
               automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+              removeClippedSubviews
+              nestedScrollEnabled={false}
+              overScrollMode="never"
               refreshControl={(
                 <RefreshControl
                   refreshing={refreshing}
@@ -1708,7 +1741,7 @@ export default function KycScreen() {
             >
               {renderStepContent()}
             </ScrollView>
-          </KeyboardDismissView>
+          </View>
         )}
       </KeyboardAvoidingView>
 
@@ -1769,12 +1802,12 @@ export default function KycScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../src/theme/types').ThemeColors) => StyleSheet.create({
   flex: { flex: 1 },
   contentCurve: {
     height: 20,
     marginTop: -20,
-    backgroundColor: Colors.pageBg,
+    backgroundColor: colors.pageBg,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
   },
@@ -1791,48 +1824,48 @@ const styles = StyleSheet.create({
     width: 160,
     height: 160,
     borderRadius: 80,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: Overlays.rgba255_255_255_005,
   },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   backBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: Overlays.white12,
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerText: { flex: 1 },
-  headerTitle: { fontSize: 20, fontWeight: '800', color: Colors.white, letterSpacing: -0.3 },
-  headerSub: { fontSize: 13, color: 'rgba(255,255,255,0.65)', marginTop: 3 },
+  headerTitle: { fontSize: 20, fontWeight: '800', color: colors.white, letterSpacing: -0.3 },
+  headerSub: { fontSize: 13, color: Overlays.white65, marginTop: 3 },
   headerProgress: { marginTop: 20, gap: 10 },
   headerProgressTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerTierPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: Overlays.white12,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: Radius.full,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
+    borderColor: Overlays.rgba255_255_255_015,
   },
-  headerTierText: { fontSize: 13, fontWeight: '700', color: Colors.white },
-  headerPct: { fontSize: 22, fontWeight: '800', color: Colors.white },
+  headerTierText: { fontSize: 13, fontWeight: '700', color: colors.white },
+  headerPct: { fontSize: 22, fontWeight: '800', color: colors.white },
   progressTrack: {
     height: 6,
     borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: Overlays.white18,
     overflow: 'hidden',
   },
   progressFill: { height: '100%', borderRadius: 3 },
 
   loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
-  loadingText: { fontSize: 14, color: Colors.muted },
+  loadingText: { fontSize: 14, color: colors.muted },
   scroll: { paddingHorizontal: Spacing.page, paddingTop: 4 },
 
-  overview: { gap: 4 },
+  overview: { gap: 8 },
   perkBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1843,16 +1876,16 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: '#FAF5FF',
+    backgroundColor: colors.pinFilled,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  perkTitle: { fontSize: 14, fontWeight: '700', color: Colors.dark },
-  perkSub: { fontSize: 12, color: Colors.muted, marginTop: 2 },
+  perkTitle: { fontSize: 14, fontWeight: '700', color: colors.dark },
+  perkSub: { fontSize: 12, color: colors.darkAlt, marginTop: 2, lineHeight: 17 },
   pathLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.muted,
+    color: colors.mid,
     letterSpacing: 1.2,
     textTransform: 'uppercase',
     marginBottom: 12,
@@ -1865,44 +1898,47 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: Colors.white,
+    backgroundColor: colors.surfaceAlt,
     borderWidth: 2,
-    borderColor: '#E2E8F0',
+    borderColor: colors.borderMid,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1,
   },
-  railDotDone: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  railDotActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  railDotLocked: { backgroundColor: '#F1F5F9', borderColor: '#E2E8F0' },
-  railDotNum: { fontSize: 11, fontWeight: '800', color: Colors.muted },
-  railDotNumActive: { color: Colors.white },
+  railDotDone: { backgroundColor: colors.primary, borderColor: colors.primary },
+  railDotActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  railDotLocked: { backgroundColor: colors.surfaceAlt, borderColor: colors.borderMid },
+  railDotNum: { fontSize: 11, fontWeight: '800', color: colors.muted },
+  railDotNumActive: { color: colors.white },
   railLine: {
     flex: 1,
     width: 2.5,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: colors.borderMid,
     marginVertical: 6,
     minHeight: 24,
     borderRadius: 2,
   },
-  railLineDone: { backgroundColor: Colors.primaryLight },
+  railLineDone: { backgroundColor: colors.primaryLight },
 
   tierPanel: {
     flex: 1,
     overflow: 'hidden',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderSubtle,
   },
   tierPanelContent: {
     gap: 12,
     overflow: 'hidden',
   },
-  tierPanelDone: {},
-  tierPanelActive: {},
-  tierPanelLocked: {
-    opacity: 0.88,
+  tierPanelDone: {
+    borderColor: Overlays.rgba124_58_237_02,
   },
-  tierPanelGlow: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: Radius.lg,
+  tierPanelActive: {
+    borderColor: colors.primary,
+    borderWidth: 1,
+  },
+  tierPanelLocked: {
+    opacity: 0.92,
   },
   tierPanelAccent: {
     position: 'absolute',
@@ -1910,7 +1946,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     width: 3,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
   },
   tierPanelHeader: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
   tierPanelIcon: {
@@ -1922,37 +1958,37 @@ const styles = StyleSheet.create({
   },
   tierPanelHeaderText: { flex: 1, gap: 4 },
   tierPanelTitleRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
-  tierPanelTitle: { fontSize: 16, fontWeight: '800', color: Colors.dark, letterSpacing: -0.2 },
-  tierPanelTitleLocked: { color: Colors.muted },
-  tierPanelDesc: { fontSize: 13, color: Colors.muted, lineHeight: 18 },
-  tierPanelDescLocked: { color: Colors.mutedLight },
+  tierPanelTitle: { fontSize: 16, fontWeight: '800', color: colors.dark, letterSpacing: -0.2 },
+  tierPanelTitleLocked: { color: colors.mid },
+  tierPanelDesc: { fontSize: 13, color: colors.darkAlt, lineHeight: 18 },
+  tierPanelDescLocked: { color: colors.mid },
   doneBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: Radius.full,
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.15)',
+    borderColor: Overlays.rgba124_58_237_015,
   },
-  doneBadgeText: { fontSize: 10, fontWeight: '700', color: Colors.primary },
+  doneBadgeText: { fontSize: 10, fontWeight: '700', color: colors.primaryLight },
   nextBadge: {
-    backgroundColor: '#FAF5FF',
+    backgroundColor: colors.inputFilled,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: Radius.full,
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.18)',
+    borderColor: colors.borderSubtle,
   },
-  nextBadgeText: { fontSize: 10, fontWeight: '700', color: Colors.primary },
+  nextBadgeText: { fontSize: 10, fontWeight: '700', color: colors.primaryLight },
 
   reqSection: { gap: 8, alignItems: 'center' },
   reqSectionLabel: {
     fontSize: 10,
     fontWeight: '700',
-    color: Colors.muted,
+    color: colors.mid,
     letterSpacing: 0.8,
     textTransform: 'uppercase',
     textAlign: 'center',
@@ -1973,12 +2009,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.surface,
     paddingHorizontal: 10,
     paddingVertical: 7,
     borderRadius: Radius.full,
     borderWidth: 1,
-    borderColor: 'rgba(15, 23, 42, 0.08)',
+    borderColor: colors.borderSubtle,
     maxWidth: '100%',
   },
   reqPillSingleRow: {
@@ -1990,22 +2026,22 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   reqPillDone: {
-    backgroundColor: Colors.primaryMuted,
-    borderColor: 'rgba(124, 58, 237, 0.2)',
+    backgroundColor: colors.primaryMuted,
+    borderColor: Overlays.rgba124_58_237_02,
   },
   reqPillPending: {
-    backgroundColor: Colors.primaryMuted,
-    borderColor: 'rgba(124, 58, 237, 0.14)',
+    backgroundColor: colors.primaryMuted,
+    borderColor: Overlays.borderPrimary14,
   },
   reqPillDimmed: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: colors.surfaceAlt,
     borderColor: 'transparent',
   },
-  reqPillText: { fontSize: 11, fontWeight: '600', color: Colors.mid, flexShrink: 1 },
+  reqPillText: { fontSize: 11, fontWeight: '600', color: colors.darkAlt, flexShrink: 1 },
   reqPillTextSingleRow: { fontSize: 10, textAlign: 'center' },
-  reqPillTextDone: { color: Colors.primary },
-  reqPillTextPending: { color: Colors.primaryDeep },
-  reqPillTextDimmed: { color: Colors.mutedLight },
+  reqPillTextDone: { color: colors.primaryLight },
+  reqPillTextPending: { color: colors.primaryLight },
+  reqPillTextDimmed: { color: colors.mid },
 
   lockedHint: {
     flexDirection: 'row',
@@ -2013,35 +2049,35 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingTop: 2,
   },
-  lockedHintText: { fontSize: 12, color: Colors.mutedLight, fontWeight: '500' },
+  lockedHintText: { fontSize: 12, color: colors.mid, fontWeight: '500' },
 
   limitsSection: { gap: 8, alignItems: 'center' },
   limitsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FAF5FF',
+    backgroundColor: colors.surfaceAlt,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.12)',
-    paddingVertical: 10,
+    borderColor: colors.borderMid,
+    paddingVertical: 12,
     paddingHorizontal: 4,
   },
   limitsRowDimmed: {
-    backgroundColor: '#F1F5F9',
-    borderColor: 'transparent',
+    backgroundColor: colors.surface,
+    borderColor: colors.borderSubtle,
   },
-  limitItem: { flex: 1, alignItems: 'center', gap: 2 },
+  limitItem: { flex: 1, alignItems: 'center', gap: 3 },
   limitLabel: {
-    fontSize: 9,
-    fontWeight: '600',
-    color: Colors.muted,
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.mid,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
-  limitValue: { fontSize: 12, fontWeight: '800', color: Colors.heroDark },
-  limitValueDimmed: { color: Colors.mutedLight },
-  limitDivider: { width: 1, height: 28, backgroundColor: 'rgba(124, 58, 237, 0.12)' },
-  limitDividerDimmed: { backgroundColor: '#E2E8F0' },
+  limitValue: { fontSize: 13, fontWeight: '800', color: colors.dark, letterSpacing: -0.2 },
+  limitValueDimmed: { color: colors.mid },
+  limitDivider: { width: 1, height: 28, backgroundColor: colors.borderMid },
+  limitDividerDimmed: { backgroundColor: colors.borderSubtle },
 
   formShell: { gap: 0 },
   formHero: {
@@ -2064,26 +2100,26 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: Overlays.rgba255_255_255_005,
   },
   formStepBadge: {
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: Overlays.white14,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: Radius.full,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: Overlays.rgba255_255_255_02,
   },
-  formStepBadgeText: { fontSize: 10, fontWeight: '700', color: '#E9D5FF', letterSpacing: 0.3 },
+  formStepBadgeText: { fontSize: 10, fontWeight: '700', color: Palette.heroTextMuted, letterSpacing: 0.3 },
   formHeroIconRing: {
     width: 54,
     height: 54,
     borderRadius: 27,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: Overlays.white12,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: Overlays.rgba255_255_255_02,
   },
   formHeroIcon: {
     width: 42,
@@ -2095,13 +2131,13 @@ const styles = StyleSheet.create({
   formTitle: {
     fontSize: 17,
     fontWeight: '800',
-    color: Colors.white,
+    color: colors.white,
     textAlign: 'center',
     letterSpacing: -0.2,
   },
   formSub: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.7)',
+    color: Overlays.rgba255_255_255_07,
     lineHeight: 17,
     textAlign: 'center',
     paddingHorizontal: 4,
@@ -2110,15 +2146,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: Overlays.white10,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: Radius.full,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: Overlays.white12,
     maxWidth: '100%',
   },
-  formPerkText: { fontSize: 10, fontWeight: '600', color: '#EDE9FE', flexShrink: 1 },
+  formPerkText: { fontSize: 10, fontWeight: '600', color: colors.primaryLight, flexShrink: 1 },
   formBody: {
     gap: 14,
   },
@@ -2130,24 +2166,24 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingVertical: 8,
   },
-  formTrustText: { fontSize: 11, color: Colors.muted },
+  formTrustText: { fontSize: 11, color: colors.muted },
   fieldWrap: { gap: 8 },
   fieldLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   fieldLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.muted,
+    color: colors.muted,
     letterSpacing: 0.6,
     textTransform: 'uppercase',
   },
-  fieldCounter: { fontSize: 11, fontWeight: '700', color: Colors.primary },
+  fieldCounter: { fontSize: 11, fontWeight: '700', color: colors.primary },
   inputShell: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FAFAFE',
+    backgroundColor: colors.formBgAlt,
     borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: 'rgba(124, 58, 237, 0.14)',
+    borderColor: Overlays.borderPrimary14,
     overflow: 'hidden',
   },
   inputIconWrap: {
@@ -2155,7 +2191,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRightWidth: 1,
-    borderRightColor: 'rgba(124, 58, 237, 0.1)',
+    borderRightColor: Overlays.violet10,
     alignSelf: 'stretch',
     paddingVertical: 14,
   },
@@ -2164,7 +2200,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 14,
     fontSize: 16,
-    color: Colors.dark,
+    color: colors.dark,
     fontWeight: '500',
   },
   selectTrigger: {
@@ -2182,11 +2218,11 @@ const styles = StyleSheet.create({
   selectText: {
     flex: 1,
     fontSize: 16,
-    color: Colors.dark,
+    color: colors.dark,
     fontWeight: '500',
   },
   selectPlaceholder: {
-    color: Colors.mutedLight,
+    color: colors.mutedLight,
     fontWeight: '400',
   },
   uploadWrap: { gap: 8 },
@@ -2195,8 +2231,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    borderColor: 'rgba(124, 58, 237, 0.22)',
-    backgroundColor: '#FAFAFE',
+    borderColor: Overlays.borderPrimary22,
+    backgroundColor: colors.formBgAlt,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
@@ -2207,7 +2243,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 2,
@@ -2215,12 +2251,12 @@ const styles = StyleSheet.create({
   uploadDropTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.dark,
+    color: colors.dark,
     textAlign: 'center',
   },
   uploadDropSub: {
     fontSize: 12,
-    color: Colors.muted,
+    color: colors.muted,
     textAlign: 'center',
   },
   uploadPreviewWrap: {
@@ -2228,12 +2264,12 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.14)',
+    borderColor: Overlays.borderPrimary14,
   },
   uploadPreview: {
     width: '100%',
     height: 180,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: colors.surfaceAlt,
   },
   uploadClearBtn: {
     position: 'absolute',
@@ -2242,7 +2278,7 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: 'rgba(15, 23, 42, 0.72)',
+    backgroundColor: Overlays.rgba15_23_42_072,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2253,7 +2289,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   uploadStatusPill: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: Palette.emerald200,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: Radius.full,
@@ -2261,22 +2297,22 @@ const styles = StyleSheet.create({
   uploadStatusText: {
     fontSize: 10,
     fontWeight: '700',
-    color: Colors.error,
+    color: colors.error,
     textTransform: 'uppercase',
   },
   uploadStatusPillSuccess: {
-    backgroundColor: '#DCFCE7',
+    backgroundColor: Palette.green100,
   },
   uploadStatusTextSuccess: {
-    color: Colors.success,
+    color: colors.success,
   },
   faceScanBtn: {
     minHeight: 132,
     borderRadius: 14,
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    borderColor: 'rgba(124, 58, 237, 0.22)',
-    backgroundColor: '#FAFAFE',
+    borderColor: Overlays.borderPrimary22,
+    backgroundColor: colors.formBgAlt,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
@@ -2292,9 +2328,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: Colors.white,
+    backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.18)',
+    borderColor: colors.borderSubtle,
     borderRadius: Radius.full,
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -2302,19 +2338,19 @@ const styles = StyleSheet.create({
   uploadActionText: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.primary,
+    color: colors.primary,
   },
   tier3Progress: { gap: 8, marginBottom: 4 },
   tier3ProgressTrack: {
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#EDE9FE',
+    backgroundColor: colors.inputFilled,
     overflow: 'hidden',
   },
   tier3ProgressFill: {
     height: '100%',
     borderRadius: 3,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
   },
   tier3ProgressLabels: {
     flexDirection: 'row',
@@ -2323,10 +2359,10 @@ const styles = StyleSheet.create({
   tier3ProgressLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: Colors.mutedLight,
+    color: colors.mutedLight,
   },
   tier3ProgressLabelActive: {
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: '700',
   },
   docStatusBanner: {
@@ -2338,29 +2374,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   docStatusBannerPending: {
-    backgroundColor: '#FFFBEB',
-    borderColor: 'rgba(245, 158, 11, 0.2)',
+    backgroundColor: Palette.amber50,
+    borderColor: Overlays.rgba245_158_11_02,
   },
   docStatusBannerRejected: {
-    backgroundColor: '#FEF2F2',
-    borderColor: 'rgba(239, 68, 68, 0.18)',
+    backgroundColor: Palette.red50,
+    borderColor: Overlays.rgba239_68_68_018,
   },
   docStatusTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.dark,
+    color: colors.dark,
   },
   docStatusSub: {
     fontSize: 12,
-    color: Colors.muted,
+    color: colors.muted,
     marginTop: 3,
     lineHeight: 17,
   },
   docReviewList: {
-    backgroundColor: '#FAFAFE',
+    backgroundColor: colors.formBgAlt,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.12)',
+    borderColor: Overlays.darkAmbientPrimary,
     paddingHorizontal: 14,
     paddingVertical: 4,
   },
@@ -2370,7 +2406,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(15, 23, 42, 0.06)',
+    borderBottomColor: colors.glassBorder,
   },
   docReviewRowLast: {
     borderBottomWidth: 0,
@@ -2378,27 +2414,27 @@ const styles = StyleSheet.create({
   docReviewLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.dark,
+    color: colors.dark,
   },
   docReviewStatus: {
     fontSize: 12,
     fontWeight: '700',
   },
   docReviewStatusPending: {
-    color: Colors.warning,
+    color: colors.warning,
   },
   docReviewStatusApproved: {
-    color: '#059669',
+    color: Palette.emerald600,
   },
   docReviewStatusRejected: {
-    color: Colors.error,
+    color: colors.error,
   },
   docReviewStatusMuted: {
-    color: Colors.muted,
+    color: colors.muted,
   },
   docReviewNote: {
     fontSize: 12,
-    color: Colors.error,
+    color: colors.error,
     lineHeight: 17,
     paddingHorizontal: 14,
     paddingBottom: 10,
@@ -2416,48 +2452,48 @@ const styles = StyleSheet.create({
     height: 54,
     borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: 'rgba(124, 58, 237, 0.18)',
-    backgroundColor: '#FAFAFE',
+    borderColor: Overlays.borderPrimary18,
+    backgroundColor: colors.formBgAlt,
     justifyContent: 'center',
     alignItems: 'center',
   },
   otpBoxActive: {
-    borderColor: Colors.primary,
-    backgroundColor: '#FAF5FF',
+    borderColor: colors.primary,
+    backgroundColor: colors.pinFilled,
     borderWidth: 2,
   },
-  otpBoxFilled: { backgroundColor: '#F5F3FF' },
-  otpDigit: { fontSize: 22, fontWeight: '800', color: Colors.heroDark },
+  otpBoxFilled: { backgroundColor: colors.inputFilled },
+  otpDigit: { fontSize: 22, fontWeight: '800', color: colors.heroDark },
   otpHiddenInput: hiddenNumericInputStyle,
-  otpHint: { fontSize: 12, color: Colors.mutedLight, fontWeight: '500' },
+  otpHint: { fontSize: 12, color: colors.mutedLight, fontWeight: '500' },
   secureNote: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
-    backgroundColor: '#FAF5FF',
+    backgroundColor: colors.pinFilled,
     borderRadius: 14,
     padding: 14,
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.12)',
+    borderColor: Overlays.darkAmbientPrimary,
   },
   secureNoteIcon: {
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: Colors.white,
+    backgroundColor: colors.primaryMuted,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  secureNoteText: { fontSize: 12, color: Colors.muted, flex: 1, lineHeight: 18 },
+  secureNoteText: { fontSize: 12, color: colors.muted, flex: 1, lineHeight: 18 },
   primaryBtn: {
     marginTop: 8,
   },
   phoneCard: {
-    backgroundColor: '#FAF5FF',
+    backgroundColor: colors.pinFilled,
     borderRadius: 16,
     padding: 22,
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.15)',
+    borderColor: Overlays.rgba124_58_237_015,
     alignItems: 'center',
     gap: 6,
     marginBottom: 4,
@@ -2466,19 +2502,19 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: Colors.white,
+    backgroundColor: colors.primaryMuted,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 4,
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.12)',
+    borderColor: colors.borderSubtle,
   },
-  phoneLabel: { fontSize: 11, color: Colors.primary, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  phoneValue: { fontSize: 26, fontWeight: '800', color: Colors.heroDark, letterSpacing: 0.5 },
-  phoneHint: { fontSize: 12, color: Colors.mutedLight, marginTop: 2 },
+  phoneLabel: { fontSize: 11, color: colors.primary, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  phoneValue: { fontSize: 26, fontWeight: '800', color: colors.heroDark, letterSpacing: 0.5 },
+  phoneHint: { fontSize: 12, color: colors.mutedLight, marginTop: 2 },
   resendBtn: { alignSelf: 'center', paddingVertical: 6 },
-  resendText: { fontSize: 14, fontWeight: '600', color: Colors.primary },
-  resendTextMuted: { color: Colors.mutedLight },
+  resendText: { fontSize: 14, fontWeight: '600', color: colors.primary },
+  resendTextMuted: { color: colors.mutedLight },
   trustFooter: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2487,5 +2523,9 @@ const styles = StyleSheet.create({
     marginTop: 20,
     paddingVertical: 8,
   },
-  trustFooterText: { fontSize: 12, color: Colors.muted },
+  trustFooterText: { fontSize: 12, color: colors.muted },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

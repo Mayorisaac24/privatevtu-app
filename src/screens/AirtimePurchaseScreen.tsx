@@ -5,12 +5,12 @@ import {
 import { useState, useCallback } from 'react';
 import { api, formatCurrency, isResponseSuccess, parseWalletBalanceKobo } from '../lib/api';
 import { useWalletStore } from '../stores';
-import { Colors, Spacing, Typography, Radius } from '../theme';
+import {Colors, Spacing, Typography, Radius, useThemedStyles } from '../theme';
 import { showToast } from '../components/ui/Toast';
 import { NetworkProviderGrid } from '../components/NetworkProviderGrid';
 import { PhoneNumberInput } from '../components/PhoneNumberInput';
 import { ServiceScreenHeader } from '../components/ServiceScreenHeader';
-import { getProviderLogo, getProviderCode } from '../lib/providers';
+import { getProviderCode } from '../lib/providers';
 import { useHardwareBack } from '../hooks/useHardwareBack';
 import { navigateBack } from '../lib/navigation';
 import { ThemedScreen } from '../components/ui/ThemedScreen';
@@ -36,6 +36,8 @@ import { ScreenBody } from '../components/ui/ScreenBody';
 const QUICK_AMOUNTS = [100, 200, 500, 1000, 2000, 5000];
 
 export default function AirtimePurchaseScreen() {
+  const styles = useStyles();
+
   const { balance, setBalance } = useWalletStore();
   const { providers, loading: loadingProviders } = useCachedServiceProviders('airtime');
   const [selectedNetwork, setSelectedNetwork] = useState('');
@@ -193,7 +195,7 @@ export default function AirtimePurchaseScreen() {
               amount={`₦${parsedAmount.toLocaleString()}`}
               title={`Airtime to ${selectedProv?.name || selectedNetwork}`}
               chip={formatPhoneDisplay(phone)}
-              logo={selectedProv ? getProviderLogo(selectedProv) : undefined}
+              networkProvider={selectedProv ?? { code: selectedNetwork, id: selectedNetwork }}
               icon="phone-portrait-outline"
               rows={[
                 { label: 'Recipient', value: formatPhoneDisplay(phone) },
@@ -238,22 +240,22 @@ export default function AirtimePurchaseScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   scroll: { paddingBottom: 40 },
   amountWrap: {
     flexDirection: 'row', alignItems: 'center',
-    borderWidth: 1.5, borderColor: Colors.borderMid,
-    borderRadius: Radius.lg, backgroundColor: Colors.surface,
+    borderWidth: 1.5, borderColor: colors.borderMid,
+    borderRadius: Radius.lg, backgroundColor: colors.card,
     paddingHorizontal: 18, height: 64, gap: 6,
   },
   amountWrapFilled: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primaryMuted,
+    borderColor: colors.primary,
+    backgroundColor: colors.inputFilled,
   },
-  nairaSign: { fontSize: 22, fontWeight: '700', color: Colors.primary },
+  nairaSign: { fontSize: 22, fontWeight: '700', color: colors.primary },
   amountInput: {
     flex: 1, fontSize: 32, fontWeight: '800',
-    color: Colors.primaryDeep, paddingVertical: 0,
+    color: colors.primaryDeep, paddingVertical: 0,
   },
   quickGrid: {
     flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14,
@@ -261,14 +263,18 @@ const styles = StyleSheet.create({
   quickChip: {
     width: '30%', flexGrow: 1,
     paddingVertical: 11, borderRadius: Radius.md,
-    backgroundColor: Colors.surface,
-    borderWidth: 1, borderColor: Colors.border,
+    backgroundColor: colors.card,
+    borderWidth: 1, borderColor: colors.border,
     alignItems: 'center',
   },
   quickChipActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
-  quickText: { ...Typography.smallMed, color: Colors.mid, fontWeight: '600' },
-  quickTextActive: { color: Colors.white },
+  quickText: { ...Typography.smallMed, color: colors.mid, fontWeight: '600' },
+  quickTextActive: { color: colors.white },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

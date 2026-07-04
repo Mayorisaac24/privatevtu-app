@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { api, formatCurrency, isResponseSuccess, parseWalletBalanceKobo, type DataPlan } from '../../src/lib/api';
 import { useWalletStore } from '../../src/stores';
-import { Colors, Typography, Radius } from '../../src/theme';
+import {Colors, Typography, Radius, useThemedStyles } from '../../src/theme';
 import { showToast } from '../../src/components/ui/Toast';
 import { NetworkProviderGrid } from '../../src/components/NetworkProviderGrid';
 import { PhoneNumberInput } from '../../src/components/PhoneNumberInput';
@@ -27,7 +27,6 @@ import {
 import { TransactionLockSheet } from '../../src/components/security/TransactionLockSheet';
 import type { TransactionAuthPayload } from '../../src/hooks/useTransactionLockAuth';
 import { useWalletAffordability } from '../../src/hooks/useWalletAffordability';
-import { getProviderLogo } from '../../src/lib/providers';
 import { useNetworkAutoDetect } from '../../src/hooks/useNetworkAutoDetect';
 import { useCachedDataCatalog, useCachedServiceProviders } from '../../src/hooks/useServiceCatalog';
 import { formatPhoneDisplay } from '../../src/lib/phone';
@@ -39,6 +38,8 @@ import {
 } from '../../src/lib/data-plans';
 
 export default function DataScreen() {
+  const styles = useStyles();
+
   const { balance, setBalance } = useWalletStore();
   const { providers, loading: loadingProviders } = useCachedServiceProviders('data');
   const [selectedNetwork, setSelectedNetwork] = useState('');
@@ -224,7 +225,7 @@ export default function DataScreen() {
               amount={formatCurrency(selectedPlan?.price ?? 0)}
               title={selectedPlan?.name || 'Data bundle'}
               chip={`${selectedProv?.name || selectedNetwork} · ${formatPhoneDisplay(phone)}`}
-              logo={selectedProv ? getProviderLogo(selectedProv) : undefined}
+              networkProvider={selectedProv ?? { code: selectedNetwork, id: selectedNetwork }}
               icon="wifi-outline"
               rows={[
                 { label: 'Phone number', value: formatPhoneDisplay(phone) },
@@ -280,7 +281,7 @@ export default function DataScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../src/theme/types').ThemeColors) => StyleSheet.create({
   scroll: { paddingBottom: 40 },
   typePills: { gap: 8, paddingVertical: 2 },
   typePill: {
@@ -288,13 +289,17 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: Radius.full,
     borderWidth: 1.5,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surface,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
   },
   typePillActive: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primaryMuted,
+    borderColor: colors.primary,
+    backgroundColor: colors.inputFilled,
   },
-  typePillText: { ...Typography.small, color: Colors.muted, fontWeight: '600' },
-  typePillTextActive: { color: Colors.primary },
+  typePillText: { ...Typography.small, color: colors.muted, fontWeight: '600' },
+  typePillTextActive: { color: colors.primary },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

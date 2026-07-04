@@ -6,6 +6,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { Spacing } from '../theme/layout-tokens';
+import { BRAND } from '../theme/colors/app-colors';
 
 export const isAndroid = Platform.OS === 'android';
 export const isIOS = Platform.OS === 'ios';
@@ -45,7 +46,7 @@ export function textStyle(style: TextStyle): TextStyle {
 /** iOS shadow + tuned Android elevation so cards/buttons feel closer across devices. */
 export function platformShadow(
   level: 'xs' | 'sm' | 'md' | 'lg',
-  color = '#4C1D95',
+  color = BRAND.primaryDeep,
 ): ViewStyle {
   const presets = {
     xs: {

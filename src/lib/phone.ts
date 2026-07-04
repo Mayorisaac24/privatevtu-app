@@ -43,6 +43,24 @@ export function normalizeNigerianPhone(raw: string): string {
   return clean.slice(0, 11);
 }
 
+/**
+ * Normalize phone for API requests (+234XXXXXXXXXX).
+ * Never throws — returns the trimmed input when the value cannot be normalized.
+ */
+export function tryNormalizePhone(raw: string): string {
+  const trimmed = String(raw || '').trim();
+  if (!trimmed) return trimmed;
+
+  const clean = trimmed.replace(/[^\d+]/g, '');
+  if (clean.startsWith('+234')) return clean;
+  if (clean.startsWith('234')) return `+${clean.slice(0, 13)}`;
+  if (clean.startsWith('0') && clean.length >= 11) return `+234${clean.slice(1, 11)}`;
+  if (clean.length === 10 && /^[789]/.test(clean)) return `+234${clean}`;
+  if (clean.length === 11 && clean.startsWith('0')) return `+234${clean.slice(1)}`;
+
+  return trimmed;
+}
+
 export function isCompleteNigerianPhone(raw: string): boolean {
   const normalized = normalizeNigerianPhone(raw);
   return normalized.length === 11 && normalized.startsWith('0');

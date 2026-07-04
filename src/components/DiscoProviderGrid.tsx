@@ -16,7 +16,7 @@ import {
   getDiscoLogo,
   getDiscoLogoScale,
 } from '../lib/disco-providers';
-import { Colors, Typography, Radius } from '../theme';
+import {Colors, Typography, Radius, Palette, useColors, useThemedStyles } from '../theme';
 import { isAndroid } from '../lib/platform-ui';
 
 type DiscoProviderGridProps = {
@@ -37,6 +37,8 @@ function DiscoChip({
   onPress: () => void;
   ringSize: number;
 }) {
+  const styles = useStyles();
+  const colors = useColors();
   const code = getDiscoCode(provider);
   const logoScale = getDiscoLogoScale(code);
   const innerSize = ringSize - 6;
@@ -50,8 +52,8 @@ function DiscoChip({
             width: ringSize,
             height: ringSize,
             borderRadius: ringSize / 2,
-            borderColor: selected ? Colors.electricity : Colors.borderMid,
-            backgroundColor: selected ? Colors.electricityBg : Colors.white,
+            borderColor: selected ? colors.electricity : colors.borderMid,
+            backgroundColor: selected ? colors.electricityBg : colors.surfaceAlt,
           },
           selected && styles.logoRingSelected,
         ]}
@@ -63,7 +65,7 @@ function DiscoChip({
               width: innerSize,
               height: innerSize,
               borderRadius: innerSize / 2,
-              backgroundColor: Colors.electricityBg,
+              backgroundColor: colors.electricityBg,
             },
           ]}
         >
@@ -92,6 +94,8 @@ export function DiscoProviderGrid({
   onSelect,
   loading = false,
 }: DiscoProviderGridProps) {
+  const styles = useStyles();
+
   const { width: screenWidth } = useWindowDimensions();
   const ringSize = isAndroid ? 54 : 58;
   const selectedProvider = providers.find((provider) => getDiscoCode(provider) === selectedCode);
@@ -149,17 +153,17 @@ export function DiscoProviderGrid({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   wrap: {
     gap: 10,
   },
   track: {
-    backgroundColor: Colors.electricityBg,
+    backgroundColor: colors.electricityBg,
     borderRadius: Radius.lg,
     paddingVertical: 12,
     paddingHorizontal: 10,
     borderWidth: 1,
-    borderColor: '#FDE68A',
+    borderColor: Palette.amber200,
     overflow: 'hidden',
   },
   scrollRow: {
@@ -185,7 +189,7 @@ const styles = StyleSheet.create({
     ...(isAndroid
       ? { elevation: 2 }
       : {
-          shadowColor: Colors.electricity,
+          shadowColor: colors.electricity,
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.18,
           shadowRadius: 4,
@@ -204,9 +208,9 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: Colors.electricity,
+    backgroundColor: colors.electricity,
     borderWidth: 2,
-    borderColor: Colors.white,
+    borderColor: colors.white,
   },
   selectedBadge: {
     alignSelf: 'center',
@@ -217,18 +221,18 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 14,
     borderRadius: Radius.full,
-    backgroundColor: Colors.electricityBg,
+    backgroundColor: colors.electricityBg,
     borderWidth: 1,
-    borderColor: '#FDE68A',
+    borderColor: Palette.amber200,
   },
   selectedBadgeText: {
     ...Typography.smallMed,
-    color: Colors.electricity,
+    color: colors.electricity,
     flexShrink: 1,
   },
   hintText: {
     ...Typography.small,
-    color: Colors.muted,
+    color: colors.muted,
     textAlign: 'center',
   },
   loadRow: {
@@ -240,12 +244,16 @@ const styles = StyleSheet.create({
   },
   loadText: {
     ...Typography.small,
-    color: Colors.muted,
+    color: colors.muted,
   },
   emptyText: {
     ...Typography.small,
-    color: Colors.muted,
+    color: colors.muted,
     textAlign: 'center',
     paddingVertical: 12,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

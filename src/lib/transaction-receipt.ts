@@ -1,4 +1,5 @@
 import type { SupportConfig } from './support';
+import { resolveAppName, DEFAULT_SUPPORT_EMAIL } from './brand';
 import type { EnrichedTransaction } from './transaction-display';
 import {
   enrichTransaction,
@@ -151,8 +152,8 @@ export function buildTransactionReceiptData(
   }
 
   return {
-    appName: config?.appName || 'Datamart',
-    supportEmail: config?.supportEmail || 'help@datamart.ng',
+    appName: resolveAppName(config?.appName),
+    supportEmail: config?.supportEmail || DEFAULT_SUPPORT_EMAIL,
     title: enriched.displayTitle || formatPaymentMethod(txType),
     amount: enriched.formattedDisplayAmount || formatCurrencyVisible(displayAmount, true),
     statusLabel: enriched.displayStatusLabel || statusMeta.label,

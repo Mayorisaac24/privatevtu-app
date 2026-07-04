@@ -15,10 +15,10 @@ import type { EnrichedTransaction } from '../../lib/transaction-display';
 import { buildTransactionReceiptData, type TransactionReceiptData } from '../../lib/transaction-receipt';
 import { receiptThemeFromApp } from '../../lib/receipt-html';
 import { isViewShotNativeAvailable, shareReceiptAsImageOrPdfFallback } from '../../lib/share-transaction-receipt';
-import type { SupportConfig } from '../../lib/support';
+import { resolveAppName, DEFAULT_SUPPORT_EMAIL } from '../../lib/brand';
 import { api, isResponseSuccess } from '../../lib/api';
 import { useColors, useGradients } from '../../theme/hooks';
-import { Radius, Spacing, Typography } from '../../theme';
+import { Radius, Spacing, Typography , Overlays } from '../../theme';
 import { showToast } from '../ui/Toast';
 import { TransactionReceiptCard } from './TransactionReceiptCard';
 
@@ -36,7 +36,7 @@ export function ShareReceiptSheet({ visible, transaction, onClose }: ShareReceip
   const gradients = useGradients();
   const captureRef = useRef<View>(null);
   const [sharing, setSharing] = useState<ShareFormat | null>(null);
-  const [supportConfig, setSupportConfig] = useState<Pick<SupportConfig, 'appName' | 'supportEmail'> | null>(null);
+  const [supportConfig, setSupportConfig] = useState<{ appName: string; supportEmail: string } | null>(null);
   const [resolvedReceipt, setResolvedReceipt] = useState<TransactionReceiptData | null>(null);
 
   const loadSupportConfig = useCallback(async () => {
@@ -44,7 +44,10 @@ export function ShareReceiptSheet({ visible, transaction, onClose }: ShareReceip
     try {
       const res = await api.getSupportConfig();
       if (isResponseSuccess(res) && res.data) {
-        const next = { appName: res.data.appName, supportEmail: res.data.supportEmail };
+        const next = {
+          appName: resolveAppName(res.data.appName),
+          supportEmail: res.data.supportEmail || DEFAULT_SUPPORT_EMAIL,
+        };
         setSupportConfig(next);
         return next;
       }
@@ -228,7 +231,7 @@ export function ShareReceiptSheet({ visible, transaction, onClose }: ShareReceip
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    backgroundColor: Overlays.rgba15_23_42_045,
   },
   sheet: {
     maxHeight: '88%',
@@ -242,7 +245,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(15, 23, 42, 0.12)',
+    backgroundColor: Overlays.rgba15_23_42_012,
     marginBottom: 12,
   },
   header: {

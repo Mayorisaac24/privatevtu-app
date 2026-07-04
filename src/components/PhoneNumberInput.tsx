@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, Text, TextInput, ActivityIndicator, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Typography, Radius } from '../theme';
+import {Colors, Typography, Radius, useColors, useThemedStyles } from '../theme';
 import { FIELD_HEIGHT, mergeInputStyle } from '../lib/platform-ui';
 import { pickPhoneFromContacts } from '../lib/contact-picker';
 
@@ -22,6 +22,8 @@ export function PhoneNumberInput({
   placeholder = '801 234 5678',
   enableContactPicker = true,
 }: PhoneNumberInputProps) {
+  const styles = useStyles();
+  const colors = useColors();
   const [pickingContact, setPickingContact] = useState(false);
   const hasValue = value.length > 0;
   const showTrailing = detecting || isComplete || (enableContactPicker && !detecting);
@@ -51,7 +53,7 @@ export function PhoneNumberInput({
       <TextInput
         style={styles.input}
         placeholder={placeholder}
-        placeholderTextColor={Colors.mutedLight}
+        placeholderTextColor={colors.mutedLight}
         value={value}
         onChangeText={onChangeText}
         keyboardType="phone-pad"
@@ -70,17 +72,17 @@ export function PhoneNumberInput({
               accessibilityLabel="Pick from contacts"
             >
               {pickingContact ? (
-                <ActivityIndicator size="small" color={Colors.primary} />
+                <ActivityIndicator size="small" color={colors.primary} />
               ) : (
-                <Ionicons name="person-circle-outline" size={22} color={Colors.primary} />
+                <Ionicons name="person-circle-outline" size={22} color={colors.primary} />
               )}
             </TouchableOpacity>
           ) : null}
           {detecting ? (
-            <ActivityIndicator size="small" color={Colors.primary} />
+            <ActivityIndicator size="small" color={colors.primary} />
           ) : null}
           {!detecting && isComplete ? (
-            <Ionicons name="checkmark-circle" size={20} color={Colors.primary} />
+            <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
           ) : null}
         </View>
       ) : null}
@@ -88,26 +90,26 @@ export function PhoneNumberInput({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../theme/types').ThemeColors) => StyleSheet.create({
   wrap: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: Colors.borderMid,
+    borderColor: colors.borderMid,
     borderRadius: Radius.lg,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.card,
     minHeight: FIELD_HEIGHT,
     overflow: 'hidden',
   },
   wrapFilled: {
-    borderColor: Colors.primaryLight,
-    backgroundColor: Colors.primaryMuted,
+    borderColor: colors.primaryLight,
+    backgroundColor: colors.inputFilled,
   },
   wrapComplete: {
-    borderColor: Colors.primary,
+    borderColor: colors.primary,
   },
   wrapDetecting: {
-    borderColor: Colors.primary,
+    borderColor: colors.primary,
   },
   prefixBox: {
     flexDirection: 'row',
@@ -115,16 +117,16 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 14,
     height: '100%',
-    backgroundColor: Colors.white,
+    backgroundColor: colors.surfaceAlt,
     borderRightWidth: 1,
-    borderRightColor: Colors.border,
+    borderRightColor: colors.border,
   },
   flag: { fontSize: 16 },
-  prefixCode: { ...Typography.smallMed, color: Colors.muted, fontWeight: '600' },
+  prefixCode: { ...Typography.smallMed, color: colors.muted, fontWeight: '600' },
   input: mergeInputStyle({
     flex: 1,
     fontSize: 16,
-    color: Colors.dark,
+    color: colors.dark,
     paddingHorizontal: 14,
     letterSpacing: 0.5,
   }),
@@ -140,8 +142,12 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.white,
+    backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

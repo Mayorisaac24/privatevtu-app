@@ -6,7 +6,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { api, formatCurrency, isResponseSuccess, parseWalletBalanceKobo, type ElectricityProvider } from '../../src/lib/api';
 import { useWalletStore } from '../../src/stores';
-import { Colors, Typography, Radius } from '../../src/theme';
+import {Colors, Typography, Radius , Overlays, useThemedStyles } from '../../src/theme';
 import { showToast } from '../../src/components/ui/Toast';
 import { ServiceScreenHeader } from '../../src/components/ServiceScreenHeader';
 import { useHardwareBack } from '../../src/hooks/useHardwareBack';
@@ -37,6 +37,8 @@ import {
 const QUICK_AMOUNTS = [1000, 2000, 5000, 10000, 20000];
 
 export default function ElectricityScreen() {
+  const styles = useStyles();
+
   const { balance, setBalance } = useWalletStore();
   const { discos, loading: loadingDiscos } = useElectricityDiscos();
   const [selectedDiscoProvider, setSelectedDiscoProvider] = useState<ElectricityProvider | null>(null);
@@ -337,18 +339,18 @@ export default function ElectricityScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../src/theme/types').ThemeColors) => StyleSheet.create({
   scroll: { paddingBottom: 40 },
   discoSelector: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.22)',
+    borderColor: Overlays.borderPrimary22,
     borderRadius: Radius.md,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     minHeight: 52,
   },
   discoSelectorInner: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
@@ -356,46 +358,50 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: Colors.white,
+    backgroundColor: colors.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
   },
   discoSelectorTextWrap: { flex: 1 },
-  discoSelectorText: { ...Typography.smallMed, color: Colors.dark },
-  discoSelectorPlaceholder: { ...Typography.small, color: Colors.mutedLight, flex: 1 },
+  discoSelectorText: { ...Typography.smallMed, color: colors.dark },
+  discoSelectorPlaceholder: { ...Typography.small, color: colors.mutedLight, flex: 1 },
   typeRow: { flexDirection: 'row', gap: 10 },
   typeBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
-    paddingVertical: 12, borderRadius: Radius.md, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.surface,
+    paddingVertical: 12, borderRadius: Radius.md, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface,
   },
-  typeBtnActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  typeLabel: { ...Typography.smallMed, color: Colors.muted },
-  typeLabelActive: { color: Colors.white },
-  inputWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: Colors.border, borderRadius: Radius.md, backgroundColor: Colors.surface, height: 52 },
-  input: { flex: 1, fontSize: 15, color: Colors.dark, paddingVertical: 0 },
-  amountWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 2, borderColor: Colors.primary, borderRadius: Radius.md, backgroundColor: Colors.primaryMuted, paddingHorizontal: 16, height: 60, gap: 8 },
-  nairaSign: { fontSize: 24, fontWeight: '700', color: Colors.primary },
-  amountInput: { flex: 1, fontSize: 26, fontWeight: '800', color: Colors.primary, paddingVertical: 0 },
+  typeBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  typeLabel: { ...Typography.smallMed, color: colors.muted },
+  typeLabelActive: { color: colors.white },
+  inputWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: colors.border, borderRadius: Radius.md, backgroundColor: colors.surface, height: 52 },
+  input: { flex: 1, fontSize: 15, color: colors.dark, paddingVertical: 0 },
+  amountWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 2, borderColor: colors.primary, borderRadius: Radius.md, backgroundColor: colors.card, paddingHorizontal: 16, height: 60, gap: 8 },
+  nairaSign: { fontSize: 24, fontWeight: '700', color: colors.primary },
+  amountInput: { flex: 1, fontSize: 26, fontWeight: '800', color: colors.primary, paddingVertical: 0 },
   quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
-  quickBtn: { paddingVertical: 7, paddingHorizontal: 14, borderRadius: Radius.full, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
-  quickBtnActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  quickText: { ...Typography.captionMed, color: Colors.muted },
-  quickTextActive: { color: Colors.white, fontWeight: '700' },
+  quickBtn: { paddingVertical: 7, paddingHorizontal: 14, borderRadius: Radius.full, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  quickBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  quickText: { ...Typography.captionMed, color: colors.muted },
+  quickTextActive: { color: colors.white, fontWeight: '700' },
   verifiedBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: Colors.successLight,
+    backgroundColor: colors.successLight,
     borderRadius: Radius.xl,
     padding: 14,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: Colors.success + '33',
+    borderColor: colors.success + '33',
   },
-  verifiedIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center' },
-  verifiedName: { ...Typography.smallMed, color: Colors.successDark, marginBottom: 2 },
-  verifiedAddr: { ...Typography.caption, color: Colors.success, marginBottom: 2 },
-  verifiedMeter: { ...Typography.caption, color: Colors.success },
-  changeBtn: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: Colors.white, borderRadius: Radius.sm },
-  changeText: { ...Typography.captionMed, color: Colors.primary },
+  verifiedIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.surfaceAlt, justifyContent: 'center', alignItems: 'center' },
+  verifiedName: { ...Typography.smallMed, color: colors.successDark, marginBottom: 2 },
+  verifiedAddr: { ...Typography.caption, color: colors.success, marginBottom: 2 },
+  verifiedMeter: { ...Typography.caption, color: colors.success },
+  changeBtn: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: colors.surfaceAlt, borderRadius: Radius.sm },
+  changeText: { ...Typography.captionMed, color: colors.primary },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

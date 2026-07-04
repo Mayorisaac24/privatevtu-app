@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useStatusBarStore } from '../../src/stores';
 import { useWalletStore } from '../../src/stores/wallet-store';
-import { Colors, Typography } from '../../src/theme';
+import { Typography, useColors, useCardGlassVariant, useThemedStyles } from '../../src/theme';
 import { ThemedScreen } from '../../src/components/ui/ThemedScreen';
 import { refreshDashboardData, refreshHistoryData, refreshHomeDashboardStats, refreshHomeInsights } from '../../src/lib/dashboard-data';
 import { TabContext } from '../../src/stores/tab-context';
@@ -37,6 +37,10 @@ const TAB_COMPONENTS: Record<TabId, React.ComponentType> = {
 };
 
 export default function TabNavigator() {
+  const styles = useStyles();
+  const colors = useColors();
+  const cardVariant = useCardGlassVariant();
+
   const [activeTab, setActiveTab] = useState<TabId>('home');
   const [mountedTabs, setMountedTabs] = useState<Set<TabId>>(() => new Set(['home']));
   const insets = useSafeAreaInsets();
@@ -44,13 +48,13 @@ export default function TabNavigator() {
 
   useFocusEffect(
     useCallback(() => {
-      setStatusBarStyle('dark');
-    }, [setStatusBarStyle]),
+      setStatusBarStyle(colors.statusBarStyle);
+    }, [setStatusBarStyle, colors.statusBarStyle]),
   );
 
   useEffect(() => {
-    setStatusBarStyle('dark');
-  }, [activeTab, setStatusBarStyle]);
+    setStatusBarStyle(colors.statusBarStyle);
+  }, [activeTab, colors.statusBarStyle, setStatusBarStyle]);
 
   useEffect(() => {
     setMountedTabs((prev) => {
@@ -97,7 +101,7 @@ export default function TabNavigator() {
         </View>
 
         <GlassSurface
-          variant="light"
+          variant={cardVariant}
           borderRadius={0}
           style={styles.tabBar}
           contentStyle={{ ...styles.tabBarInner, paddingBottom: insets.bottom || (Platform.OS === 'ios' ? 20 : 10) }}
@@ -114,7 +118,7 @@ export default function TabNavigator() {
                 <Ionicons
                   name={(active ? tab.iconActive : tab.icon) as any}
                   size={22}
-                  color={active ? Colors.primary : Colors.muted}
+                  color={active ? colors.primary : colors.muted}
                 />
                 <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>
                   {tab.label}
@@ -129,14 +133,14 @@ export default function TabNavigator() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../src/theme/types').ThemeColors) => StyleSheet.create({
   root: { flex: 1 },
   screen: { flex: 1, position: 'relative' },
   tabPane: { ...StyleSheet.absoluteFillObject },
   tabPaneHidden: { display: 'none' },
   tabBar: {
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.borderSubtle,
+    borderTopColor: colors.borderSubtle,
   },
   tabBarInner: {
     flexDirection: 'row',
@@ -152,17 +156,21 @@ const styles = StyleSheet.create({
     ...Typography.caption,
     fontSize: 10,
     fontWeight: '500',
-    color: Colors.muted,
+    color: colors.muted,
   },
   tabLabelActive: {
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: '700',
   },
   tabDot: {
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     marginTop: 1,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

@@ -2,6 +2,7 @@
 import { Platform, type ViewStyle } from 'react-native';
 import { platformShadow, platformText } from './lib/platform-ui';
 import { FontFamily, Radius, Spacing } from './theme/layout-tokens';
+import { Palette } from './theme/colors/app-colors';
 
 export { FontFamily, Radius, Spacing };
 
@@ -26,7 +27,7 @@ export const Shadow = {
   lg: platformShadow('lg'),
   card: Platform.select({
     ios: {
-      shadowColor: '#64748B',
+      shadowColor: Palette.slate500,
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.07,
       shadowRadius: 10,
@@ -53,4 +54,4 @@ export const Typography = {
 };
 
 /** @deprecated Use Colors.heroDark from useColors() */
-export const HERO_DARK = '#1A0A3C';
+export const HERO_DARK = Palette.heroBase;

@@ -21,7 +21,7 @@ import {
   type AppBroadcast,
   type BroadcastScreenKey,
 } from '../../lib/broadcast-navigation';
-import { Colors, Spacing } from '../../theme';
+import {Colors, Spacing , Overlays, useThemedStyles } from '../../theme';
 import { GlassSurface } from '../ui/GlassSurface';
 
 type Props = {
@@ -29,6 +29,8 @@ type Props = {
 };
 
 export function BroadcastBanner({ screen }: Props) {
+  const styles = useStyles();
+
   const [items, setItems] = useState<AppBroadcast[]>([]);
 
   const loadBroadcasts = useCallback(async () => {
@@ -116,6 +118,8 @@ export function BroadcastBanner({ screen }: Props) {
 }
 
 export function BroadcastModalHost() {
+  const styles = useStyles();
+
   const [modal, setModal] = useState<AppBroadcast | null>(null);
   const [visible, setVisible] = useState(false);
 
@@ -190,7 +194,7 @@ export function BroadcastModalHost() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   wrap: {
     gap: Spacing.sm,
     marginBottom: Spacing.sm,
@@ -220,29 +224,29 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.dark,
+    color: colors.dark,
   },
   body: {
     fontSize: 13,
-    color: Colors.muted,
+    color: colors.muted,
     lineHeight: 18,
   },
   cta: {
     marginTop: 4,
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.primary,
+    color: colors.primary,
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    backgroundColor: Overlays.rgba15_23_42_055,
     justifyContent: 'center',
     padding: Spacing.lg,
   },
   modalCard: {
     borderRadius: 20,
     overflow: 'hidden',
-    backgroundColor: Colors.white,
+    backgroundColor: colors.card,
   },
   modalImage: {
     width: '100%',
@@ -255,23 +259,27 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: Colors.dark,
+    color: colors.dark,
   },
   modalBody: {
     fontSize: 14,
-    color: Colors.muted,
+    color: colors.muted,
     lineHeight: 20,
   },
   modalButton: {
     marginTop: Spacing.sm,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
   },
   modalButtonText: {
-    color: Colors.white,
+    color: colors.white,
     fontSize: 14,
     fontWeight: '700',
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

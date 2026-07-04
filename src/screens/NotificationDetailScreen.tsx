@@ -17,7 +17,7 @@ import { useTabContext } from '../stores/tab-context';
 import { api, isResponseSuccess, type AppNotification, type AppNotificationType } from '../lib/api';
 import { getLoginDeviceId } from '../lib/login-context';
 import { navigateBack } from '../lib/navigation';
-import { Colors, Spacing, getNotificationTypePalette, useColors } from '../theme';
+import {Colors, Spacing, getNotificationTypePalette, useColors , Overlays, useThemedStyles } from '../theme';
 import { ThemedScreen } from '../components/ui/ThemedScreen';
 import { GlassCard } from '../components/ui/GlassCard';
 import { GlassSurface } from '../components/ui/GlassSurface';
@@ -71,6 +71,8 @@ type Props = {
 };
 
 export default function NotificationDetailScreen({ id }: Props) {
+  const styles = useStyles();
+
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { setTab } = useTabContext();
@@ -322,10 +324,10 @@ export default function NotificationDetailScreen({ id }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   headerShell: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(124, 58, 237, 0.08)',
+    borderBottomColor: Overlays.violet08,
   },
   headerContent: {
     flexDirection: 'row',
@@ -340,7 +342,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(124, 58, 237, 0.08)',
+    backgroundColor: Overlays.violet08,
   },
   menuBtn: {
     width: 40,
@@ -348,18 +350,18 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(124, 58, 237, 0.08)',
+    backgroundColor: Overlays.violet08,
   },
   headerCenter: { flex: 1 },
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: Colors.dark,
+    color: colors.dark,
     letterSpacing: -0.3,
   },
   headerSub: {
     fontSize: 12,
-    color: Colors.muted,
+    color: colors.muted,
     marginTop: 2,
   },
   body: {
@@ -382,35 +384,35 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '700',
-    color: Colors.dark,
+    color: colors.dark,
     lineHeight: 26,
   },
   timestamp: {
     fontSize: 12,
-    color: Colors.mutedLight,
+    color: colors.mutedLight,
   },
   divider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: Colors.borderSubtle,
+    backgroundColor: colors.borderSubtle,
     marginVertical: 4,
   },
   message: {
     fontSize: 15,
     lineHeight: 24,
-    color: Colors.muted,
+    color: colors.muted,
   },
   actionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     borderRadius: 14,
     paddingVertical: 14,
     paddingHorizontal: 18,
   },
   actionBtnText: {
-    color: Colors.white,
+    color: colors.white,
     fontSize: 14,
     fontWeight: '700',
   },
@@ -420,6 +422,10 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 14,
-    color: Colors.muted,
+    color: colors.muted,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

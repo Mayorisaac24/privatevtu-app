@@ -2,6 +2,11 @@ import { create } from 'zustand';
 import type { ThemeColors, ThemeGradients, ThemeId } from './types';
 import { DEFAULT_THEME_ID, THEME_MAP } from './palettes';
 import { loadStoredThemeId, saveThemeId } from './theme-storage';
+import { useStatusBarStore } from '../stores/status-bar-store';
+
+function syncStatusBar(colors: ThemeColors) {
+  useStatusBarStore.getState().setStyle(colors.statusBarStyle);
+}
 
 type ThemeState = {
   themeId: ThemeId;
@@ -34,6 +39,7 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     set({ themeId: next.themeId, colors: next.colors, gradients: next.gradients });
     Object.assign(Colors, next.colors);
     Object.assign(Gradients, next.gradients);
+    syncStatusBar(next.colors);
     await saveThemeId(next.themeId);
   },
 
@@ -45,12 +51,9 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
       set({ themeId: next.themeId, colors: next.colors, gradients: next.gradients, hydrated: true });
       Object.assign(Colors, next.colors);
       Object.assign(Gradients, next.gradients);
+      syncStatusBar(next.colors);
     } catch {
       set({ hydrated: true });
     }
   },
 }));
-
-export { Overlays } from './colors/overlays';
-export { Palette } from './colors/palette';
-export { CableProviderColors, KycStatusColors, WalletFlowColors } from './colors/semantic';

@@ -16,8 +16,23 @@ export {
   OTHER_THEME_FAMILIES,
 } from './palettes';
 
-export { Palette } from './colors/palette';
-export { Overlays } from './colors/overlays';
+export {
+  BRAND,
+  Palette,
+  type PaletteKey,
+  Overlays,
+  FormColors,
+  SupportChannelColors,
+  NetworkProviderColors,
+  DisputeStatusColors,
+  StarRatingColor,
+  PrivacyHighlightColors,
+  EducationProviderColors,
+  BankBrandColors,
+  FamilyAccents,
+  ReceiptColors,
+  BRAND_SPLASH_BG,
+} from './colors/app-colors';
 export {
   KycStatusColors,
   CableProviderColors,
@@ -36,7 +51,7 @@ export type { NotificationVisualType, ToastVariant } from './colors/ui-semantics
 
 export { Colors, Gradients, useThemeStore } from './theme-store';
 export { ThemeProvider } from './ThemeProvider';
-export { useTheme, useColors, useGradients, useThemeId, useThemedStyles } from './hooks';
-export { gradientStops } from './gradient-utils';
+export { useTheme, useColors, useGradients, useThemeId, useThemedStyles, createThemedStyles, useCardGlassVariant } from './hooks';
+export { gradientStops, withAlpha } from './gradient-utils';
 
 export { Spacing, Radius, Shadow, Typography, FontFamily, HERO_DARK } from '../theme-legacy';

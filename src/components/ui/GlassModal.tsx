@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import { Overlays } from '../../theme/colors/app-colors';
 import {
   Modal,
   Platform,
@@ -79,7 +80,7 @@ const styles = StyleSheet.create({
   },
   overlayTint: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15, 23, 42, 0.42)',
+    backgroundColor: Overlays.rgba15_23_42_042,
   },
   sheetBottom: {
     width: '100%',

@@ -13,7 +13,8 @@ import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Radius } from '../theme';
+import {Colors, Radius , Palette, FormColors, BRAND, Overlays, useThemedStyles, useGradients } from '../theme';
+import { gradientStops } from '../theme/gradient-utils';
 import { CTA_BUTTON_HEIGHT } from '../lib/platform-ui';
 import { GradientButton } from './ui/GradientButton';
 import { GlassCard } from './ui/GlassCard';
@@ -74,6 +75,8 @@ function yearsInDecade(decade: number): number[] {
 }
 
 function StepHeader({ step }: { step: number }) {
+  const styles = useStyles();
+
   const labels = ['Select year', 'Select month', 'Select day'];
   return (
     <View style={styles.stepHeader}>
@@ -90,6 +93,7 @@ function YearStep({
   year: number;
   onSelect: (year: number) => void;
 }) {
+  const styles = useStyles();
   const [decade, setDecade] = useState(() => Math.floor(year / 10) * 10);
   const years = useMemo(() => yearsInDecade(decade), [decade]);
 
@@ -133,6 +137,7 @@ function MonthStep({
   month: number;
   onSelect: (month: number) => void;
 }) {
+  const styles = useStyles();
   return (
     <View style={styles.stepBody}>
       <Text style={styles.stepHint}>Tap the month you were born</Text>
@@ -165,6 +170,7 @@ function DayStep({
   day: number;
   onSelect: (day: number) => void;
 }) {
+  const styles = useStyles();
   const count = daysInMonth(year, month);
 
   return (
@@ -194,6 +200,7 @@ function BirthDatePicker({
   value: Date;
   onChange: (date: Date) => void;
 }) {
+  const styles = useStyles();
   const [step, setStep] = useState(0);
   const [year, setYear] = useState(value.getFullYear());
   const [month, setMonth] = useState(value.getMonth());
@@ -259,6 +266,9 @@ export function DateOfBirthField({
   onChange,
   placeholder = 'Select date of birth',
 }: DateOfBirthFieldProps) {
+  const styles = useStyles();
+  const gradients = useGradients();
+
   const insets = useSafeAreaInsets();
   const [showPicker, setShowPicker] = useState(false);
   const [draft, setDraft] = useState<Date>(() => parseIsoDate(value) ?? new Date(1990, 0, 1));
@@ -316,7 +326,7 @@ export function DateOfBirthField({
               contentStyle={styles.sheetInner}
             >
               <LinearGradient
-                colors={[Colors.heroDark, '#2E1065']}
+                colors={gradientStops(gradients.hero)}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.sheetHeader}
@@ -352,7 +362,7 @@ export function DateOfBirthField({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   trigger: {
     flex: 1,
     flexDirection: 'row',
@@ -364,10 +374,10 @@ const styles = StyleSheet.create({
   triggerText: {
     fontSize: 16,
     fontWeight: '500',
-    color: Colors.dark,
+    color: colors.dark,
   },
   triggerPlaceholder: {
-    color: Colors.mutedLight,
+    color: colors.mutedLight,
     fontWeight: '400',
   },
   modalRoot: {
@@ -379,7 +389,7 @@ const styles = StyleSheet.create({
   },
   backdropTint: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15, 23, 42, 0.28)',
+    backgroundColor: Overlays.rgba15_23_42_028,
   },
   sheetWrap: {
     maxHeight: '90%',
@@ -401,11 +411,11 @@ const styles = StyleSheet.create({
   sheetTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: Colors.white,
+    color: colors.white,
   },
   sheetSub: {
     fontSize: 13,
-    color: 'rgba(255,255,255,0.7)',
+    color: Overlays.rgba255_255_255_07,
   },
   previewPill: {
     flexDirection: 'row',
@@ -413,9 +423,9 @@ const styles = StyleSheet.create({
     gap: 8,
     alignSelf: 'flex-start',
     marginTop: 4,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: Overlays.white12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
+    borderColor: Overlays.white18,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: Radius.full,
@@ -423,7 +433,7 @@ const styles = StyleSheet.create({
   previewText: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.white,
+    color: colors.white,
   },
   pickerCard: {
     marginHorizontal: 16,
@@ -438,12 +448,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingTop: 18,
     paddingBottom: 12,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: colors.formBgNeutral,
   },
   stepCount: {
     fontSize: 11,
     fontWeight: '600',
-    color: Colors.primaryLight,
+    color: colors.primaryLight,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: 6,
@@ -451,7 +461,7 @@ const styles = StyleSheet.create({
   stepTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: Colors.dark,
+    color: colors.dark,
     letterSpacing: -0.2,
   },
   stepScroll: {
@@ -464,7 +474,7 @@ const styles = StyleSheet.create({
   stepHint: {
     fontSize: 13,
     fontWeight: '400',
-    color: Colors.mutedLight,
+    color: colors.mutedLight,
     lineHeight: 19,
   },
   chipRow: {
@@ -475,18 +485,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: Radius.full,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.surface,
   },
   chipActive: {
-    backgroundColor: '#EDE9FE',
+    backgroundColor: colors.inputFilled,
   },
   chipText: {
     fontSize: 13,
     fontWeight: '500',
-    color: Colors.muted,
+    color: colors.muted,
   },
   chipTextActive: {
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: '600',
   },
   grid: {
@@ -502,18 +512,18 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     borderRadius: 14,
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.surface,
   },
   gridBtnActive: {
-    backgroundColor: '#EDE9FE',
+    backgroundColor: colors.inputFilled,
   },
   gridBtnText: {
     fontSize: 15,
     fontWeight: '400',
-    color: Colors.mid,
+    color: colors.mid,
   },
   gridBtnTextActive: {
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: '600',
   },
   list: {
@@ -529,15 +539,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   listRowActive: {
-    backgroundColor: '#F5F3FF',
+    backgroundColor: colors.primaryMuted,
   },
   listRowText: {
     fontSize: 15,
     fontWeight: '400',
-    color: Colors.mid,
+    color: colors.mid,
   },
   listRowTextActive: {
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: '600',
   },
   dayGrid: {
@@ -553,18 +563,18 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.surface,
   },
   dayBtnActive: {
-    backgroundColor: '#EDE9FE',
+    backgroundColor: colors.inputFilled,
   },
   dayBtnText: {
     fontSize: 14,
     fontWeight: '400',
-    color: Colors.mid,
+    color: colors.mid,
   },
   dayBtnTextActive: {
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: '600',
   },
   backLink: {
@@ -573,12 +583,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 4,
     paddingVertical: 14,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: colors.formBgNeutral,
   },
   backLinkText: {
     fontSize: 13,
     fontWeight: '500',
-    color: Colors.muted,
+    color: colors.muted,
   },
   sheetActions: {
     flexDirection: 'row',
@@ -596,13 +606,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 14,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: colors.surfaceAlt,
     paddingHorizontal: 8,
   },
   cancelText: {
     fontSize: 15,
     fontWeight: '500',
-    color: Colors.muted,
+    color: colors.muted,
   },
   confirmWrap: {
     flex: 1,
@@ -610,3 +620,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

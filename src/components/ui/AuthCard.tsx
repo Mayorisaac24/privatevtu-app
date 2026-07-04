@@ -7,7 +7,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import { Colors, Shadow } from '../../theme';
+import {Colors, Shadow , Overlays, useThemedStyles } from '../../theme';
 import { isAndroid, useLayout } from '../../lib/platform-ui';
 import { ScreenContent } from './ScreenContent';
 
@@ -35,6 +35,8 @@ export function AuthCard({
   scrollBottomInset = 32,
   keyboardPadding = 0,
 }: AuthCardProps) {
+  const styles = useStyles();
+
   const { pagePadding } = useLayout();
   const contentPadding = {
     paddingHorizontal: pagePadding,
@@ -87,15 +89,15 @@ export function AuthCard({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   card: {
-    backgroundColor: Colors.white,
+    backgroundColor: colors.card,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255, 255, 255, 0.8)',
+    borderColor: Overlays.cardBorder,
     ...Shadow.lg,
   },
   cardFill: {
@@ -115,7 +117,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 4,
     borderRadius: 2,
-    backgroundColor: Colors.borderMid,
+    backgroundColor: colors.borderMid,
     alignSelf: 'center',
     marginTop: 10,
     marginBottom: 6,
@@ -125,3 +127,7 @@ const styles = StyleSheet.create({
     flexGrow: 0,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

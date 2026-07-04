@@ -5,10 +5,13 @@ import { ProfileSubScreen } from '../../src/components/profile/ProfileSubScreen'
 import { GlassCard } from '../../src/components/ui/GlassCard';
 import { api, isResponseSuccess } from '../../src/lib/api';
 import { type SupportConfig } from '../../src/lib/support';
-import { Colors, Radius } from '../../src/theme';
+import { APP_NAME } from '../../src/lib/brand';
+import {Colors, Radius, StarRatingColor, useThemedStyles } from '../../src/theme';
 import { showToast } from '../../src/components/ui/Toast';
 
 export default function RateAppScreen() {
+  const styles = useStyles();
+
   const [config, setConfig] = useState<SupportConfig | null>(null);
 
   useEffect(() => {
@@ -40,10 +43,10 @@ export default function RateAppScreen() {
       <GlassCard variant="tinted" borderRadius={Radius.xl} padding={24} contentStyle={styles.hero}>
         <View style={styles.stars}>
           {[1, 2, 3, 4, 5].map((n) => (
-            <Ionicons key={n} name="star" size={28} color="#F59E0B" />
+            <Ionicons key={n} name="star" size={28} color={StarRatingColor} />
           ))}
         </View>
-        <Text style={styles.heroTitle}>Enjoying {config?.appName || 'Datamart'}?</Text>
+        <Text style={styles.heroTitle}>Enjoying {APP_NAME}?</Text>
         <Text style={styles.heroSub}>
           Your rating helps us improve and reach more users. It only takes a few seconds.
         </Text>
@@ -57,13 +60,15 @@ export default function RateAppScreen() {
       <View style={styles.perks}>
         <Perk icon="flash-outline" text="Faster feature updates driven by user feedback" />
         <Perk icon="shield-checkmark-outline" text="Helps new users trust a verified app" />
-        <Perk icon="heart-outline" text="Supports the team building Datamart" />
+        <Perk icon="heart-outline" text={`Supports the team building ${APP_NAME}`} />
       </View>
     </ProfileSubScreen>
   );
 }
 
 function Perk({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: string }) {
+  const styles = useStyles();
+
   return (
     <View style={styles.perkRow}>
       <Ionicons name={icon} size={18} color={Colors.primary} />
@@ -72,31 +77,35 @@ function Perk({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: stri
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../src/theme/types').ThemeColors) => StyleSheet.create({
   hero: { alignItems: 'center', gap: 10 },
   stars: { flexDirection: 'row', gap: 4, marginBottom: 4 },
-  heroTitle: { fontSize: 20, fontWeight: '700', color: Colors.dark, textAlign: 'center' },
-  heroSub: { fontSize: 14, lineHeight: 21, color: Colors.muted, textAlign: 'center' },
+  heroTitle: { fontSize: 20, fontWeight: '700', color: colors.dark, textAlign: 'center' },
+  heroSub: { fontSize: 14, lineHeight: 21, color: colors.muted, textAlign: 'center' },
   primaryBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     borderRadius: Radius.lg,
     paddingVertical: 15,
     marginTop: 8,
   },
-  primaryBtnText: { color: Colors.white, fontSize: 15, fontWeight: '700' },
+  primaryBtnText: { color: colors.white, fontSize: 15, fontWeight: '700' },
   perks: {
     marginTop: 20,
     gap: 12,
-    backgroundColor: Colors.white,
+    backgroundColor: colors.card,
     borderRadius: Radius.lg,
     padding: 16,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.borderSubtle,
+    borderColor: colors.borderSubtle,
   },
   perkRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  perkText: { flex: 1, fontSize: 13, lineHeight: 19, color: Colors.mid },
+  perkText: { flex: 1, fontSize: 13, lineHeight: 19, color: colors.mid },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

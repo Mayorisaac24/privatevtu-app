@@ -1,5 +1,6 @@
 import { ImageSourcePropType } from 'react-native';
 import type { EducationProvider } from './api';
+import { EducationProviderColors } from '../theme/colors/app-colors';
 
 export type EducationProviderStyle = {
   bg: string;
@@ -7,11 +8,7 @@ export type EducationProviderStyle = {
   text: string;
 };
 
-const PROVIDER_STYLES: Record<string, EducationProviderStyle> = {
-  waec: { bg: '#FEF9C3', border: '#FACC15', text: '#854D0E' },
-  'waec-registration': { bg: '#EDE9FE', border: '#A78BFA', text: '#5B21B6' },
-  jamb: { bg: '#DCFCE7', border: '#4ADE80', text: '#166534' },
-};
+const PROVIDER_STYLES: Record<string, EducationProviderStyle> = EducationProviderColors;
 
 const SHORT_NAMES: Record<string, string> = {
   waec: 'WAEC',

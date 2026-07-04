@@ -2,6 +2,8 @@ import { View, Text, Image, StyleSheet, type ImageSourcePropType } from 'react-n
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GlassCard } from '../ui/GlassCard';
+import { NetworkProviderLogo } from '../NetworkProviderLogo';
+import type { AirtimeProvider } from '../../lib/api';
 import { Overlays, Radius, Shadow, getPurchaseConfirmGradient, useColors, useGradients, useThemedStyles } from '../../theme';
 import type { ThemeColors } from '../../theme';
 import { formatCurrency } from '../../lib/api';
@@ -18,6 +20,7 @@ type PurchaseConfirmCardProps = {
   title: string;
   chip?: string;
   logo?: ImageSourcePropType;
+  networkProvider?: Pick<AirtimeProvider, 'code' | 'id' | 'imageUrl'>;
   icon?: keyof typeof Ionicons.glyphMap;
   rows: PurchaseConfirmRow[];
   /** @deprecated All purchase confirms use the brand card gradient. */
@@ -35,7 +38,7 @@ function InsufficientBalanceNotice({
   requiredNaira: number;
 }) {
   const colors = useColors();
-  const styles = useThemedStyles(createStyles);
+  const styles = useStyles();
 
   return (
     <View style={[styles.insufficientBanner, { borderColor: Overlays.borderError12 }]}>
@@ -56,6 +59,7 @@ export function PurchaseConfirmCard({
   title,
   chip,
   logo,
+  networkProvider,
   icon = 'receipt-outline',
   rows,
   walletBalanceKobo,
@@ -64,7 +68,7 @@ export function PurchaseConfirmCard({
 }: PurchaseConfirmCardProps) {
   const colors = useColors();
   const gradients = useGradients();
-  const styles = useThemedStyles(createStyles);
+  const styles = useStyles();
   const gradient = getPurchaseConfirmGradient(gradients);
   const detailRows = walletBalanceKobo != null
     ? [
@@ -90,7 +94,9 @@ export function PurchaseConfirmCard({
 
         <View style={styles.heroRow}>
           <View style={styles.logoRing}>
-            {logo ? (
+            {networkProvider ? (
+              <NetworkProviderLogo provider={networkProvider} size={56} />
+            ) : logo ? (
               <Image source={logo} style={styles.logo} resizeMode="contain" />
             ) : (
               <View style={[styles.iconFallback, { backgroundColor: colors.primary }]}>
@@ -302,3 +308,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     color: colors.error,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

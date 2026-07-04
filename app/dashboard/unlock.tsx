@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { BackHandler } from 'react-native';
 import { router, useNavigation } from 'expo-router';
 import { api } from '../../src/lib/api';
+import { refreshDashboardData } from '../../src/lib/dashboard-data';
+import { refreshUserProfile } from '../../src/lib/profile-sync';
 import { getBiometricCapability, unlockWithBiometric } from '../../src/lib/biometric-auth';
 import { canUnlockWithBiometric } from '../../src/lib/security-storage';
 import { useAuthStore, useSecurityStore } from '../../src/stores';
@@ -59,10 +61,20 @@ export default function UnlockScreen() {
     });
   }, []);
 
-  const finishUnlock = useCallback(() => {
+  const finishUnlock = useCallback(async () => {
+    const token = await api.getValidToken({ logoutOnAuthFailure: true });
+    if (!token || !useAuthStore.getState().isAuthenticated) {
+      unlockedRef.current = true;
+      unlock();
+      router.replace('/auth/login');
+      return;
+    }
+
     unlockedRef.current = true;
     const destination = lockReturnPath || '/(tabs)';
     unlock();
+    void refreshDashboardData({ force: true });
+    void refreshUserProfile();
     router.replace(destination as '/(tabs)');
   }, [lockReturnPath, unlock]);
 
@@ -72,7 +84,7 @@ export default function UnlockScreen() {
     try {
       const res = await api.verifyPin(value);
       if (res.success) {
-        finishUnlock();
+        await finishUnlock();
       } else {
         showToast({ type: 'error', text1: 'Incorrect PIN', text2: res.message || 'Try again' });
         setPin('');
@@ -93,7 +105,7 @@ export default function UnlockScreen() {
     setBioLoading(true);
     try {
       const ok = await unlockWithBiometric();
-      if (ok) finishUnlock();
+      if (ok) await finishUnlock();
     } finally {
       setBioLoading(false);
     }

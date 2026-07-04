@@ -1,6 +1,17 @@
 import { router } from 'expo-router';
 import { openBroadcastAction } from './broadcast-navigation';
 
+const SCREEN_ROUTES: Record<string, string> = {
+  kyc: '/kyc',
+  wallet: '/(tabs)/wallet',
+  home: '/(tabs)',
+  history: '/(tabs)/history',
+  profile: '/profile',
+  security: '/profile/change-password',
+  data: '/services/data',
+  dispute: '/profile/disputes',
+};
+
 export function navigateFromNotificationData(data?: Record<string, unknown> | null): void {
   if (!data) {
     router.push('/notifications');
@@ -18,12 +29,12 @@ export function navigateFromNotificationData(data?: Record<string, unknown> | nu
   const reference = typeof data.reference === 'string' ? data.reference : '';
   const type = typeof data.type === 'string' ? data.type : '';
 
-  if (screen === 'kyc' || type === 'kyc_document_review') {
-    router.push('/kyc');
+  if (screen && SCREEN_ROUTES[screen]) {
+    router.push(SCREEN_ROUTES[screen] as any);
     return;
   }
 
-  if (type === 'kyc_document_review') {
+  if (screen === 'kyc' || type === 'kyc_document_review' || type === 'automated_kyc_tier_bvn') {
     router.push('/kyc');
     return;
   }
@@ -38,18 +49,23 @@ export function navigateFromNotificationData(data?: Record<string, unknown> | nu
     return;
   }
 
-  if (screen === 'transaction-details' || category === 'transaction' || reference) {
+  if (screen === 'transaction-details' || category === 'transaction' || reference || type.startsWith('automated_failed_tx')) {
     router.push('/(tabs)/history');
     return;
   }
 
-  if (type.startsWith('transfer')) {
+  if (type.startsWith('transfer') || type.startsWith('automated_transfer')) {
     router.push('/(tabs)/history');
     return;
   }
 
   if (type === 'admin_broadcast') {
     router.push('/notifications');
+    return;
+  }
+
+  if (type === 'automated_new_device_login' || category === 'security') {
+    router.push('/profile/change-password');
     return;
   }
 

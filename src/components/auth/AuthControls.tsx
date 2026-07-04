@@ -8,7 +8,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Radius, Shadow, Typography } from '../../theme';
+import {Colors, Radius, Shadow, Typography , Overlays, useThemedStyles } from '../../theme';
 import { isAndroid, platformSpacing, AUTH_SEGMENT_HEIGHT } from '../../lib/platform-ui';
 import { GradientButton } from '../ui/GradientButton';
 
@@ -86,6 +86,8 @@ export function AuthGradientButton({
   icon,
   style,
 }: AuthGradientButtonProps) {
+  const styles = useStyles();
+
   return (
     <GradientButton
       title={title}
@@ -101,6 +103,8 @@ export function AuthGradientButton({
 }
 
 export function AuthDivider({ label = 'or' }: { label?: string }) {
+  const styles = useStyles();
+
   return (
     <View style={styles.divider}>
       <View style={styles.dividerLine} />
@@ -119,6 +123,7 @@ export function AuthFooterLink({
   linkLabel: string;
   onPress: () => void;
 }) {
+  const styles = useStyles();
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.8} style={styles.footerLink}>
       <Text style={styles.footerPrefix}>
@@ -140,6 +145,7 @@ export function AuthTextLink({
   align?: 'left' | 'center' | 'right';
   style?: ViewStyle;
 }) {
+  const styles = useStyles();
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -156,21 +162,21 @@ export function AuthTextLink({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   segmented: {
     flexDirection: 'row',
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: isAndroid ? 16 : 18,
     padding: isAndroid ? 4 : 5,
     marginBottom: platformSpacing(24, -6),
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     gap: isAndroid ? 4 : 6,
   },
   segmentLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: Colors.muted,
+    color: colors.muted,
     letterSpacing: 0.3,
     marginBottom: isAndroid ? 8 : 10,
     textTransform: 'uppercase',
@@ -190,9 +196,9 @@ const styles = StyleSheet.create({
     minHeight: AUTH_SEGMENT_HEIGHT,
   },
   segmentInnerActive: {
-    backgroundColor: Colors.white,
+    backgroundColor: colors.card,
     borderWidth: 1.5,
-    borderColor: 'rgba(124, 58, 237, 0.24)',
+    borderColor: Overlays.borderPrimary24,
     ...(isAndroid ? { elevation: 1 } : Shadow.sm),
   },
   segmentIcon: {
@@ -204,18 +210,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   segmentIconActive: {
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
   },
   segmentText: {
     fontSize: isAndroid ? 14 : 15,
     fontWeight: '500',
-    color: Colors.mutedLight,
+    color: colors.mutedLight,
     ...(isAndroid ? { includeFontPadding: false } : null),
   },
   segmentTextActive: {
     fontSize: isAndroid ? 14 : 15,
     fontWeight: '700',
-    color: Colors.primary,
+    color: colors.primary,
     ...(isAndroid ? { includeFontPadding: false } : null),
   },
   btnWrap: {
@@ -236,11 +242,11 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: StyleSheet.hairlineWidth,
-    backgroundColor: Colors.borderMid,
+    backgroundColor: colors.borderMid,
   },
   dividerText: {
     ...Typography.caption,
-    color: Colors.mutedLight,
+    color: colors.mutedLight,
     fontWeight: '600',
     letterSpacing: 0.4,
     textTransform: 'lowercase',
@@ -250,11 +256,11 @@ const styles = StyleSheet.create({
   },
   footerPrefix: {
     ...Typography.small,
-    color: Colors.muted,
+    color: colors.muted,
     textAlign: 'center',
   },
   footerAction: {
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: '700',
   },
   textLink: {
@@ -268,7 +274,11 @@ const styles = StyleSheet.create({
   },
   textLinkLabel: {
     ...Typography.smallMed,
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: '600',
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

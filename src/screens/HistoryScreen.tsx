@@ -14,7 +14,7 @@ import {
 } from '../lib/transaction-display';
 import { getHomeDashboardStats, hasHistoryStatsReady, refreshHistoryData, refreshHomeDashboardStats } from '../lib/dashboard-data';
 import { useWalletStore } from '../stores';
-import { Colors, Spacing, Typography, Radius, Shadow } from '../theme';
+import {Colors, Spacing, Typography, Radius, Shadow, useThemedStyles } from '../theme';
 import { Skeleton, SkeletonCard } from '../components/ui/Skeleton';
 import { TransactionListItem } from '../components/TransactionListItem';
 import { MonthActivityPanel } from '../components/MonthActivityPanel';
@@ -57,6 +57,8 @@ type DayGroup = {
 };
 
 function OverviewSkeleton() {
+  const styles = useStyles();
+
   return (
     <GlassCard borderRadius={20} contentStyle={styles.overviewSkeleton}>
       <Skeleton width="45%" height={14} borderRadius={6} style={{ marginBottom: 18 }} />
@@ -72,6 +74,8 @@ function OverviewSkeleton() {
 }
 
 export default function HistoryScreen() {
+  const styles = useStyles();
+
   const insets = useSafeAreaInsets();
   const { pagePadding } = useLayout();
   const {
@@ -353,7 +357,7 @@ export default function HistoryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   root: { flex: 1 },
   headerShell: {
     borderBottomLeftRadius: 24,
@@ -374,26 +378,26 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 20,
     fontWeight: '700',
-    color: Colors.dark,
+    color: colors.dark,
     letterSpacing: -0.3,
   },
   refreshBtn: {
     width: 40,
     height: 40,
     borderRadius: 14,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.pageBg,
+    backgroundColor: colors.pageBg,
     borderRadius: 16,
     paddingHorizontal: 4,
     height: 48,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.borderSubtle,
+    borderColor: colors.borderSubtle,
   },
   searchIconWrap: {
     width: 40,
@@ -405,7 +409,7 @@ const styles = StyleSheet.create({
   searchInput: mergeInputStyle({
     flex: 1,
     fontSize: 14,
-    color: Colors.dark,
+    color: colors.dark,
     fontWeight: '500',
   }),
   searchClear: {
@@ -416,7 +420,7 @@ const styles = StyleSheet.create({
   },
   segmented: {
     flexDirection: 'row',
-    backgroundColor: Colors.pageBg,
+    backgroundColor: colors.pageBg,
     borderRadius: 14,
     padding: 4,
     gap: 4,
@@ -439,10 +443,10 @@ const styles = StyleSheet.create({
   segmentText: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.muted,
+    color: colors.muted,
   },
   segmentTextActive: {
-    color: Colors.dark,
+    color: colors.dark,
   },
   loadingWrap: {
     padding: Spacing.page,
@@ -473,14 +477,14 @@ const styles = StyleSheet.create({
   dateHeader: {
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.muted,
+    color: colors.muted,
     letterSpacing: 0.6,
     textTransform: 'uppercase',
   },
   dateLine: {
     flex: 1,
     height: StyleSheet.hairlineWidth,
-    backgroundColor: Colors.borderSubtle,
+    backgroundColor: colors.borderSubtle,
   },
   dateCount: {
     minWidth: 22,
@@ -495,7 +499,7 @@ const styles = StyleSheet.create({
   dateCountText: {
     fontSize: 10,
     fontWeight: '700',
-    color: Colors.muted,
+    color: colors.muted,
   },
   empty: {
     alignItems: 'center',
@@ -507,7 +511,7 @@ const styles = StyleSheet.create({
     width: 88,
     height: 88,
     borderRadius: 28,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 6,
@@ -525,12 +529,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.dark,
+    color: colors.dark,
     letterSpacing: -0.2,
   },
   emptySub: {
     ...Typography.small,
-    color: Colors.muted,
+    color: colors.muted,
     textAlign: 'center',
     lineHeight: 20,
     maxWidth: 260,
@@ -543,6 +547,10 @@ const styles = StyleSheet.create({
   emptyActionText: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.primary,
+    color: colors.primary,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

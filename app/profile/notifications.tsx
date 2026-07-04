@@ -18,11 +18,13 @@ import {
   setNotificationSettingsCache,
 } from '../../src/lib/notification-settings-cache';
 import { registerPushNotifications } from '../../src/lib/push-notifications';
-import { Colors, Radius } from '../../src/theme';
+import {Colors, Radius , Palette, FormColors, BRAND, Overlays, useThemedStyles } from '../../src/theme';
 import { showToast } from '../../src/components/ui/Toast';
 
 
 export default function NotificationSettingsScreen() {
+  const styles = useStyles();
+
   const [settings, setSettings] = useState<NotificationSettings | null>(peekNotificationSettings());
   const [initialLoading, setInitialLoading] = useState(!peekNotificationSettings());
   const [saving, setSaving] = useState(false);
@@ -172,6 +174,7 @@ function ToggleRow({
   disabled?: boolean;
   inactive?: boolean;
 }) {
+  const styles = useStyles();
   return (
     <View style={[styles.row, inactive && styles.rowInactive]}>
       <View style={styles.rowText}>
@@ -183,13 +186,13 @@ function ToggleRow({
         onValueChange={onValueChange}
         disabled={disabled}
         trackColor={{ false: Colors.borderMid, true: inactive ? Colors.borderMid : Colors.primary }}
-        thumbColor="#fff"
+        thumbColor={Palette.white}
       />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../src/theme/types').ThemeColors) => StyleSheet.create({
   card: { overflow: 'hidden' },
   row: {
     flex: 1,
@@ -204,9 +207,13 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   rowText: { flex: 1 },
-  rowTitle: { fontSize: 15, fontWeight: '600', color: Colors.dark },
-  rowTitleInactive: { color: Colors.muted },
-  rowSub: { fontSize: 13, color: Colors.muted, marginTop: 2 },
-  rowSubInactive: { color: Colors.mutedLight },
-  divider: { height: StyleSheet.hairlineWidth, backgroundColor: Colors.border, marginLeft: 16 },
+  rowTitle: { fontSize: 15, fontWeight: '600', color: colors.dark },
+  rowTitleInactive: { color: colors.muted },
+  rowSub: { fontSize: 13, color: colors.muted, marginTop: 2 },
+  rowSubInactive: { color: colors.mutedLight },
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 16 },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

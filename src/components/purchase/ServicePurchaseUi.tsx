@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GlassCard } from '../ui/GlassCard';
 import { GradientButton } from '../ui/GradientButton';
-import { Colors, Radius, Shadow, Typography } from '../../theme';
+import {Colors, Radius, Shadow, Typography , Overlays, useThemedStyles } from '../../theme';
 import { useColors, useGradients } from '../../theme/hooks';
 import { gradientStops } from '../../theme/gradient-utils';
 
@@ -15,20 +15,22 @@ type ServiceSectionLabelProps = {
 };
 
 export function ServiceSectionLabel({ title, hint, icon }: ServiceSectionLabelProps) {
+  const styles = useStyles();
+
   const colors = useColors();
 
   return (
     <View style={styles.sectionRow}>
       <View style={styles.sectionLeft}>
         {icon ? (
-          <View style={[styles.sectionIcon, { backgroundColor: colors.primaryMuted }]}>
+          <View style={[styles.sectionIcon, { backgroundColor: colors.surfaceAlt }]}>
             <Ionicons name={icon} size={13} color={colors.primary} />
           </View>
         ) : null}
         <Text style={[styles.sectionTitle, { color: colors.muted }]}>{title}</Text>
       </View>
       {hint ? (
-        <View style={[styles.hintPill, { backgroundColor: colors.primaryMuted, borderColor: colors.border }]}>
+        <View style={[styles.hintPill, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
           <Text style={[styles.hintText, { color: colors.primary }]}>{hint}</Text>
         </View>
       ) : null}
@@ -42,10 +44,12 @@ type ServicePurchaseCardProps = {
 };
 
 export function ServicePurchaseCard({ children, style }: ServicePurchaseCardProps) {
+  const styles = useStyles();
+
   const gradients = useGradients();
 
   return (
-    <GlassCard variant="tinted" borderRadius={Radius.xl} padding={18} style={[styles.card, style]}>
+    <GlassCard variant="light" borderRadius={Radius.xl} padding={18} style={[styles.card, style]}>
       <LinearGradient
         colors={gradientStops(gradients.primary)}
         start={{ x: 0, y: 0 }}
@@ -64,6 +68,8 @@ type ServiceStepProgressProps = {
 };
 
 export function ServiceStepProgress({ activeIndex, labels, variant = 'default' }: ServiceStepProgressProps) {
+  const styles = useStyles();
+
   const colors = useColors();
 
   if (variant === 'hero') {
@@ -154,6 +160,8 @@ export function ServiceContinueButton({
   loading = false,
   icon = 'arrow-forward',
 }: ServiceContinueButtonProps) {
+  const styles = useStyles();
+
   return (
     <GradientButton
       title={label}
@@ -169,10 +177,12 @@ export function ServiceContinueButton({
 }
 
 export function ServiceDetectedBadge({ label }: { label: string }) {
+  const styles = useStyles();
+
   const colors = useColors();
 
   return (
-    <View style={[styles.detectedBadge, { backgroundColor: colors.primaryMuted, borderColor: colors.border }]}>
+    <View style={[styles.detectedBadge, { backgroundColor: colors.surfaceAlt, borderColor: colors.border }]}>
       <Ionicons name="sparkles" size={13} color={colors.primary} />
       <Text style={[styles.detectedText, { color: colors.primary }]}>Detected {label}</Text>
     </View>
@@ -180,6 +190,8 @@ export function ServiceDetectedBadge({ label }: { label: string }) {
 }
 
 export function ServiceSecureNote({ text }: { text: string }) {
+  const styles = useStyles();
+
   const colors = useColors();
 
   return (
@@ -191,6 +203,8 @@ export function ServiceSecureNote({ text }: { text: string }) {
 }
 
 export function ServiceCardDivider() {
+  const styles = useStyles();
+
   const colors = useColors();
   return <View style={[styles.cardDivider, { backgroundColor: colors.border }]} />;
 }
@@ -200,6 +214,8 @@ type ServiceEditLinkProps = {
 };
 
 export function ServiceEditLink({ onPress }: ServiceEditLinkProps) {
+  const styles = useStyles();
+
   const colors = useColors();
 
   return (
@@ -210,7 +226,7 @@ export function ServiceEditLink({ onPress }: ServiceEditLinkProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   card: {
     marginBottom: 14,
     overflow: 'hidden',
@@ -287,7 +303,7 @@ const styles = StyleSheet.create({
   progressDotNum: {
     fontSize: 10,
     fontWeight: '700',
-    color: Colors.muted,
+    color: colors.muted,
   },
   progressText: {
     ...Typography.caption,
@@ -308,23 +324,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: Overlays.white08,
   },
   heroStepPillActive: {
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: Overlays.white18,
   },
   heroStepText: {
     fontSize: 11,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.55)',
+    color: Overlays.white55,
   },
   heroStepTextActive: {
-    color: Colors.white,
+    color: colors.white,
   },
   heroStepLine: {
     flex: 1,
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: Overlays.rgba255_255_255_015,
   },
   cta: {
     borderRadius: Radius.lg,
@@ -372,3 +388,7 @@ const styles = StyleSheet.create({
     ...Typography.small,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

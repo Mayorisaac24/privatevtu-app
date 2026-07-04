@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Radius, Typography } from '../../theme';
+import {Colors, Radius, Typography, useThemedStyles } from '../../theme';
 
 type Props = {
   biometricEnabled: boolean;
@@ -17,6 +17,8 @@ export function TransactionAuthActions({
   onRetryBiometric,
   onUsePinInstead,
 }: Props) {
+  const styles = useStyles();
+
   if (!biometricEnabled) return null;
 
   if (biometricVerified) {
@@ -51,20 +53,20 @@ export function transactionAuthHint(
   return 'Enter your 4-digit PIN to authorize';
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   verifiedWrap: { gap: 10, marginBottom: 12 },
   verifiedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     alignSelf: 'flex-start',
-    backgroundColor: Colors.successLight,
+    backgroundColor: colors.successLight,
     borderRadius: Radius.full,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  verifiedText: { ...Typography.small, color: Colors.success, fontWeight: '600' },
-  linkText: { ...Typography.small, color: Colors.primary, fontWeight: '600' },
+  verifiedText: { ...Typography.small, color: colors.success, fontWeight: '600' },
+  linkText: { ...Typography.small, color: colors.primary, fontWeight: '600' },
   retryBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -74,7 +76,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: Radius.md,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
   },
-  retryText: { ...Typography.small, color: Colors.primary, fontWeight: '600' },
+  retryText: { ...Typography.small, color: colors.primary, fontWeight: '600' },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

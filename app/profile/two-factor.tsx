@@ -31,7 +31,7 @@ import { useAuthStore } from '../../src/stores';
 import { refreshUserProfile } from '../../src/lib/profile-sync';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
-import { Colors, Radius, Spacing } from '../../src/theme';
+import {Colors, Radius, Spacing , Palette, FormColors, BRAND, Overlays, useThemedStyles } from '../../src/theme';
 import { useGradients } from '../../src/theme/hooks';
 import { gradientStops } from '../../src/theme/gradient-utils';
 import { SERVICE_ICON } from '../../src/lib/service-catalog-ui';
@@ -80,6 +80,8 @@ function isMethodInactive(item: TwoFactorMethodOption) {
 }
 
 export default function TwoFactorScreen() {
+  const styles = useStyles();
+
   const { user, updateUser } = useAuthStore();
   const gradients = useGradients();
   const enabled = Boolean(user?.twoFactorEnabled);
@@ -525,6 +527,8 @@ function SecurityHero({
   enabled: boolean;
   activeMethod: TwoFactorMethodType | null;
 }) {
+  const styles = useStyles();
+
   const gradients = useGradients();
 
   return (
@@ -561,6 +565,7 @@ function MethodCard({
   item: TwoFactorMethodOption;
   onPress: () => void;
 }) {
+  const styles = useStyles();
   const meta = METHOD_META[item.method];
   const inactive = isMethodInactive(item);
 
@@ -600,6 +605,8 @@ function VerifyFlowHeader({
   method: TwoFactorMethodType;
   variant?: 'setup' | 'disable';
 }) {
+  const styles = useStyles();
+
   const meta = METHOD_META[method];
 
   return (
@@ -639,6 +646,7 @@ function AuthenticatorVerifyCard({
   onOtpChange: (value: string) => void;
   onBack: () => void;
 }) {
+  const styles = useStyles();
   const setupKey = secret?.trim() ?? '';
   const otpInputRef = useRef<TextInput>(null);
 
@@ -711,6 +719,8 @@ function OtpInput({ value, onChange }: { value: string; onChange: (v: string) =>
 }
 
 function TipRow({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: string }) {
+  const styles = useStyles();
+
   return (
     <View style={styles.tipRow}>
       <View style={styles.tipIcon}>
@@ -721,7 +731,7 @@ function TipRow({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: st
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../src/theme/types').ThemeColors) => StyleSheet.create({
   heroCard: {
     borderRadius: 22,
     padding: 18,
@@ -735,20 +745,20 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: 'rgba(124, 58, 237, 0.28)',
+    backgroundColor: Overlays.violet28,
   },
   heroRow: { flexDirection: 'row', gap: 14, alignItems: 'flex-start' },
   heroIcon: {
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: Overlays.white14,
     alignItems: 'center',
     justifyContent: 'center',
   },
   heroCopy: { flex: 1, gap: 6 },
-  heroTitle: { fontSize: 16, fontWeight: '800', color: Colors.white, letterSpacing: -0.2 },
-  heroBody: { fontSize: 13, color: 'rgba(255,255,255,0.78)', lineHeight: 19 },
+  heroTitle: { fontSize: 16, fontWeight: '800', color: colors.white, letterSpacing: -0.2 },
+  heroBody: { fontSize: 13, color: Overlays.white78, lineHeight: 19 },
 
   verifyHeaderRow: {
     flexDirection: 'row',
@@ -764,14 +774,14 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: Overlays.white12,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.16)',
+    borderColor: Overlays.white16,
   },
   verifyHeaderPillText: {
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.white,
+    color: colors.white,
   },
   verifyHeaderTrack: {
     flexDirection: 'row',
@@ -780,30 +790,30 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     paddingHorizontal: 10,
     borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: Overlays.white08,
   },
   verifyHeaderTrackLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: 'rgba(255,255,255,0.82)',
+    color: Overlays.white82,
     letterSpacing: 0.2,
   },
   verifyHeaderTrackLine: {
     width: 14,
     height: 2,
     borderRadius: 1,
-    backgroundColor: 'rgba(255,255,255,0.35)',
+    backgroundColor: Overlays.glassShine,
   },
 
   methodSection: { gap: 10 },
-  sectionLabel: { fontSize: 15, fontWeight: '800', color: Colors.dark, letterSpacing: -0.2 },
-  sectionHint: { fontSize: 13, color: Colors.muted, lineHeight: 18, marginBottom: 4 },
+  sectionLabel: { fontSize: 15, fontWeight: '800', color: colors.dark, letterSpacing: -0.2 },
+  sectionHint: { fontSize: 13, color: colors.muted, lineHeight: 18, marginBottom: 4 },
 
   methodList: { gap: 12 },
   loadingCard: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.white,
+    backgroundColor: colors.card,
     minHeight: 120,
   },
   methodCard: {
@@ -811,7 +821,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 14,
     padding: 16,
-    backgroundColor: Colors.white,
+    backgroundColor: colors.card,
     overflow: 'hidden',
   },
   methodCardInactive: { opacity: 0.58 },
@@ -824,20 +834,20 @@ const styles = StyleSheet.create({
   },
   methodIconInactive: { opacity: 0.72 },
   methodCopy: { flex: 1, gap: 5 },
-  methodTitle: { fontSize: 16, fontWeight: '700', color: Colors.dark },
-  methodTitleInactive: { color: Colors.muted },
-  methodBody: { fontSize: 13, color: Colors.muted, lineHeight: 18 },
-  methodBodyInactive: { color: Colors.mutedLight },
+  methodTitle: { fontSize: 16, fontWeight: '700', color: colors.dark },
+  methodTitleInactive: { color: colors.muted },
+  methodBody: { fontSize: 13, color: colors.muted, lineHeight: 18 },
+  methodBodyInactive: { color: colors.mutedLight },
   methodArrow: {
     width: 32,
     height: 32,
     borderRadius: 12,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
   methodArrowInactive: {
-    backgroundColor: Colors.surfaceAlt,
+    backgroundColor: colors.surfaceAlt,
     opacity: 0.85,
   },
 
@@ -845,27 +855,27 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 16,
     overflow: 'hidden',
-    backgroundColor: Colors.white,
+    backgroundColor: colors.card,
   },
   activeHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   activeIconWrap: {
     width: 48,
     height: 48,
     borderRadius: 16,
-    backgroundColor: Colors.successLight,
+    backgroundColor: colors.successLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
   activeCopy: { flex: 1, gap: 2 },
   activeTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  activeTitle: { fontSize: 18, fontWeight: '800', color: Colors.dark },
+  activeTitle: { fontSize: 18, fontWeight: '800', color: colors.dark },
   liveDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: Colors.success,
+    backgroundColor: colors.success,
   },
-  activeSub: { fontSize: 13, color: Colors.muted },
+  activeSub: { fontSize: 13, color: colors.muted },
   methodChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -874,9 +884,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 16,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.borderSubtle,
+    borderColor: colors.borderSubtle,
   },
   methodChipIcon: {
     width: 36,
@@ -885,19 +895,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  methodChipText: { fontSize: 15, fontWeight: '700', color: Colors.dark },
+  methodChipText: { fontSize: 15, fontWeight: '700', color: colors.dark },
   switchNote: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
-    backgroundColor: 'rgba(124, 58, 237, 0.06)',
+    backgroundColor: Overlays.violet06,
     borderRadius: Radius.md,
     padding: 14,
   },
   switchNoteText: {
     flex: 1,
     fontSize: 13,
-    color: Colors.muted,
+    color: colors.muted,
     lineHeight: 18,
   },
   dangerOutline: {
@@ -906,22 +916,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     borderWidth: 1.5,
-    borderColor: 'rgba(239, 68, 68, 0.25)',
+    borderColor: Overlays.borderError25,
     borderRadius: Radius.lg,
     paddingVertical: 13,
-    backgroundColor: Colors.errorLight,
+    backgroundColor: colors.errorLight,
   },
-  dangerOutlineText: { fontSize: 14, fontWeight: '700', color: Colors.error },
+  dangerOutlineText: { fontSize: 14, fontWeight: '700', color: colors.error },
 
   flowCard: {
-    backgroundColor: Colors.white,
+    backgroundColor: colors.card,
     paddingHorizontal: 20,
     paddingTop: 18,
     paddingBottom: 22,
     gap: 16,
   },
   authCard: {
-    backgroundColor: Colors.white,
+    backgroundColor: colors.card,
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 22,
@@ -933,7 +943,7 @@ const styles = StyleSheet.create({
   stepLabel: {
     fontSize: 11,
     fontWeight: '800',
-    color: Colors.primary,
+    color: colors.primary,
     letterSpacing: 0.6,
     textTransform: 'uppercase',
   },
@@ -942,7 +952,7 @@ const styles = StyleSheet.create({
   },
   stepHint: {
     fontSize: 13,
-    color: Colors.muted,
+    color: colors.muted,
     lineHeight: 18,
   },
   qrFrame: {
@@ -952,10 +962,10 @@ const styles = StyleSheet.create({
   qrInner: {
     padding: 14,
     borderRadius: 18,
-    backgroundColor: Colors.white,
+    backgroundColor: colors.card,
     borderWidth: 1.5,
-    borderColor: 'rgba(124, 58, 237, 0.18)',
-    shadowColor: Colors.primary,
+    borderColor: Overlays.borderPrimary18,
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.08,
     shadowRadius: 14,
@@ -975,21 +985,21 @@ const styles = StyleSheet.create({
   orLine: {
     flex: 1,
     height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(124, 58, 237, 0.12)',
+    backgroundColor: Overlays.darkAmbientPrimary,
   },
   orText: {
     fontSize: 11,
     fontWeight: '600',
-    color: 'rgba(124, 58, 237, 0.55)',
+    color: Overlays.textPrimary55,
     letterSpacing: 0.2,
   },
   keyInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: 'rgba(124, 58, 237, 0.22)',
+    borderColor: Overlays.borderPrimary22,
     borderRadius: 14,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     paddingLeft: 14,
     paddingRight: 6,
     minHeight: 50,
@@ -999,7 +1009,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     fontWeight: '700',
-    color: '#5B21B6',
+    color: Palette.violet800,
     letterSpacing: 0.5,
     fontVariant: ['tabular-nums'],
   },
@@ -1007,17 +1017,17 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: Colors.primary,
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.22,
     shadowRadius: 6,
     elevation: 2,
   },
   backLink: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' },
-  backLinkText: { fontSize: 14, fontWeight: '600', color: Colors.primary },
+  backLinkText: { fontSize: 14, fontWeight: '600', color: colors.primary },
   stepBadge: { alignSelf: 'center' },
   stepBadgeIcon: {
     width: 48,
@@ -1027,8 +1037,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   stepHeader: { alignItems: 'center', gap: 8, paddingHorizontal: 8 },
-  stepTitle: { fontSize: 20, fontWeight: '800', color: Colors.dark, textAlign: 'center' },
-  stepSubtitle: { fontSize: 13, color: Colors.muted, textAlign: 'center', lineHeight: 19 },
+  stepTitle: { fontSize: 20, fontWeight: '800', color: colors.dark, textAlign: 'center' },
+  stepSubtitle: { fontSize: 13, color: colors.muted, textAlign: 'center', lineHeight: 19 },
 
   resendBtn: {
     flexDirection: 'row',
@@ -1037,41 +1047,45 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 4,
   },
-  resendText: { fontSize: 14, fontWeight: '600', color: Colors.primary },
+  resendText: { fontSize: 14, fontWeight: '600', color: colors.primary },
 
   emptyCard: { alignItems: 'center', gap: 8 },
-  emptyTitle: { fontSize: 15, fontWeight: '700', color: Colors.dark },
-  emptyText: { fontSize: 13, color: Colors.muted, textAlign: 'center', lineHeight: 18 },
+  emptyTitle: { fontSize: 15, fontWeight: '700', color: colors.dark },
+  emptyText: { fontSize: 13, color: colors.muted, textAlign: 'center', lineHeight: 18 },
   retryBtn: {
     marginTop: 6,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 12,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
   },
-  retryText: { fontSize: 14, fontWeight: '700', color: Colors.primary },
+  retryText: { fontSize: 14, fontWeight: '700', color: colors.primary },
 
   tipsCard: {
-    backgroundColor: Colors.white,
+    backgroundColor: colors.card,
     padding: 18,
     gap: 0,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.borderSubtle,
+    borderColor: colors.borderSubtle,
   },
   tipRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
   tipIcon: {
     width: 34,
     height: 34,
     borderRadius: 12,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tipText: { flex: 1, fontSize: 13, color: Colors.muted, lineHeight: 18 },
+  tipText: { flex: 1, fontSize: 13, color: colors.muted, lineHeight: 18 },
   tipDivider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: Colors.borderSubtle,
+    backgroundColor: colors.borderSubtle,
     marginLeft: 46,
   },
 
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

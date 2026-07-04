@@ -15,8 +15,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../stores';
-import { api, isResponseSuccess } from '../lib/api';
-import { Colors, Spacing, Typography, Radius, Shadow } from '../theme';
+import { api } from '../lib/api';
+import {Colors, Spacing, Typography, Radius, Shadow , Overlays, useColors, useThemedStyles } from '../theme';
+import { withAlpha, gradientStops } from '../theme/gradient-utils';
+import { POWERED_BY_LABEL } from '../constants/brand';
 import { useGradients } from '../theme/hooks';
 import { ThemedScreen } from '../components/ui/ThemedScreen';
 import { GlassCard } from '../components/ui/GlassCard';
@@ -29,12 +31,20 @@ import { preloadBiometricSettings } from '../lib/biometric-settings-cache';
 import { getNotificationSettingsCached, hydrateNotificationSettingsCache } from '../lib/notification-settings-cache';
 import { getKycStatusData, peekKycStatusCache } from '../lib/kyc-status-cache';
 import { preloadNigeriaLocations } from '../lib/nigeria-locations-cache';
+import {
+  preloadProgramsData,
+  getProgramsData,
+  getProgramsProfileSubtitle,
+} from '../lib/programs-cache';
+import {
+  preloadApiAccessData,
+  getApiAccessData,
+  getApiAccessProfileMeta,
+} from '../lib/api-access-cache';
 import { getProfileKycDisplay } from '../lib/kyc-display';
 import type { KycStatusData } from '../lib/api';
 import { refreshUserProfile } from '../lib/profile-sync';
 import { useAvatarPicker } from '../hooks/useAvatarPicker';
-
-const BRAND_ICON = { bg: Colors.primaryMuted, iconColor: Colors.primary };
 
 type MenuItem = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -54,15 +64,18 @@ type MenuGroup = {
 };
 
 export default function ProfileScreen() {
+  const styles = useStyles();
+  const colors = useColors();
+
   const insets = useSafeAreaInsets();
   const { pagePadding } = useLayout();
   const { user, logout } = useAuthStore();
   const gradients = useGradients();
   const { pickAvatar, uploading } = useAvatarPicker();
   const [kycData, setKycData] = useState<KycStatusData | null>(() => peekKycStatusCache());
-  const [programSubtitle, setProgramSubtitle] = useState('Upgrade your pricing tier');
-  const [apiAccessSubtitle, setApiAccessSubtitle] = useState('Request developer API credentials');
-  const [apiAccessBadge, setApiAccessBadge] = useState(false);
+  const [programSubtitle, setProgramSubtitle] = useState(() => getProgramsProfileSubtitle());
+  const [apiAccessSubtitle, setApiAccessSubtitle] = useState(() => getApiAccessProfileMeta().subtitle);
+  const [apiAccessBadge, setApiAccessBadge] = useState(() => getApiAccessProfileMeta().badge);
 
   useFocusEffect(
     useCallback(() => {
@@ -70,27 +83,14 @@ export default function ProfileScreen() {
       void getKycStatusData({ force: true }).then((data) => {
         if (data) setKycData(data);
       });
-      void Promise.all([api.getMyUserType(), api.getMyApiAccess()]).then(([typeRes, apiRes]) => {
-        if (isResponseSuccess(typeRes) && typeRes.data) {
-          const label = typeRes.data.name || typeRes.data.code || 'Default';
-          setProgramSubtitle(`Current plan: ${label}`);
-        }
-        if (isResponseSuccess(apiRes) && apiRes.data) {
-          if (apiRes.data.activeClient?.isActive) {
-            setApiAccessSubtitle(`Active · ${apiRes.data.activeClient.responseFormat}`);
-            setApiAccessBadge(false);
-          } else if (apiRes.data.pending) {
-            setApiAccessSubtitle('Request pending admin review');
-            setApiAccessBadge(true);
-          } else if (apiRes.data.latest?.status === 'REJECTED') {
-            setApiAccessSubtitle('Last request rejected — you can resubmit');
-            setApiAccessBadge(true);
-          } else {
-            setApiAccessSubtitle('Request developer API credentials');
-            setApiAccessBadge(false);
-          }
-        }
-      }).catch(() => undefined);
+      void getProgramsData().then((snapshot) => {
+        setProgramSubtitle(getProgramsProfileSubtitle(snapshot));
+      });
+      void getApiAccessData().then((snapshot) => {
+        const meta = getApiAccessProfileMeta(snapshot);
+        setApiAccessSubtitle(meta.subtitle);
+        setApiAccessBadge(meta.badge);
+      });
     }, []),
   );
 
@@ -98,6 +98,8 @@ export default function ProfileScreen() {
     preloadTwoFactorMethods();
     preloadBiometricSettings();
     preloadNigeriaLocations();
+    preloadProgramsData();
+    preloadApiAccessData();
     void hydrateNotificationSettingsCache();
     void getNotificationSettingsCached().catch(() => undefined);
   }, []);
@@ -148,6 +150,12 @@ export default function ProfileScreen() {
           label: 'Programs',
           subtitle: programSubtitle,
           action: () => router.push('/profile/programs'),
+        },
+        {
+          icon: 'gift-outline',
+          label: 'Refer & Earn',
+          subtitle: 'Share your code and track referrals',
+          action: () => router.push('/profile/referrals'),
         },
         {
           icon: 'code-slash-outline',
@@ -273,7 +281,7 @@ export default function ProfileScreen() {
       <ScreenBody>
       <View style={styles.heroCard}>
         <LinearGradient
-          colors={[...gradients.hero]}
+          colors={gradientStops(gradients.hero)}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.heroGradient}
@@ -311,7 +319,7 @@ export default function ProfileScreen() {
             <View style={styles.heroMetaRow}>
               <Text style={styles.heroMeta}>{user.email}</Text>
               {user.isEmailVerified ? (
-                <Ionicons name="checkmark-circle" size={13} color="rgba(255,255,255,0.75)" />
+                <Ionicons name="checkmark-circle" size={13} color={Overlays.white75} />
               ) : null}
             </View>
           ) : null}
@@ -319,7 +327,7 @@ export default function ProfileScreen() {
             <View style={styles.heroMetaRow}>
               <Text style={styles.heroMeta}>{user.phone}</Text>
               {user.isPhoneVerified ? (
-                <Ionicons name="checkmark-circle" size={13} color="rgba(255,255,255,0.75)" />
+                <Ionicons name="checkmark-circle" size={13} color={Overlays.white75} />
               ) : null}
             </View>
           ) : null}
@@ -365,7 +373,7 @@ export default function ProfileScreen() {
                     <Ionicons
                       name={item.icon}
                       size={18}
-                      color={item.danger ? Colors.error : BRAND_ICON.iconColor}
+                      color={item.danger ? colors.error : colors.primary}
                     />
                   </View>
 
@@ -407,8 +415,11 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.footer}>
-        <Ionicons name="lock-closed" size={12} color={Colors.muted} />
-        <Text style={styles.footerText}>Datamart v1.0.0 · Secured & NDPR compliant</Text>
+        <View style={styles.footerRow}>
+          <Ionicons name="lock-closed" size={12} color={Colors.muted} />
+          <Text style={styles.footerText}>Datamart v1.0.0 · Secured & NDPR compliant</Text>
+        </View>
+        <Text style={styles.poweredByText}>{POWERED_BY_LABEL}</Text>
       </View>
       </ScreenBody>
       </ScrollView>
@@ -416,7 +427,7 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../theme/types').ThemeColors, gradients: import('../theme/types').ThemeGradients) => StyleSheet.create({
   root: { flex: 1 },
   scroll: { flex: 1 },
   content: {
@@ -433,13 +444,13 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     ...Typography.h2,
-    color: Colors.dark,
+    color: colors.dark,
     letterSpacing: -0.3,
   },
   headerSub: {
     fontSize: 14,
     fontWeight: '500',
-    color: Colors.mid,
+    color: colors.mid,
     lineHeight: 20,
   },
 
@@ -461,7 +472,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: Overlays.white12,
   },
   blob1: {
     position: 'absolute',
@@ -470,7 +481,7 @@ const styles = StyleSheet.create({
     width: 130,
     height: 130,
     borderRadius: 65,
-    backgroundColor: 'rgba(124, 58, 237, 0.35)',
+    backgroundColor: withAlpha(gradients.hero[2], 0.38),
   },
   blob2: {
     position: 'absolute',
@@ -479,7 +490,7 @@ const styles = StyleSheet.create({
     width: 90,
     height: 90,
     borderRadius: 45,
-    backgroundColor: 'rgba(99, 102, 241, 0.22)',
+    backgroundColor: withAlpha(gradients.hero[1], 0.28),
   },
   avatarTap: {
     position: 'relative',
@@ -492,18 +503,18 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2.5,
-    borderColor: 'rgba(255,255,255,0.95)',
+    borderColor: Overlays.white95,
   },
   avatarRing: {
     width: 84,
     height: 84,
     borderRadius: 42,
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.28)',
+    borderColor: Overlays.white28,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
@@ -515,15 +526,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  avatarText: { fontSize: 24, fontWeight: '800', color: Colors.white, letterSpacing: -0.5 },
-  heroName: { fontSize: 20, fontWeight: '800', color: Colors.white, marginBottom: 4, letterSpacing: -0.3 },
+  avatarText: { fontSize: 24, fontWeight: '800', color: colors.white, letterSpacing: -0.5 },
+  heroName: { fontSize: 20, fontWeight: '800', color: colors.white, marginBottom: 4, letterSpacing: -0.3 },
   heroMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
     marginBottom: 2,
   },
-  heroMeta: { fontSize: 13, color: 'rgba(255,255,255,0.68)' },
+  heroMeta: { fontSize: 13, color: colors.textOnHeroMuted },
   badgeRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -538,14 +549,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: Radius.full,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: Overlays.white12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
+    borderColor: Overlays.white18,
   },
   glassBadgeText: {
     fontSize: 11,
     fontWeight: '700',
-    color: 'rgba(255,255,255,0.92)',
+    color: Overlays.white92,
     letterSpacing: 0.2,
   },
 
@@ -553,7 +564,7 @@ const styles = StyleSheet.create({
   groupTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.mid,
+    color: colors.mid,
     letterSpacing: 0.4,
     textTransform: 'uppercase',
     marginTop: 12,
@@ -564,7 +575,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   groupCardDanger: {
-    borderColor: 'rgba(239, 68, 68, 0.12)',
+    borderColor: Overlays.borderError12,
   },
   row: {
     flexDirection: 'row',
@@ -575,7 +586,7 @@ const styles = StyleSheet.create({
   },
   rowBorder: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.surfaceAlt,
+    borderBottomColor: colors.surfaceAlt,
   },
   rowIcon: {
     width: 40,
@@ -584,31 +595,40 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  rowIconBrand: { backgroundColor: Colors.primaryMuted },
-  rowIconDanger: { backgroundColor: Colors.errorLight },
+  rowIconBrand: { backgroundColor: withAlpha(colors.primary, 0.1) },
+  rowIconDanger: { backgroundColor: colors.errorLight },
   rowBody: { flex: 1, gap: 2 },
-  rowLabel: { fontSize: 15, fontWeight: '600', color: Colors.dark },
-  rowLabelDanger: { color: Colors.error },
-  rowSub: { fontSize: 12, color: Colors.muted, lineHeight: 16 },
-  rowSubDanger: { color: Colors.error, opacity: 0.75 },
+  rowLabel: { fontSize: 15, fontWeight: '600', color: colors.dark },
+  rowLabelDanger: { color: colors.error },
+  rowSub: { fontSize: 12, color: colors.muted, lineHeight: 16 },
+  rowSubDanger: { color: colors.error, opacity: 0.75 },
   alertBadge: {
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: Colors.error,
+    backgroundColor: colors.error,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 2,
   },
-  alertBadgeText: { fontSize: 11, fontWeight: '800', color: Colors.white },
+  alertBadgeText: { fontSize: 11, fontWeight: '800', color: colors.white },
 
   footer: {
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 16,
+    paddingBottom: 8,
+  },
+  footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    marginTop: 16,
-    paddingBottom: 8,
   },
-  footerText: { fontSize: 11, color: Colors.muted, fontWeight: '500' },
+  footerText: { fontSize: 11, color: colors.muted, fontWeight: '500' },
+  poweredByText: { fontSize: 10, color: colors.mutedLight, fontWeight: '500' },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

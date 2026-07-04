@@ -8,7 +8,7 @@ import {
   getEducationProviderShortName,
   getEducationProviderStyle,
 } from '../lib/education-providers';
-import { Colors } from '../theme';
+import {Colors, useThemedStyles } from '../theme';
 
 type Props = {
   provider: Pick<EducationProvider, 'code' | 'id' | 'name' | 'displayName' | 'imageUrl'>;
@@ -16,6 +16,8 @@ type Props = {
 };
 
 export function EducationProviderLogo({ provider, size = 36 }: Props) {
+  const styles = useStyles();
+
   const code = getEducationProviderCode(provider);
   const style = getEducationProviderStyle(code, {
     bg: Colors.surface,
@@ -62,7 +64,7 @@ export function EducationProviderLogo({ provider, size = 36 }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   wrap: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -74,3 +76,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

@@ -1,8 +1,8 @@
-import { Palette } from './palette';
-import { Overlays } from './overlays';
+import { BRAND, FamilyAccents, Overlays, Palette } from './app-colors';
+import { withAlpha } from '../gradient-utils';
 import type { ThemeColors, ThemeGradients } from '../types';
 
-/** Default light semantic colors — current PrivateVTU design. */
+/** Default light semantic colors — Datamart design. */
 export function createVioletLightColors(): ThemeColors {
   return {
     primary: Palette.violet600,
@@ -16,7 +16,7 @@ export function createVioletLightColors(): ThemeColors {
     successLight: Palette.emerald100,
     successDark: Palette.emerald700,
     warning: Palette.amber500,
-    warningLight: '#FEF3C7',
+    warningLight: Palette.warningLight,
     warningDark: Palette.amber700,
     error: Palette.red500,
     errorLight: Palette.red50,
@@ -39,6 +39,11 @@ export function createVioletLightColors(): ThemeColors {
     card: Palette.white,
     white: Palette.white,
     pageBg: Palette.pageBg,
+    formBg: Palette.formBg,
+    formBgAlt: Palette.formBgAlt,
+    formBgNeutral: Palette.formBgNeutral,
+    inputFilled: Palette.violet50,
+    pinFilled: Palette.headerTint,
     heroDark: Palette.heroBase,
     textOnHero: Palette.white,
     textOnHeroMuted: Overlays.white72,
@@ -63,7 +68,7 @@ export function createVioletLightColors(): ThemeColors {
 
     ambientPrimary: Overlays.violet06,
     ambientSecondary: Overlays.indigo05,
-    glassOverlay: 'rgba(255, 255, 255, 0.94)',
+    glassOverlay: Overlays.rgba255_255_255_094,
     glassBorder: Overlays.glassBorder,
     headerGlass: Overlays.headerGlass,
     statusBarStyle: 'dark',
@@ -76,13 +81,13 @@ export function createVioletLightGradients(): ThemeGradients {
     primary: [Palette.violet900, Palette.violet700, Palette.violet600],
     card: [Palette.indigoBorder, Palette.purpleDeep, Palette.violet600],
     cardSoft: [Palette.violet700, Palette.violet500, Palette.violet400],
-    header: [Palette.white, '#FAF5FF', Palette.slate50],
+    header: [Palette.white, Palette.headerTint, Palette.slate50],
     hero: [Palette.heroBase, Palette.heroDeep, Palette.violet900],
     heroAlt: [Palette.heroBase, Palette.heroMid, Palette.heroAccent],
     heroAuth: [Palette.heroBase, Palette.heroMid, Palette.heroDeep, Palette.violet900],
     button: [Palette.violet500, Palette.violet600, Palette.violet700],
     buttonInactive: [Palette.violet300, Palette.violet400],
-    buttonDanger: [Palette.red500, Palette.red600, '#B91C1C'],
+    buttonDanger: [Palette.red500, Palette.red600, Palette.dangerDark],
     buttonDangerInactive: [Palette.red300, Palette.red400],
     logo: [Palette.violet400, Palette.violet500, Palette.violet600],
     success: [Palette.emerald600, Palette.emerald500],
@@ -102,7 +107,7 @@ export function createVioletDarkColors(): ThemeColors {
     primaryDark: Palette.violet500,
     primaryDeep: Palette.violet800,
     primaryLight: Palette.violet300,
-    primaryMuted: '#1E1535',
+    primaryMuted: Palette.darkPrimaryMuted,
     primaryGlow: Palette.violet500,
 
     dark: Palette.darkText,
@@ -113,38 +118,45 @@ export function createVioletDarkColors(): ThemeColors {
     muted: Palette.darkMuted,
     mutedLight: Palette.slate500,
     border: Palette.darkBorder,
-    borderMid: '#3D3258',
-    borderSubtle: 'rgba(255, 255, 255, 0.08)',
+    borderMid: Palette.darkBorderMid,
+    borderSubtle: Overlays.white08,
     surface: Palette.darkSurface,
     surfaceAlt: Palette.darkSurfaceAlt,
     card: Palette.darkCard,
     pageBg: Palette.darkPageBg,
-    heroDark: '#0D0518',
+    formBg: Palette.darkSurface,
+    formBgAlt: Palette.darkSurfaceAlt,
+    formBgNeutral: Palette.darkSurfaceAlt,
+    inputFilled: Palette.darkPrimaryMuted,
+    pinFilled: Palette.darkBorderMid,
+    heroDark: Palette.darkHeroSurface,
     textOnHero: Palette.white,
     textOnHeroMuted: Overlays.white72,
     textOnHeroSubtle: Overlays.white55,
 
-    airtimeBg: '#1A1030',
-    dataBg: '#1A1030',
-    electricityBg: '#1F1508',
-    cableBg: '#1F0A0A',
-    transferBg: '#0A1428',
-    fundBg: '#081820',
-    bettingBg: '#1F1008',
-    educationBg: '#081820',
+    airtimeBg: Palette.darkAirtimeBg,
+    dataBg: Palette.darkAirtimeBg,
+    electricityBg: Palette.darkElectricityBg,
+    cableBg: Palette.darkCableBg,
+    transferBg: Palette.darkTransferBg,
+    fundBg: Palette.darkFundBg,
+    bettingBg: Palette.darkBettingBg,
+    educationBg: Palette.darkFundBg,
 
-    successLight: '#0A2E22',
-    warningLight: '#2A1F08',
-    errorLight: '#2A1010',
-    infoLight: '#082028',
+    successLight: Palette.darkSuccessLight,
+    successDark: Palette.emerald400,
+    warningLight: Palette.darkWarningLight,
+    errorLight: Palette.darkErrorLight,
+    errorDark: Palette.red400,
+    infoLight: Palette.darkInfoLight,
 
-    ambientPrimary: 'rgba(124, 58, 237, 0.12)',
-    ambientSecondary: 'rgba(99, 102, 241, 0.08)',
-    glassOverlay: 'rgba(18, 12, 34, 0.92)',
-    glassBorder: 'rgba(255, 255, 255, 0.08)',
-    headerGlass: 'rgba(10, 6, 20, 0.88)',
+    ambientPrimary: Overlays.darkAmbientPrimary,
+    ambientSecondary: Overlays.darkAmbientSecondary,
+    glassOverlay: Overlays.darkGlassOverlay,
+    glassBorder: Overlays.white08,
+    headerGlass: Overlays.darkHeaderGlass,
     statusBarStyle: 'light',
-    shadowColor: '#000000',
+    shadowColor: Palette.black,
   };
 }
 
@@ -152,10 +164,10 @@ export function createVioletDarkGradients(): ThemeGradients {
   const light = createVioletLightGradients();
   return {
     ...light,
-    header: [Palette.darkPageBg, '#120C22', Palette.darkSurface],
-    hero: ['#0D0518', '#1A0A3C', Palette.violet900],
-    heroAlt: ['#0D0518', Palette.heroMid, Palette.violet900],
-    heroAuth: ['#0D0518', Palette.heroBase, Palette.heroDeep, Palette.violet900],
+    header: [Palette.darkPageBg, Palette.darkHeaderMid, Palette.darkSurface],
+    hero: [Palette.darkHeroSurface, Palette.heroMid, Palette.violet900],
+    heroAlt: [Palette.darkHeroSurface, Palette.heroMid, Palette.violet900],
+    heroAuth: [Palette.darkHeroSurface, Palette.heroBase, Palette.heroDeep, Palette.violet900],
     surface: [Palette.darkSurface, Palette.darkSurfaceAlt],
     dark: [Palette.darkCard, Palette.darkBorder],
   };
@@ -173,20 +185,48 @@ type FamilyAccent = {
   border: string;
   ambientPrimary: string;
   ambientSecondary: string;
+  surface: string;
+  surfaceAlt: string;
+  card: string;
+  formBg: string;
+  formBgAlt: string;
+  inputFilled: string;
+  pinFilled: string;
+  borderMid: string;
+  shadowColor: string;
+  glassOverlay?: string;
+  headerGlass?: string;
+  airtimeBg?: string;
+  dataBg?: string;
+  transferBg?: string;
+  fundBg?: string;
+  educationBg?: string;
 };
 
-function buildFamilyLight(accent: FamilyAccent, pageBg: string): ThemeColors {
+function buildFamilyLight(accent: FamilyAccent): ThemeColors {
   const base = createVioletLightColors();
   return {
     ...base,
-    ...accent,
-    pageBg,
-    primaryMuted: accent.primaryMuted,
-    border: accent.border,
+    // Brand accents — headers, buttons, icons, active states
+    primary: accent.primary,
+    primaryDark: accent.primaryDark,
+    primaryDeep: accent.primaryDeep,
+    primaryLight: accent.primaryLight,
+    primaryGlow: accent.primaryGlow,
+    pageBg: accent.pageBg,
+    heroDark: accent.heroDark,
+    ambientPrimary: accent.ambientPrimary,
+    ambientSecondary: accent.ambientSecondary,
+    shadowColor: accent.shadowColor,
+    airtime: accent.primary,
+    data: accent.primary,
+    glassOverlay: accent.glassOverlay ?? base.glassOverlay,
+    headerGlass: accent.headerGlass ?? base.headerGlass,
+    // Surfaces, borders, fills stay neutral (same as default violet-light)
   };
 }
 
-function buildFamilyDark(accent: FamilyAccent, pageBg: string): ThemeColors {
+function buildFamilyDark(accent: FamilyAccent): ThemeColors {
   const base = createVioletDarkColors();
   return {
     ...base,
@@ -196,11 +236,30 @@ function buildFamilyDark(accent: FamilyAccent, pageBg: string): ThemeColors {
     primaryLight: accent.primaryLight,
     primaryMuted: accent.primaryMuted,
     primaryGlow: accent.primaryGlow,
-    pageBg,
+    pageBg: accent.pageBg,
     heroDark: accent.heroDark,
     border: accent.border,
+    borderMid: accent.borderMid,
     ambientPrimary: accent.ambientPrimary,
     ambientSecondary: accent.ambientSecondary,
+    surface: accent.surface,
+    surfaceAlt: accent.surfaceAlt,
+    card: accent.card,
+    formBg: accent.formBg,
+    formBgAlt: accent.formBgAlt,
+    formBgNeutral: accent.surfaceAlt,
+    inputFilled: accent.inputFilled,
+    pinFilled: accent.pinFilled,
+    shadowColor: accent.shadowColor,
+    airtime: accent.primaryLight,
+    data: accent.primaryLight,
+    glassOverlay: accent.glassOverlay ?? base.glassOverlay,
+    headerGlass: accent.headerGlass ?? base.headerGlass,
+    airtimeBg: accent.airtimeBg ?? base.airtimeBg,
+    dataBg: accent.dataBg ?? base.dataBg,
+    transferBg: accent.transferBg ?? base.transferBg,
+    fundBg: accent.fundBg ?? base.fundBg,
+    educationBg: accent.educationBg ?? base.educationBg,
   };
 }
 
@@ -209,129 +268,12 @@ function buildFamilyGradients(hero: [string, string, string], button: [string, s
   return { ...base, hero, heroAlt: hero, heroAuth: [hero[0], hero[1], hero[2], hero[2]], button, logo, primary: button };
 }
 
-export const FamilyAccents = {
-  midnight: {
-    light: {
-      primary: '#1E3A5F',
-      primaryDark: '#152A45',
-      primaryDeep: '#0F1D32',
-      primaryLight: '#3B82F6',
-      primaryMuted: '#EFF6FF',
-      primaryGlow: '#2563EB',
-      pageBg: '#F8FAFC',
-      heroDark: '#0F1D32',
-      border: '#DBEAFE',
-      ambientPrimary: 'rgba(59, 130, 246, 0.06)',
-      ambientSecondary: 'rgba(30, 58, 95, 0.04)',
-    },
-    dark: {
-      primary: '#3B82F6',
-      primaryDark: '#2563EB',
-      primaryDeep: '#1E3A5F',
-      primaryLight: '#60A5FA',
-      primaryMuted: '#111827',
-      primaryGlow: '#3B82F6',
-      pageBg: Palette.midnightPage,
-      heroDark: '#060B12',
-      border: '#1F2937',
-      ambientPrimary: 'rgba(59, 130, 246, 0.12)',
-      ambientSecondary: 'rgba(30, 58, 95, 0.08)',
-    },
-  },
-  ocean: {
-    light: {
-      primary: Palette.oceanAccent,
-      primaryDark: '#0E7490',
-      primaryDeep: '#164E63',
-      primaryLight: Palette.oceanAccentLight,
-      primaryMuted: '#ECFEFF',
-      primaryGlow: '#06B6D4',
-      pageBg: Palette.oceanPage,
-      heroDark: '#164E63',
-      border: '#CFFAFE',
-      ambientPrimary: 'rgba(8, 145, 178, 0.06)',
-      ambientSecondary: 'rgba(34, 211, 238, 0.04)',
-    },
-    dark: {
-      primary: Palette.oceanAccentLight,
-      primaryDark: Palette.oceanAccent,
-      primaryDeep: '#164E63',
-      primaryLight: '#67E8F9',
-      primaryMuted: '#0A1A22',
-      primaryGlow: '#06B6D4',
-      pageBg: Palette.oceanDarkPage,
-      heroDark: '#021018',
-      border: '#1A3040',
-      ambientPrimary: 'rgba(34, 211, 238, 0.1)',
-      ambientSecondary: 'rgba(8, 145, 178, 0.08)',
-    },
-  },
-  emerald: {
-    light: {
-      primary: Palette.emeraldAccent,
-      primaryDark: '#047857',
-      primaryDeep: '#064E3B',
-      primaryLight: '#34D399',
-      primaryMuted: Palette.emeraldPage,
-      primaryGlow: Palette.emerald500,
-      pageBg: Palette.emeraldPage,
-      heroDark: '#064E3B',
-      border: '#D1FAE5',
-      ambientPrimary: 'rgba(5, 150, 105, 0.06)',
-      ambientSecondary: 'rgba(212, 175, 55, 0.04)',
-    },
-    dark: {
-      primary: '#34D399',
-      primaryDark: Palette.emeraldAccent,
-      primaryDeep: '#064E3B',
-      primaryLight: '#6EE7B7',
-      primaryMuted: '#0A1A12',
-      primaryGlow: Palette.emerald500,
-      pageBg: Palette.emeraldDarkPage,
-      heroDark: '#021208',
-      border: '#1A3028',
-      ambientPrimary: 'rgba(52, 211, 153, 0.1)',
-      ambientSecondary: 'rgba(212, 175, 55, 0.06)',
-    },
-  },
-  rose: {
-    light: {
-      primary: Palette.roseAccent,
-      primaryDark: '#BE123C',
-      primaryDeep: '#881337',
-      primaryLight: Palette.roseAccentLight,
-      primaryMuted: Palette.rosePage,
-      primaryGlow: '#F43F5E',
-      pageBg: Palette.rosePage,
-      heroDark: '#881337',
-      border: '#FFE4E6',
-      ambientPrimary: 'rgba(225, 29, 72, 0.06)',
-      ambientSecondary: 'rgba(251, 113, 133, 0.04)',
-    },
-    dark: {
-      primary: Palette.roseAccentLight,
-      primaryDark: Palette.roseAccent,
-      primaryDeep: '#881337',
-      primaryLight: '#FDA4AF',
-      primaryMuted: '#1A0A10',
-      primaryGlow: '#F43F5E',
-      pageBg: Palette.roseDarkPage,
-      heroDark: '#0A0408',
-      border: '#301820',
-      ambientPrimary: 'rgba(251, 113, 133, 0.1)',
-      ambientSecondary: 'rgba(225, 29, 72, 0.08)',
-    },
-  },
-} as const;
-
 export function createFamilyLightColors(family: keyof typeof FamilyAccents): ThemeColors {
-  const accent = FamilyAccents[family].light;
-  return buildFamilyLight(accent, accent.pageBg);
+  return buildFamilyLight(FamilyAccents[family].light);
 }
 
 export function createFamilyDarkColors(family: keyof typeof FamilyAccents): ThemeColors {
-  const accent = FamilyAccents[family].dark;
-  return buildFamilyDark(accent, accent.pageBg);
+  return buildFamilyDark(FamilyAccents[family].dark);
 }
 
 export function createFamilyGradients(family: keyof typeof FamilyAccents, mode: 'light' | 'dark'): ThemeGradients {
@@ -341,6 +283,44 @@ export function createFamilyGradients(family: keyof typeof FamilyAccents, mode: 
     [accent.primaryGlow, accent.primary, accent.primaryDark],
     [accent.primaryLight, accent.primaryGlow, accent.primary],
   );
+}
+
+export function createFamilyLightGradients(family: keyof typeof FamilyAccents): ThemeGradients {
+  const accent = FamilyAccents[family].light;
+  const base = createFamilyGradients(family, 'light');
+  return {
+    ...base,
+    header: [Palette.white, Palette.slate50, accent.pageBg],
+    hero: [accent.heroDark, accent.primaryDeep, accent.primaryGlow],
+    heroAlt: [accent.heroDark, accent.primaryDeep, accent.primaryLight],
+    heroAuth: [accent.heroDark, accent.primaryDeep, accent.primaryDark, accent.primary],
+    card: [accent.primaryDeep, accent.primaryDark, accent.primary],
+    cardSoft: [accent.primaryDark, accent.primaryGlow, accent.primaryLight],
+    buttonInactive: [accent.primaryLight, accent.primaryMuted],
+    accentLine: [withAlpha(accent.primary, 0.55), withAlpha(accent.primaryGlow, 0.35), 'transparent'],
+    activeCard: [Overlays.emerald04, accent.ambientPrimary],
+    surface: [accent.surface, accent.surfaceAlt],
+    dark: [accent.heroDark, accent.primaryDeep],
+  };
+}
+
+export function createFamilyDarkGradients(family: keyof typeof FamilyAccents): ThemeGradients {
+  const accent = FamilyAccents[family].dark;
+  const base = createFamilyGradients(family, 'dark');
+  return {
+    ...base,
+    header: [accent.pageBg, accent.surface, accent.surfaceAlt],
+    hero: [accent.heroDark, accent.primaryDeep, accent.primaryGlow],
+    heroAlt: [accent.heroDark, accent.primaryDeep, accent.primaryLight],
+    heroAuth: [accent.heroDark, accent.pageBg, accent.primaryDeep, accent.primaryDark],
+    card: [accent.primaryDeep, accent.primaryDark, accent.primary],
+    cardSoft: [accent.primaryDark, accent.primaryGlow, accent.primaryLight],
+    buttonInactive: [accent.primaryMuted, accent.primaryDeep],
+    accentLine: [withAlpha(accent.primary, 0.55), withAlpha(accent.primaryGlow, 0.35), 'transparent'],
+    activeCard: [Overlays.emerald04, accent.ambientPrimary],
+    surface: [accent.surface, accent.surfaceAlt],
+    dark: [accent.card, accent.border],
+  };
 }
 
 /** KYC status color map */
@@ -368,5 +348,7 @@ export const WalletFlowColors = {
   out: Palette.red600,
   outBg: Palette.red50,
   outBorder: Overlays.borderDanger10,
-  outIconBg: 'rgba(220, 38, 38, 0.12)',
+  outIconBg: Overlays.walletOutIconBg,
 } as const;
+
+export { FamilyAccents } from './app-colors';

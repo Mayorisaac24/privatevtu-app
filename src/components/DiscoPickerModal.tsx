@@ -14,7 +14,7 @@ import {
   sortDiscosAlphabetically,
 } from '../lib/disco-providers';
 import { DiscoLogo } from './DiscoLogo';
-import { Colors, Radius, Shadow } from '../theme';
+import {Colors, Radius, Shadow , Palette, FormColors, BRAND, Overlays, useThemedStyles } from '../theme';
 
 const SHEET_HEIGHT = Math.round(Dimensions.get('window').height * 0.88);
 const POP_COLS = 4;
@@ -43,6 +43,8 @@ export function DiscoPickerModal({
   onClose,
   onSelect,
 }: Props) {
+  const styles = useStyles();
+
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const [search, setSearch] = useState('');
@@ -227,21 +229,21 @@ export function DiscoPickerModal({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
   },
   overlayTint: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15, 23, 42, 0.42)',
+    backgroundColor: Overlays.rgba15_23_42_042,
   },
   sheetWrap: {
     width: '100%',
   },
   sheet: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.card,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: SHEET_H_PAD,
@@ -250,7 +252,7 @@ const styles = StyleSheet.create({
   },
   fixedHeader: {
     paddingTop: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.card,
     zIndex: 1,
   },
   discoListFlex: {
@@ -260,7 +262,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: colors.borderMid,
     alignSelf: 'center',
     marginBottom: 14,
   },
@@ -274,11 +276,11 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingRight: 12,
   },
-  title: { fontSize: 20, fontWeight: '700', color: Colors.dark, letterSpacing: -0.3 },
+  title: { fontSize: 20, fontWeight: '700', color: colors.dark, letterSpacing: -0.3 },
   subtitle: {
     fontSize: 14,
     fontWeight: '500',
-    color: Colors.mid,
+    color: colors.mid,
     marginTop: 4,
     lineHeight: 20,
   },
@@ -286,7 +288,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: colors.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -294,22 +296,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     borderRadius: Radius.lg,
     paddingHorizontal: 14,
     height: 48,
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.18)',
+    borderColor: Overlays.borderPrimary18,
     marginBottom: 16,
   },
-  searchInput: { flex: 1, fontSize: 15, color: Colors.dark, paddingVertical: 0 },
+  searchInput: { flex: 1, fontSize: 15, color: colors.dark, paddingVertical: 0 },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
-  loadingText: { fontSize: 13, color: Colors.muted },
+  loadingText: { fontSize: 13, color: colors.muted },
   section: { marginBottom: 18 },
   sectionLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.mid,
+    color: colors.mid,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
     marginBottom: 10,
@@ -325,24 +327,24 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 6,
     borderRadius: Radius.lg,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.12)',
+    borderColor: Overlays.darkAmbientPrimary,
     alignItems: 'center',
     gap: 8,
   },
   popularChipActive: {
-    backgroundColor: '#FAF5FF',
-    borderColor: 'rgba(124, 58, 237, 0.35)',
+    backgroundColor: colors.pinFilled,
+    borderColor: Overlays.violet35,
   },
   popularText: {
     fontSize: 10,
     fontWeight: '600',
-    color: Colors.mid,
+    color: colors.mid,
     textAlign: 'center',
     lineHeight: 13,
   },
-  popularTextActive: { color: Colors.primary },
+  popularTextActive: { color: colors.primary },
   listContent: { paddingBottom: 12, flexGrow: 1 },
   discoRowSeparator: { height: 8 },
   discoRow: {
@@ -351,19 +353,23 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 14,
     borderRadius: Radius.lg,
-    backgroundColor: '#FAFBFC',
+    backgroundColor: colors.formBg,
     borderWidth: 1,
-    borderColor: 'rgba(15, 23, 42, 0.05)',
+    borderColor: Overlays.rgba15_23_42_005,
   },
   discoRowActive: {
-    backgroundColor: '#FAF5FF',
-    borderColor: 'rgba(124, 58, 237, 0.25)',
+    backgroundColor: colors.pinFilled,
+    borderColor: Overlays.rgba124_58_237_025,
   },
   discoRowPressed: {
     opacity: 0.88,
   },
   discoText: { flex: 1 },
-  discoName: { fontSize: 15, fontWeight: '600', color: Colors.dark },
+  discoName: { fontSize: 15, fontWeight: '600', color: colors.dark },
   empty: { alignItems: 'center', paddingVertical: 32, gap: 8 },
-  emptyText: { fontSize: 13, color: Colors.muted },
+  emptyText: { fontSize: 13, color: colors.muted },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

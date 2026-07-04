@@ -15,7 +15,7 @@ import { api } from '../../lib/api';
 import { recordAdView, shouldShowAd } from '../../lib/ad-storage';
 import { getCachedActiveAds, type AdRecord } from '../../lib/marketing-content-cache';
 import { GlassSurface } from '../ui/GlassSurface';
-import { Colors, Spacing } from '../../theme';
+import {Colors, Spacing , Palette, FormColors, BRAND, Overlays, useThemedStyles } from '../../theme';
 
 export type AdScreenKey = 'HOME' | 'WALLET' | 'SERVICES' | 'HISTORY' | 'PROFILE' | 'TRANSFER' | 'FUND';
 
@@ -55,6 +55,7 @@ function openAdAction(ad: AppAd): void {
 }
 
 function TopBannerAd({ ad, onPress }: { ad: AppAd; onPress: () => void }) {
+  const styles = useStyles();
   return (
     <TouchableOpacity activeOpacity={0.9} onPress={onPress}>
       {ad.imageUrl ? (
@@ -70,6 +71,7 @@ function TopBannerAd({ ad, onPress }: { ad: AppAd; onPress: () => void }) {
 }
 
 function BannerAd({ ad, onPress }: { ad: AppAd; onPress: () => void }) {
+  const styles = useStyles();
   const hasAction = ad.actionType !== 'NONE' && Boolean(ad.actionRoute || ad.linkUrl);
 
   return (
@@ -92,6 +94,7 @@ function BannerAd({ ad, onPress }: { ad: AppAd; onPress: () => void }) {
 }
 
 function CardAd({ ad, onPress }: { ad: AppAd; onPress: () => void }) {
+  const styles = useStyles();
   const hasAction = ad.actionType !== 'NONE' && Boolean(ad.actionRoute || ad.linkUrl);
 
   return (
@@ -128,6 +131,7 @@ function ModalAd({
   visible: boolean;
   onClose: () => void;
 }) {
+  const styles = useStyles();
   const hasAction = ad.actionType !== 'NONE' && Boolean(ad.actionRoute || ad.linkUrl);
 
   return (
@@ -135,7 +139,7 @@ function ModalAd({
       <Pressable style={styles.modalBackdrop} onPress={onClose}>
         <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
           <TouchableOpacity style={styles.modalClose} onPress={onClose} hitSlop={12}>
-            <Ionicons name="close" size={22} color="#64748B" />
+            <Ionicons name="close" size={22} color={Palette.slate500} />
           </TouchableOpacity>
           {ad.imageUrl ? (
             <Image source={{ uri: ad.imageUrl }} style={styles.modalImage} resizeMode="cover" />
@@ -160,6 +164,8 @@ function ModalAd({
 }
 
 export function AdBanner({ screen, placement }: Props) {
+  const styles = useStyles();
+
   const [ads, setAds] = useState<AppAd[]>([]);
   const [modalAd, setModalAd] = useState<AppAd | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -223,7 +229,7 @@ export function AdBanner({ screen, placement }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   wrap: {
     gap: 12,
     marginBottom: Spacing.md,
@@ -258,18 +264,18 @@ const styles = StyleSheet.create({
   bannerTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#0F172A',
+    color: colors.dark,
   },
   bannerSubtitle: {
     fontSize: 12,
-    color: '#64748B',
+    color: colors.surface0,
     lineHeight: 16,
   },
   bannerCta: {
     marginTop: 4,
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.primary,
+    color: colors.primary,
   },
   cardWrap: {
     width: '100%',
@@ -289,7 +295,7 @@ const styles = StyleSheet.create({
     height: 120,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(124, 58, 237, 0.08)',
+    backgroundColor: Overlays.violet08,
   },
   cardCopy: {
     padding: 14,
@@ -298,11 +304,11 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0F172A',
+    color: colors.dark,
   },
   cardSubtitle: {
     fontSize: 13,
-    color: '#64748B',
+    color: colors.surface0,
     lineHeight: 18,
   },
   cardCtaRow: {
@@ -314,11 +320,11 @@ const styles = StyleSheet.create({
   cardCta: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.primary,
+    color: colors.primary,
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    backgroundColor: Overlays.rgba15_23_42_045,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
@@ -326,7 +332,7 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 360,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.card,
     borderRadius: 18,
     padding: 18,
     gap: 10,
@@ -342,23 +348,27 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#0F172A',
+    color: colors.dark,
   },
   modalSubtitle: {
     fontSize: 14,
-    color: '#64748B',
+    color: colors.surface0,
     lineHeight: 20,
   },
   modalCta: {
     marginTop: 4,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
   },
   modalCtaText: {
-    color: '#FFFFFF',
+    color: colors.card,
     fontWeight: '700',
     fontSize: 15,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

@@ -97,13 +97,15 @@ export function disputeStatusLabel(status: DisputeStatus) {
   }
 }
 
+import { DisputeStatusColors } from '../theme/colors/app-colors';
+
 export function disputeStatusColor(status: DisputeStatus) {
   switch (status) {
-    case 'RESOLVED': return '#059669';
-    case 'REJECTED': return '#DC2626';
-    case 'AWAITING_USER': return '#2563EB';
-    case 'IN_REVIEW': return '#7C3AED';
-    case 'OPEN': return '#D97706';
-    default: return '#64748B';
+    case 'RESOLVED': return DisputeStatusColors.RESOLVED;
+    case 'REJECTED': return DisputeStatusColors.REJECTED;
+    case 'AWAITING_USER': return DisputeStatusColors.AWAITING_USER;
+    case 'IN_REVIEW': return DisputeStatusColors.IN_REVIEW;
+    case 'OPEN': return DisputeStatusColors.OPEN;
+    default: return DisputeStatusColors.default;
   }
 }

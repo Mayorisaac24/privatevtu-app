@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../theme';
+import {Colors , Palette, FormColors, BRAND, Overlays, useThemedStyles } from '../theme';
 import { GlassCard } from './ui/GlassCard';
 import { formatInsightAmount, getServiceTypeLabel, type HomeDashboardStats } from '../lib/transaction-display';
 
@@ -22,6 +22,8 @@ export function MonthActivityPanel({
   onPress,
   embedded = false,
 }: MonthActivityPanelProps) {
+  const styles = useStyles();
+
   const successRate = stats.monthTransactionCount
     ? Math.round((stats.monthSuccessfulCount / stats.monthTransactionCount) * 100)
     : 0;
@@ -102,7 +104,7 @@ export function MonthActivityPanel({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   panelContent: {
     gap: 0,
   },
@@ -115,7 +117,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 3,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     opacity: 0.85,
   },
   header: {
@@ -133,14 +135,14 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 9,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
   title: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.dark,
+    color: colors.dark,
     letterSpacing: -0.2,
   },
   link: {
@@ -151,7 +153,7 @@ const styles = StyleSheet.create({
   linkText: {
     fontSize: 13,
     fontWeight: '500',
-    color: Colors.primary,
+    color: colors.primary,
   },
   metrics: {
     flexDirection: 'row',
@@ -166,41 +168,45 @@ const styles = StyleSheet.create({
   metricValue: {
     fontSize: 17,
     fontWeight: '600',
-    color: Colors.dark,
+    color: colors.dark,
     letterSpacing: -0.3,
   },
   metricValueAccent: {
-    color: Colors.primary,
+    color: colors.primary,
   },
   metricValueSuccess: {
-    color: '#059669',
+    color: Palette.emerald600,
   },
   metricLabel: {
     fontSize: 11,
-    color: Colors.muted,
+    color: colors.muted,
     fontWeight: '400',
   },
   metricDivider: {
     width: StyleSheet.hairlineWidth,
     height: 32,
-    backgroundColor: 'rgba(15, 23, 42, 0.08)',
+    backgroundColor: colors.borderSubtle,
   },
   progressTrack: {
     height: 5,
     borderRadius: 3,
-    backgroundColor: 'rgba(124, 58, 237, 0.1)',
+    backgroundColor: Overlays.violet10,
     overflow: 'hidden',
     marginBottom: 10,
   },
   progressFill: {
     height: '100%',
     borderRadius: 3,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
   },
   foot: {
     fontSize: 12,
-    color: Colors.muted,
+    color: colors.muted,
     fontWeight: '400',
     lineHeight: 17,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

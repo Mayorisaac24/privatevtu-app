@@ -4,10 +4,10 @@ import type { Transaction } from '../lib/api';
 import { formatCurrencyVisible } from '../lib/api';
 import { BankLogo } from './BankLogo';
 import { resolveTransferBankForDisplay } from '../lib/transfer-banks';
-import { getProviderLogo } from '../lib/providers';
+import { NetworkProviderLogo } from './NetworkProviderLogo';
 import { getEducationProviderLogo, hasEducationProviderLogo } from '../lib/education-providers';
 import { getBettingPlatformLogo, hasBettingPlatformLogo } from '../lib/betting-platforms';
-import { Colors, Radius } from '../theme';
+import {Colors, Radius , Palette, FormColors, BRAND, Overlays, useColors, useThemedStyles } from '../theme';
 import { GlassCard } from './ui/GlassCard';
 import {
   enrichTransaction,
@@ -35,6 +35,9 @@ function readMetaString(metadata: unknown, key: string): string {
 }
 
 function TransactionAvatar({ tx }: { tx: EnrichedTransaction }) {
+  const styles = useStyles();
+  const colors = useColors();
+
   const visual = getTransactionVisual(tx);
 
   if (visual.logoType === 'bank' && tx.logoKey) {
@@ -59,13 +62,13 @@ function TransactionAvatar({ tx }: { tx: EnrichedTransaction }) {
       if (bettingLogo && hasBettingPlatformLogo({ imageUrl: providerImageUrl })) {
         return (
           <View style={styles.avatarWrap}>
-            <Image source={bettingLogo as ImageSourcePropType} style={styles.providerLogo} resizeMode="contain" />
+            <Image source={bettingLogo as ImageSourcePropType} style={styles.providerLogo} resizeMode="cover" />
           </View>
         );
       }
       return (
-        <View style={[styles.avatarWrap, { backgroundColor: Colors.primaryMuted }]}>
-          <Ionicons name="trophy-outline" size={18} color={Colors.primary} />
+        <View style={[styles.avatarWrap, { backgroundColor: colors.primaryMuted }]}>
+          <Ionicons name="trophy-outline" size={18} color={colors.primary} />
         </View>
       );
     }
@@ -79,17 +82,19 @@ function TransactionAvatar({ tx }: { tx: EnrichedTransaction }) {
       if (eduLogo && hasEducationProviderLogo({ imageUrl: providerImageUrl })) {
         return (
           <View style={styles.avatarWrap}>
-            <Image source={eduLogo as ImageSourcePropType} style={styles.providerLogo} resizeMode="contain" />
+            <Image source={eduLogo as ImageSourcePropType} style={styles.providerLogo} resizeMode="cover" />
           </View>
         );
       }
     }
 
     if (tx.type === 'AIRTIME' || tx.type === 'DATA') {
-      const logo = getProviderLogo({ code: visual.providerCode, id: visual.providerCode, imageUrl: providerImageUrl });
       return (
         <View style={styles.avatarWrap}>
-          <Image source={logo as ImageSourcePropType} style={styles.providerLogo} resizeMode="contain" />
+          <NetworkProviderLogo
+            provider={{ code: visual.providerCode, id: visual.providerCode, imageUrl: providerImageUrl }}
+            size={44}
+          />
         </View>
       );
     }
@@ -109,6 +114,8 @@ function TransactionAvatar({ tx }: { tx: EnrichedTransaction }) {
 }
 
 function StatusBadge({ status }: { status: EnrichedTransaction['displayStatus'] }) {
+  const styles = useStyles();
+
   const meta = getStatusMeta(status);
   return (
     <View style={[styles.statusBadge, { backgroundColor: meta.bg }]}>
@@ -126,6 +133,8 @@ export function TransactionListItem({
   isLast = false,
   onPress,
 }: Props) {
+  const styles = useStyles();
+
   const tx = enrichTransaction(transaction);
   const { prefix, color: amountColor } = getAmountPresentation(tx);
   const title = getTransactionListTitle(tx);
@@ -183,7 +192,7 @@ export function TransactionListItem({
   return card;
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -199,7 +208,7 @@ const styles = StyleSheet.create({
   },
   rowEmbeddedBorder: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(15, 23, 42, 0.08)',
+    borderBottomColor: colors.borderSubtle,
   },
   avatarWrap: {
     width: 44,
@@ -208,16 +217,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: 'transparent',
   },
   providerLogo: {
-    width: 34,
-    height: 34,
-    borderRadius: 8,
+    width: '100%',
+    height: '100%',
   },
   body: { flex: 1, gap: 3 },
-  title: { fontSize: 14, fontWeight: '600', color: Colors.dark, letterSpacing: -0.2 },
-  subtitle: { fontSize: 12, color: Colors.muted, fontWeight: '400', lineHeight: 16 },
+  title: { fontSize: 14, fontWeight: '600', color: colors.dark, letterSpacing: -0.2 },
+  subtitle: { fontSize: 12, color: colors.muted, fontWeight: '400', lineHeight: 16 },
   right: { alignItems: 'flex-end', gap: 4 },
   amount: { fontSize: 14, fontWeight: '800' },
   statusBadge: {
@@ -231,5 +239,9 @@ const styles = StyleSheet.create({
   statusDot: { width: 6, height: 6, borderRadius: 3 },
   statusText: { fontSize: 10, fontWeight: '700' },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}
 
 export { StatusBadge };

@@ -3,7 +3,7 @@ import { View, TouchableOpacity, StyleSheet, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Spacing } from '../theme';
+import {Colors, Spacing , Overlays, useThemedStyles } from '../theme';
 import { useColors, useGradients } from '../theme/hooks';
 import { gradientStops } from '../theme/gradient-utils';
 import { ServiceStepProgress } from './purchase/ServicePurchaseUi';
@@ -29,6 +29,8 @@ export function ServiceScreenHeader({
   stepProgress,
   footer,
 }: ServiceScreenHeaderProps) {
+  const styles = useStyles();
+
   const insets = useSafeAreaInsets();
   const gradients = useGradients();
   const colors = useColors();
@@ -88,7 +90,7 @@ export function ServiceScreenHeader({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   header: {
     paddingHorizontal: Spacing.page,
     paddingBottom: 20,
@@ -101,7 +103,7 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: Overlays.white06,
   },
   headerBlob2: {
     position: 'absolute',
@@ -110,7 +112,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: Overlays.rgba255_255_255_004,
   },
   headerRow: {
     flexDirection: 'row',
@@ -121,11 +123,11 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: Overlays.white12,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: Overlays.white08,
   },
   headerText: {
     flex: 1,
@@ -134,12 +136,12 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: Colors.white,
+    color: colors.white,
     letterSpacing: -0.3,
   },
   headerSub: {
     fontSize: 13,
-    color: 'rgba(255,255,255,0.68)',
+    color: Overlays.white68,
     marginTop: 3,
   },
   headerSpacer: {
@@ -147,23 +149,23 @@ const styles = StyleSheet.create({
   },
   balPill: {
     alignItems: 'flex-end',
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: Overlays.white12,
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: Overlays.white10,
     maxWidth: 120,
   },
   balLabel: {
     fontSize: 10,
-    color: 'rgba(255,255,255,0.55)',
+    color: Overlays.white55,
     fontWeight: '600',
   },
   balText: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.white,
+    color: colors.white,
   },
   contentCurve: {
     height: 22,
@@ -172,3 +174,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

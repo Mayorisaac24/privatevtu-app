@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { View, Image, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { BettingPlatform } from '../lib/api';
-import { Colors } from '../theme';
+import {Colors , Overlays, useThemedStyles } from '../theme';
 
 type Props = {
   platform: Pick<BettingPlatform, 'name' | 'imageUrl' | 'code'>;
@@ -10,6 +10,8 @@ type Props = {
 };
 
 export function BettingPlatformLogo({ platform, size = 36 }: Props) {
+  const styles = useStyles();
+
   const [failed, setFailed] = useState(false);
   const imageUrl = platform.imageUrl?.trim() || '';
 
@@ -40,13 +42,17 @@ export function BettingPlatformLogo({ platform, size = 36 }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   wrap: {
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(124, 58, 237, 0.18)',
+    borderColor: Overlays.borderPrimary18,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

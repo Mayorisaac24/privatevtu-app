@@ -13,7 +13,7 @@ import { GlassCard } from '../../src/components/ui/GlassCard';
 import { GlassSurface } from '../../src/components/ui/GlassSurface';
 import { api, isResponseSuccess } from '../../src/lib/api';
 import { useAuthStore } from '../../src/stores';
-import { Colors, Radius, Spacing } from '../../src/theme';
+import {Colors, Radius, Spacing , Palette, FormColors, BRAND, Overlays, useThemedStyles } from '../../src/theme';
 import { ConfirmDialog } from '../../src/components/ui/ConfirmDialog';
 import { LoadingOverlay } from '../../src/components/ui/LoadingOverlay';
 import { showToast } from '../../src/components/ui/Toast';
@@ -54,6 +54,8 @@ function maskPhone(phone: string) {
 }
 
 export default function ChangePinScreen() {
+  const styles = useStyles();
+
   const { user } = useAuthStore();
   const inputRef = useRef<TextInput>(null);
   const [mode, setMode] = useState<Mode>('change');
@@ -485,6 +487,7 @@ function OtpBoxes({
   onChange: (v: string) => void;
   inputRef: RefObject<TextInput>;
 }) {
+  const styles = useStyles();
   const digits = value.padEnd(6, ' ').split('').slice(0, 6);
   const activeIndex = Math.min(value.length, 5);
 
@@ -521,6 +524,8 @@ function OtpBoxes({
 }
 
 function TipRow({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: string }) {
+  const styles = useStyles();
+
   return (
     <View style={styles.tipRow}>
       <View style={styles.tipIcon}>
@@ -531,7 +536,7 @@ function TipRow({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: st
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../src/theme/types').ThemeColors) => StyleSheet.create({
   securityBanner: {
     flexDirection: 'row',
     gap: 12,
@@ -542,15 +547,14 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: 'rgba(124, 58, 237, 0.12)',
+    backgroundColor: Overlays.darkAmbientPrimary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   securityCopy: { flex: 1, gap: 3 },
-  securityTitle: { fontSize: 14, fontWeight: '700', color: Colors.dark },
-  securityBody: { fontSize: 13, color: Colors.muted, lineHeight: 18 },
+  securityTitle: { fontSize: 14, fontWeight: '700', color: colors.dark },
+  securityBody: { fontSize: 13, color: colors.muted, lineHeight: 18 },
   card: {
-    backgroundColor: Colors.white,
     paddingHorizontal: 20,
     paddingTop: 22,
     paddingBottom: 24,
@@ -568,22 +572,22 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 14,
     borderWidth: 2,
-    borderColor: Colors.borderMid,
+    borderColor: colors.borderMid,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.white,
+    backgroundColor: colors.surface,
   },
-  progressDotActive: { borderColor: Colors.primary },
-  progressDotDone: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  progressNum: { fontSize: 12, fontWeight: '700', color: Colors.mutedLight },
-  progressNumActive: { color: Colors.primary },
+  progressDotActive: { borderColor: colors.primary },
+  progressDotDone: { backgroundColor: colors.primary, borderColor: colors.primary },
+  progressNum: { fontSize: 12, fontWeight: '700', color: colors.mutedLight },
+  progressNumActive: { color: colors.primary },
   progressLine: {
     width: 42,
     height: 2,
-    backgroundColor: Colors.borderMid,
+    backgroundColor: colors.borderMid,
     marginHorizontal: 6,
   },
-  progressLineDone: { backgroundColor: Colors.primary },
+  progressLineDone: { backgroundColor: colors.primary },
   toolbar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -605,17 +609,17 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
   stepBadge: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.primary,
+    color: colors.primary,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 999,
@@ -627,8 +631,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     marginBottom: 4,
   },
-  stepTitle: { fontSize: 20, fontWeight: '800', color: Colors.dark, letterSpacing: -0.3, textAlign: 'center' },
-  stepSubtitle: { fontSize: 13, color: Colors.muted, textAlign: 'center', lineHeight: 18 },
+  stepTitle: { fontSize: 20, fontWeight: '800', color: colors.dark, letterSpacing: -0.3, textAlign: 'center' },
+  stepSubtitle: { fontSize: 13, color: colors.muted, textAlign: 'center', lineHeight: 18 },
   pinWrap: { position: 'relative', alignItems: 'center', paddingVertical: 8 },
   pinRow: { flexDirection: 'row', justifyContent: 'center', gap: 12 },
   pinBox: {
@@ -636,19 +640,19 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 16,
     borderWidth: 1.5,
-    borderColor: Colors.borderSubtle,
-    backgroundColor: '#FAFBFC',
+    borderColor: colors.borderSubtle,
+    backgroundColor: colors.formBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pinBoxFilled: { borderColor: Colors.primary, backgroundColor: '#FAF5FF' },
-  pinBoxSuccess: { borderColor: Colors.success, backgroundColor: Colors.successLight },
-  pinBoxError: { borderColor: Colors.error, backgroundColor: Colors.errorLight },
+  pinBoxFilled: { borderColor: colors.primary, backgroundColor: colors.pinFilled },
+  pinBoxSuccess: { borderColor: colors.success, backgroundColor: colors.successLight },
+  pinBoxError: { borderColor: colors.error, backgroundColor: colors.errorLight },
   pinDot: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
   },
   pinInputOverlay: hiddenNumericInputStyle,
   otpWrap: { alignItems: 'center', paddingVertical: 8, gap: 10 },
@@ -658,23 +662,23 @@ const styles = StyleSheet.create({
     height: 54,
     borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: Colors.borderSubtle,
-    backgroundColor: '#FAFBFC',
+    borderColor: colors.borderSubtle,
+    backgroundColor: colors.formBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  otpBoxActive: { borderColor: Colors.primary, backgroundColor: '#FAF5FF' },
-  otpBoxFilled: { borderColor: Colors.primary },
-  otpDigit: { fontSize: 20, fontWeight: '800', color: Colors.dark },
-  otpHint: { fontSize: 12, color: Colors.mutedLight },
+  otpBoxActive: { borderColor: colors.primary, backgroundColor: colors.pinFilled },
+  otpBoxFilled: { borderColor: colors.primary },
+  otpDigit: { fontSize: 20, fontWeight: '800', color: colors.dark },
+  otpHint: { fontSize: 12, color: colors.mutedLight },
   matchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
   },
-  matchText: { fontSize: 13, fontWeight: '600', color: Colors.success },
-  mismatchText: { fontSize: 13, fontWeight: '600', color: Colors.error },
+  matchText: { fontSize: 13, fontWeight: '600', color: colors.success },
+  mismatchText: { fontSize: 13, fontWeight: '600', color: colors.error },
   forgotBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -682,28 +686,32 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 4,
   },
-  forgotText: { fontSize: 14, fontWeight: '600', color: Colors.primary },
+  forgotText: { fontSize: 14, fontWeight: '600', color: colors.primary },
   tapHint: {
     fontSize: 12,
-    color: Colors.mutedLight,
+    color: colors.mutedLight,
     textAlign: 'center',
   },
   tipsCard: {
-    backgroundColor: Colors.white,
+    backgroundColor: colors.surface,
     borderRadius: Radius.lg,
     padding: 16,
     gap: 12,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.borderSubtle,
+    borderColor: colors.borderSubtle,
   },
   tipRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   tipIcon: {
     width: 30,
     height: 30,
     borderRadius: 10,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tipText: { flex: 1, fontSize: 13, color: Colors.muted, lineHeight: 18 },
+  tipText: { flex: 1, fontSize: 13, color: colors.muted, lineHeight: 18 },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

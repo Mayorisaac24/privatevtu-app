@@ -8,7 +8,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useTabContext } from '../stores/tab-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Spacing, Typography, Radius, Shadow } from '../theme';
+import {Colors, Spacing, Typography, Radius, Shadow , Palette, FormColors, BRAND, Overlays, useColors, useThemedStyles } from '../theme';
+import { withAlpha } from '../theme/gradient-utils';
 import { useServiceAvailability } from '../hooks/useServiceAvailability';
 import { SERVICE_CATALOG_GROUPS, type ServiceCatalogItem } from '../lib/service-catalog-ui';
 import { refreshServiceCatalogState, syncCatalogRevision } from '../lib/catalog-revision-sync';
@@ -36,7 +37,11 @@ function ServiceGridTile({
   width: number;
   onPress: () => void;
 }) {
+  const styles = useStyles();
+  const colors = useColors();
   const badgeLabel = item.route ? 'Unavailable' : 'Soon';
+  const iconBg = item.route ? withAlpha(colors.primary, 0.1) : colors.surfaceAlt;
+  const iconColor = item.route ? colors.primary : colors.muted;
 
   return (
     <TouchableOpacity
@@ -45,11 +50,11 @@ function ServiceGridTile({
       activeOpacity={available ? 0.72 : 1}
     >
       <GlassSurface variant="solid" borderRadius={14} style={styles.tile} contentStyle={styles.tileInner}>
-        <View style={[styles.tileIcon, { backgroundColor: item.bg }, !available && styles.tileIconDisabled]}>
+        <View style={[styles.tileIcon, { backgroundColor: iconBg }, !available && styles.tileIconDisabled]}>
           <Ionicons
             name={item.icon as keyof typeof Ionicons.glyphMap}
             size={26}
-            color={available ? item.color : Colors.mutedLight}
+            color={available ? iconColor : colors.mutedLight}
           />
         </View>
         <Text style={[styles.tileLabel, !available && styles.tileLabelDisabled]} numberOfLines={2}>
@@ -80,6 +85,8 @@ function ServiceGroupPanel({
   onPressItem: (item: ServiceCatalogItem) => void;
   muted?: boolean;
 }) {
+  const styles = useStyles();
+
   return (
     <GlassCard
       variant="solid"
@@ -108,6 +115,8 @@ function ServiceGroupPanel({
 }
 
 export default function ServicesScreen() {
+  const styles = useStyles();
+
   const insets = useSafeAreaInsets();
   const { pagePadding, contentWidth } = useLayout();
   const { setTab } = useTabContext();
@@ -204,7 +213,7 @@ export default function ServicesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   root: { flex: 1 },
   headerShell: {
     borderBottomLeftRadius: 24,
@@ -224,11 +233,11 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(124, 58, 237, 0.12)',
+    borderColor: Overlays.darkAmbientPrimary,
   },
   headerText: {
     flex: 1,
@@ -236,13 +245,13 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     ...Typography.h2,
-    color: Colors.dark,
+    color: colors.dark,
     letterSpacing: -0.3,
   },
   headerSub: {
     fontSize: 14,
     fontWeight: '500',
-    color: Colors.mid,
+    color: colors.mid,
     lineHeight: 20,
   },
   scroll: { flex: 1 },
@@ -265,14 +274,14 @@ const styles = StyleSheet.create({
   groupTitle: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.muted,
+    color: colors.muted,
     letterSpacing: 0.35,
     textTransform: 'uppercase',
   },
   groupLine: {
     flex: 1,
     height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(124, 58, 237, 0.1)',
+    backgroundColor: Overlays.violet10,
   },
   grid: {
     flexDirection: 'row',
@@ -308,17 +317,17 @@ const styles = StyleSheet.create({
   tileLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.mid,
+    color: colors.mid,
     textAlign: 'center',
   },
   tileLabelDisabled: {
-    color: Colors.muted,
+    color: colors.muted,
   },
   tileBadge: {
     position: 'absolute',
     top: 6,
     right: 6,
-    backgroundColor: 'rgba(15, 23, 42, 0.08)',
+    backgroundColor: colors.borderSubtle,
     borderRadius: Radius.full,
     paddingHorizontal: 5,
     paddingVertical: 2,
@@ -326,6 +335,10 @@ const styles = StyleSheet.create({
   tileBadgeText: {
     fontSize: 7,
     fontWeight: '700',
-    color: Colors.muted,
+    color: colors.muted,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

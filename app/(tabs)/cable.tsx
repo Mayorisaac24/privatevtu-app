@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { api, formatCurrency, isResponseSuccess, parseWalletBalanceKobo, type CablePlan } from '../../src/lib/api';
 import { useWalletStore } from '../../src/stores';
-import { Colors, Typography, Radius } from '../../src/theme';
+import {Colors, Typography, Radius, useThemedStyles } from '../../src/theme';
 import { showToast } from '../../src/components/ui/Toast';
 import { ServiceScreenHeader } from '../../src/components/ServiceScreenHeader';
 import { useHardwareBack } from '../../src/hooks/useHardwareBack';
@@ -29,6 +29,8 @@ import { getCableProviderDisplayName, getCableProviderLogo } from '../../src/lib
 import { DataPlanPickerSheet, DataPlanSelectField } from '../../src/components/DataPlanPickerSheet';
 
 export default function CableScreen() {
+  const styles = useStyles();
+
   const { balance, setBalance } = useWalletStore();
   const { providers, loading: loadingProviders } = useCachedServiceProviders('cable');
   const [selectedProvider, setSelectedProvider] = useState('');
@@ -258,32 +260,36 @@ export default function CableScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../src/theme/types').ThemeColors) => StyleSheet.create({
   scroll: { paddingBottom: 40 },
   verifyRow: { flexDirection: 'row', gap: 8 },
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: Colors.borderMid,
+    borderColor: colors.borderMid,
     borderRadius: Radius.lg,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     height: 52,
   },
-  input: { flex: 1, fontSize: 15, color: Colors.dark, paddingVertical: 0 },
-  verifyBtn: { backgroundColor: Colors.primary, borderRadius: Radius.md, paddingHorizontal: 16, justifyContent: 'center', height: 52 },
+  input: { flex: 1, fontSize: 15, color: colors.dark, paddingVertical: 0 },
+  verifyBtn: { backgroundColor: colors.primary, borderRadius: Radius.md, paddingHorizontal: 16, justifyContent: 'center', height: 52 },
   verifyBtnDis: { opacity: 0.5 },
-  verifyBtnText: { ...Typography.smallMed, color: Colors.white, fontWeight: '700' },
+  verifyBtnText: { ...Typography.smallMed, color: colors.white, fontWeight: '700' },
   customerBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: Colors.successLight,
+    backgroundColor: colors.successLight,
     borderRadius: Radius.md,
     padding: 10,
     marginTop: 10,
     borderWidth: 1,
-    borderColor: Colors.success + '33',
+    borderColor: colors.success + '33',
   },
-  customerText: { ...Typography.smallMed, color: Colors.successDark },
+  customerText: { ...Typography.smallMed, color: colors.successDark },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

@@ -12,7 +12,7 @@ import {
   Inter_700Bold,
   Inter_800ExtraBold,
 } from '@expo-google-fonts/inter';
-import { Colors } from '../theme';
+import { useThemedStyles } from '../theme/hooks';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -23,6 +23,8 @@ type FontBootstrapProps = {
 };
 
 export function FontBootstrap({ children }: FontBootstrapProps) {
+  const styles = useStyles();
+
   const [interLoaded, interError] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -57,9 +59,13 @@ export function FontBootstrap({ children }: FontBootstrapProps) {
   return <>{children}</>;
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../theme/types').ThemeColors) => StyleSheet.create({
   boot: {
     flex: 1,
-    backgroundColor: Colors.white,
+    backgroundColor: colors.pageBg,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

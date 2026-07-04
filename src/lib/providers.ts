@@ -1,5 +1,6 @@
 import { ImageSourcePropType } from 'react-native';
 import type { AirtimeProvider } from './api';
+import { NetworkProviderColors } from '../theme/colors/app-colors';
 
 export type ProviderStyle = {
   bg: string;
@@ -15,16 +16,7 @@ const LOCAL_LOGOS: Record<string, ImageSourcePropType> = {
   t2: require('../../assets/images/providers/9mobilelogo.png'),
 };
 
-const PROVIDER_STYLES: Record<string, ProviderStyle> = {
-  mtn: { bg: '#FFFDE7', border: '#FDE047', text: '#78350F' },
-  glo: { bg: '#F0FDF4', border: '#86EFAC', text: '#14532D' },
-  airtel: { bg: '#FFF5F5', border: '#FCA5A5', text: '#7F1D1D' },
-  '9mobile': { bg: '#F0FDF4', border: '#6EE7B7', text: '#064E3B' },
-};
-
-const LOGO_SCALE_BY_CODE: Record<string, number> = {
-  airtel: 1.22,
-};
+const PROVIDER_STYLES: Record<string, ProviderStyle> = NetworkProviderColors;
 
 export function getProviderCode(provider: Pick<AirtimeProvider, 'code' | 'id'>): string {
   return String(provider.code || provider.id || '').toLowerCase();
@@ -44,10 +36,6 @@ export function getProviderLogo(provider: Pick<AirtimeProvider, 'code' | 'id' | 
 
 export function getProviderStyle(code: string, fallback: ProviderStyle): ProviderStyle {
   return PROVIDER_STYLES[String(code || '').toLowerCase()] ?? fallback;
-}
-
-export function getProviderLogoScale(code: string): number {
-  return LOGO_SCALE_BY_CODE[String(code || '').toLowerCase()] ?? 1;
 }
 
 const SHORT_NAMES: Record<string, string> = {

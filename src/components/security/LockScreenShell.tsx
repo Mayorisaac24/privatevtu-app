@@ -9,9 +9,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Radius, Shadow, Spacing, Typography } from '../../theme';
+import {Colors, Radius, Shadow, Spacing, Typography , Overlays, useThemedStyles } from '../../theme';
 import { useColors, useGradients } from '../../theme/hooks';
-import { gradientStops } from '../../theme/gradient-utils';
+import { gradientStops, withAlpha } from '../../theme/gradient-utils';
 import { UserAvatar } from '../ui/UserAvatar';
 import { PinKeypad } from './PinKeypad';
 import { isAndroid } from '../../lib/platform-ui';
@@ -81,6 +81,8 @@ export function LockScreenShell({
   preparing = false,
   preparingLabel = 'Preparing secure authorization…',
 }: LockScreenShellProps) {
+  const styles = useStyles();
+
   const insets = useSafeAreaInsets();
   const colors = useColors();
   const gradients = useGradients();
@@ -106,8 +108,8 @@ export function LockScreenShell({
           </View>
         ) : null}
 
-        <View style={styles.heroMeshPrimary} />
-        <View style={styles.heroMeshSecondary} />
+        <View style={styles.heroMeshPrimary} pointerEvents="none" />
+        <View style={styles.heroMeshSecondary} pointerEvents="none" />
 
         {avatar ? (
           <UserAvatar
@@ -127,14 +129,14 @@ export function LockScreenShell({
 
         {badgeText ? (
           <View style={styles.badge}>
-            <Ionicons name={badgeIcon} size={12} color="rgba(255,255,255,0.92)" />
+            <Ionicons name={badgeIcon} size={12} color={Overlays.white92} />
             <Text style={styles.badgeText}>{badgeText}</Text>
           </View>
         ) : null}
       </LinearGradient>
 
       <LinearGradient
-        colors={gradientStops([gradients.header[1], colors.pageBg])}
+        colors={gradientStops([colors.card, colors.pageBg])}
         style={[
           styles.sheet,
           {
@@ -174,7 +176,7 @@ export function LockScreenShell({
             style={[
               styles.footerBtn,
               {
-                backgroundColor: colors.primaryMuted,
+                backgroundColor: colors.surfaceAlt,
                 borderColor: colors.border,
               },
               footerAction.disabled && styles.footerBtnDisabled,
@@ -202,7 +204,7 @@ export function LockScreenShell({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors, gradients: import('../../theme/types').ThemeGradients) => StyleSheet.create({
   root: {
     flex: 1,
   },
@@ -216,7 +218,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: Overlays.white12,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -235,7 +237,7 @@ const styles = StyleSheet.create({
     width: 140,
     height: 140,
     borderRadius: 70,
-    backgroundColor: 'rgba(139, 92, 246, 0.22)',
+    backgroundColor: withAlpha(gradients.hero[2], 0.24),
   },
   heroMeshSecondary: {
     position: 'absolute',
@@ -244,14 +246,14 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: 'rgba(99, 102, 241, 0.16)',
+    backgroundColor: withAlpha(gradients.hero[0], 0.16),
   },
   heroIconWrap: {
     marginBottom: 2,
   },
   headline: {
     ...Typography.h2,
-    color: Colors.white,
+    color: colors.white,
     fontWeight: '800',
     marginTop: 4,
     textAlign: 'center',
@@ -259,7 +261,7 @@ const styles = StyleSheet.create({
   },
   subline: {
     ...Typography.small,
-    color: 'rgba(255,255,255,0.68)',
+    color: Overlays.white68,
     textAlign: 'center',
     lineHeight: 20,
     maxWidth: 320,
@@ -267,7 +269,7 @@ const styles = StyleSheet.create({
   amount: {
     fontSize: 34,
     fontWeight: '800',
-    color: Colors.white,
+    color: colors.white,
     marginTop: 4,
     letterSpacing: -0.8,
   },
@@ -279,14 +281,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: Radius.full,
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: Overlays.white14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: Overlays.rgba255_255_255_02,
   },
   badgeText: {
     fontSize: 12,
     fontWeight: '700',
-    color: 'rgba(255,255,255,0.92)',
+    color: Overlays.white92,
     letterSpacing: 0.3,
   },
   sheet: {
@@ -365,3 +367,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

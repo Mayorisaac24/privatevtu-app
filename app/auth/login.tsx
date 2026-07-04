@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { api } from '../../src/lib/api';
 import { useAuthStore } from '../../src/stores';
 import { showToast } from '../../src/components/ui/Toast';
-import { Colors, Radius } from '../../src/theme';
+import {Colors, Radius , Overlays, useThemedStyles } from '../../src/theme';
 import { isAndroid, AUTH_BUTTON_HEIGHT } from '../../src/lib/platform-ui';
 import { registerPushNotifications } from '../../src/lib/push-notifications';
 import { getLoginDeviceId } from '../../src/lib/login-context';
@@ -37,6 +37,8 @@ const LOGIN_METHODS = [
 ];
 
 export default function LoginScreen() {
+  const styles = useStyles();
+
   const [method, setMethod] = useState<'email' | 'phone'>('email');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -290,7 +292,7 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../src/theme/types').ThemeColors) => StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -305,8 +307,8 @@ const styles = StyleSheet.create({
     height: AUTH_BUTTON_HEIGHT,
     borderRadius: Radius.lg,
     borderWidth: 1.5,
-    borderColor: 'rgba(124, 58, 237, 0.3)',
-    backgroundColor: Colors.white,
+    borderColor: Overlays.rgba124_58_237_03,
+    backgroundColor: colors.card,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -314,3 +316,7 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

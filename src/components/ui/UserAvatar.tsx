@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, type ViewStyle } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Colors } from '../../theme';
+import {Colors , Palette, FormColors, BRAND, Overlays, useTheme, useThemedStyles } from '../../theme';
 import { useGradients } from '../../theme/hooks';
 import { gradientStops } from '../../theme/gradient-utils';
 
@@ -39,6 +39,9 @@ export function UserAvatar({
   variant = 'brand',
   style,
 }: Props) {
+  const styles = useStyles();
+  const { isDark } = useTheme();
+
   const dims = SIZES[size];
   const gradients = useGradients();
   const initials = getInitials(firstName, lastName);
@@ -47,7 +50,7 @@ export function UserAvatar({
 
   const ringStyle = variant === 'hero'
     ? styles.heroRing
-    : variant === 'light'
+    : variant === 'light' && !isDark
       ? styles.lightRing
       : styles.brandRing;
 
@@ -100,26 +103,30 @@ export function UserAvatar({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   wrap: {
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
   },
   brandRing: {
-    backgroundColor: 'rgba(124, 58, 237, 0.14)',
+    backgroundColor: Overlays.borderPrimary14,
   },
   lightRing: {
-    backgroundColor: 'rgba(124, 58, 237, 0.1)',
+    backgroundColor: colors.primaryMuted,
   },
   heroRing: {
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    backgroundColor: Overlays.rgba255_255_255_022,
     borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.35)',
+    borderColor: Overlays.glassShine,
   },
   initials: {
-    color: Colors.white,
+    color: colors.white,
     fontWeight: '800',
     letterSpacing: -0.5,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

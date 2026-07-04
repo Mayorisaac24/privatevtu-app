@@ -21,13 +21,14 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.devnex.datamartng",
-      "buildNumber": "2",
+      "buildNumber": "6",
       "infoPlist": {
         "CFBundleDisplayName": "Datamart",
         "NSCameraUsageDescription": "Allow camera for KYC live face scan and document capture",
         "NSMicrophoneUsageDescription": "Allow microphone so you can say a verification word during live face scan",
         "NSPhotoLibraryUsageDescription": "Allow photo library access to scan bank account details",
         "NSContactsUsageDescription": "Allow access to contacts to fill in phone numbers for airtime and data purchases",
+        "NSLocationWhenInUseUsageDescription": "Datamart may use your location to help detect unusual sign-in activity and protect your account. Location is not used for airtime or data purchases.",
         "ITSAppUsesNonExemptEncryption": false,
         "UIViewControllerBasedStatusBarAppearance": false
       },
@@ -39,7 +40,7 @@
         "backgroundColor": "#7B2CFE"
       },
       "package": "com.devnex.datamartng",
-      "versionCode": 2,
+      "versionCode": 3,
       "googleServicesFile": "./google-services.json",
       "permissions": [
         "android.permission.CAMERA",

@@ -16,11 +16,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthCard } from '../ui/AuthCard';
 import { AppLogo } from '../ui/AppLogo';
 import { KeyboardDismissView } from '../ui/KeyboardDismissView';
-import { Colors, Spacing } from '../../theme';
+import {Colors, Spacing , Palette, FormColors, BRAND, Overlays, useThemedStyles } from '../../theme';
 import { useGradients } from '../../theme/hooks';
 import { ThemedScreen } from '../ui/ThemedScreen';
 import { useKeyboardInsets } from '../../hooks/useKeyboardInsets';
 import { isAndroid, platformSpacing, useLayout } from '../../lib/platform-ui';
+import { POWERED_BY_LABEL } from '../../constants/brand';
 
 const APP_ICON = require('../../../assets/icon.png');
 
@@ -65,12 +66,16 @@ function resolveAuthHeroLogoPx(
 }
 
 export function AuthHeroLogo({ size = 'md' }: { size?: LogoSize }) {
+  const styles = useStyles();
+
   const { width, isTablet } = useLayout();
   const px = resolveAuthHeroLogoPx(size, width, isTablet);
   return <AppLogo size={px} />;
 }
 
 function AuthHeroBrandMark({ compact }: { compact?: boolean }) {
+  const styles = useStyles();
+
   const iconSize = compact ? 36 : 44;
   return (
     <View style={styles.authBrandMark}>
@@ -97,6 +102,8 @@ export function AuthHeroIcon({
   icon: keyof typeof Ionicons.glyphMap;
   size?: number;
 }) {
+  const styles = useStyles();
+
   const gradients = useGradients();
 
   return (
@@ -120,10 +127,15 @@ export function AuthHeroIcon({
 }
 
 export function AuthSecurityFooter() {
+  const styles = useStyles();
+
   return (
     <View style={styles.securityFooter}>
-      <Ionicons name="lock-closed" size={11} color={Colors.mutedLight} />
-      <Text style={styles.securityText}>Encrypted sign-in · Instant VTU delivery</Text>
+      <View style={styles.securityRow}>
+        <Ionicons name="lock-closed" size={11} color={Colors.mutedLight} />
+        <Text style={styles.securityText}>Encrypted sign-in · Instant VTU delivery</Text>
+      </View>
+      <Text style={styles.poweredByText}>{POWERED_BY_LABEL}</Text>
     </View>
   );
 }
@@ -135,6 +147,8 @@ export function AuthMethodPill({
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
 }) {
+  const styles = useStyles();
+
   return (
     <View style={styles.methodPill}>
       <Ionicons name={icon} size={14} color={Colors.primary} />
@@ -160,6 +174,8 @@ function AuthBrandedHero({
   showBrandInline?: boolean;
   compact?: boolean;
 }) {
+  const styles = useStyles();
+
   if (heroIcon) {
     return (
       <View style={[styles.iconHero, compact && styles.iconHeroCompact]}>
@@ -189,7 +205,7 @@ function AuthBrandedHero({
           <AuthHeroBrandMark compact={showBrandInline} />
 
           <View style={styles.trustMicro}>
-            <Ionicons name="shield-checkmark" size={12} color="rgba(255,255,255,0.55)" />
+            <Ionicons name="shield-checkmark" size={12} color={Overlays.white55} />
             <Text style={styles.trustMicroText}>Secure · Encrypted · Always on</Text>
           </View>
         </>
@@ -222,6 +238,8 @@ function AuthHeroSection({
   showBrandInline?: boolean;
   compact?: boolean;
 }) {
+  const styles = useStyles();
+
   const gradients = useGradients();
   const iconHeroMode = Boolean(heroIcon) && !showLogo;
 
@@ -276,6 +294,8 @@ export function AuthShell({
   cardContentStyle,
   cardFooter,
 }: AuthShellProps) {
+  const styles = useStyles();
+
   const insets = useSafeAreaInsets();
   const { keyboardVisible, keyboardHeight } = useKeyboardInsets();
   const scrollBottomInset = insets.bottom + (keyboardVisible ? 24 : (isAndroid ? 44 : 32));
@@ -349,6 +369,8 @@ export function AuthCardHeader({
   subtitle?: string;
   eyebrow?: string;
 }) {
+  const styles = useStyles();
+
   return (
     <View style={styles.cardHeader}>
       {eyebrow ? <Text style={styles.cardEyebrow}>{eyebrow}</Text> : null}
@@ -358,7 +380,7 @@ export function AuthCardHeader({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   root: {
     flex: 1,
   },
@@ -399,7 +421,7 @@ const styles = StyleSheet.create({
     width: 160,
     height: 160,
     borderRadius: 80,
-    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+    backgroundColor: Overlays.violet20,
   },
   heroMeshSecondary: {
     position: 'absolute',
@@ -408,7 +430,7 @@ const styles = StyleSheet.create({
     width: 110,
     height: 110,
     borderRadius: 55,
-    backgroundColor: 'rgba(99, 102, 241, 0.14)',
+    backgroundColor: Overlays.indigo14,
   },
   heroMeshAccent: {
     position: 'absolute',
@@ -417,9 +439,9 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    backgroundColor: Overlays.white03,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255, 255, 255, 0.07)',
+    borderColor: Overlays.white07,
   },
   heroFade: {
     position: 'absolute',
@@ -427,7 +449,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: Overlays.white06,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
   },
@@ -439,9 +461,9 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: Overlays.white10,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderColor: Overlays.white16,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -460,12 +482,12 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   authBrandIconWrap: {
-    backgroundColor: Colors.white,
+    backgroundColor: colors.card,
     alignItems: 'center',
     justifyContent: 'center',
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
+        shadowColor: Palette.black,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.12,
         shadowRadius: 8,
@@ -481,7 +503,7 @@ const styles = StyleSheet.create({
   authBrandName: {
     fontSize: 22,
     fontWeight: '800',
-    color: Colors.white,
+    color: colors.white,
     letterSpacing: -0.3,
   },
   authBrandNameCompact: {
@@ -490,7 +512,7 @@ const styles = StyleSheet.create({
   authBrandTagline: {
     fontSize: 12,
     fontWeight: '500',
-    color: 'rgba(255,255,255,0.72)',
+    color: Overlays.white72,
     lineHeight: 16,
   },
   brandTextCol: {
@@ -500,32 +522,32 @@ const styles = StyleSheet.create({
   logoGlow: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(139, 92, 246, 0.18)',
+    backgroundColor: Overlays.violet18,
   },
   logoRing: {
     padding: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+    backgroundColor: Overlays.white14,
   },
   logoLetter: {
     fontWeight: '800',
-    color: Colors.white,
+    color: colors.white,
     letterSpacing: -0.8,
   },
   iconGlow: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+    backgroundColor: Overlays.violet20,
   },
   brandName: {
     fontSize: 20,
     fontWeight: '800',
-    color: Colors.white,
+    color: colors.white,
     letterSpacing: -0.4,
   },
   brandTagline: {
     fontSize: 11.5,
     fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.56)',
+    color: Overlays.rgba255_255_255_056,
     lineHeight: 16,
     letterSpacing: 0.1,
   },
@@ -544,7 +566,7 @@ const styles = StyleSheet.create({
   trustMicroText: {
     fontSize: 10,
     fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.44)',
+    color: Overlays.rgba255_255_255_044,
     letterSpacing: 0.2,
   },
   iconHero: {
@@ -561,7 +583,7 @@ const styles = StyleSheet.create({
   iconHeroTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: Overlays.white90,
     letterSpacing: -0.1,
     textAlign: 'center',
     ...(isAndroid ? { includeFontPadding: false } : null),
@@ -575,7 +597,7 @@ const styles = StyleSheet.create({
   compactBrandName: {
     fontSize: 16,
     fontWeight: '800',
-    color: Colors.white,
+    color: colors.white,
     letterSpacing: -0.3,
   },
   backBtnCompact: {
@@ -587,12 +609,12 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.88)',
+    color: Overlays.white88,
     letterSpacing: -0.1,
   },
   heroSubtitle: {
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.62)',
+    color: Overlays.white62,
     textAlign: 'center',
     lineHeight: 18,
     maxWidth: 280,
@@ -607,7 +629,7 @@ const styles = StyleSheet.create({
   cardEyebrow: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.primary,
+    color: colors.primary,
     letterSpacing: 0.2,
     marginBottom: 2,
     ...(isAndroid ? { includeFontPadding: false } : null),
@@ -615,33 +637,44 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: isAndroid ? 25 : 26,
     fontWeight: '700',
-    color: Colors.dark,
+    color: colors.dark,
     letterSpacing: -0.6,
     lineHeight: isAndroid ? 30 : 32,
     ...(isAndroid ? { includeFontPadding: false } : null),
   },
   cardSubtitle: {
     fontSize: 14,
-    color: Colors.muted,
+    color: colors.muted,
     lineHeight: 21,
     ...(isAndroid ? { includeFontPadding: false } : null),
   },
   securityFooter: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
+    gap: 4,
     marginTop: isAndroid ? 22 : 28,
     paddingTop: isAndroid ? 16 : 20,
     paddingBottom: isAndroid ? 8 : 0,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.border,
+    borderTopColor: colors.border,
+  },
+  securityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
   },
   securityText: {
     fontSize: 11,
     fontWeight: '500',
-    color: Colors.mutedLight,
+    color: colors.mutedLight,
     letterSpacing: 0.15,
+    ...(isAndroid ? { includeFontPadding: false } : null),
+  },
+  poweredByText: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: colors.mutedLight,
+    opacity: 0.85,
     ...(isAndroid ? { includeFontPadding: false } : null),
   },
   methodPill: {
@@ -652,14 +685,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.14)',
+    borderColor: Overlays.borderPrimary14,
     marginBottom: 20,
   },
   methodPillText: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.primary,
+    color: colors.primary,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

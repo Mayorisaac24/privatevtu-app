@@ -1,4 +1,4 @@
-import { Colors } from '../theme';
+import { Colors, ReceiptColors } from '../theme';
 import type { Transaction } from './api';
 import { formatAccountNumberDisplay } from './transfer-banks';
 import { formatBettingPlatformLabel } from './betting-platforms';
@@ -253,6 +253,8 @@ export function getTransactionMeta(tx: Transaction): TxDisplayMeta {
   };
   return {
     ...base,
+    bgColor: Colors.primaryMuted,
+    iconColor: Colors.primary,
     label: enriched.displayTitle || base.label,
     isCredit: enriched.type === 'WALLET_FUND' || enriched.type === 'ADMIN_CREDIT' || Boolean(enriched.isCredit),
   };
@@ -335,9 +337,9 @@ export function getStatusMeta(status: DisplayStatus | string): StatusMeta {
     case 'processing':
       return {
         label: 'Processing',
-        bg: '#EEF2FF',
-        text: '#4338CA',
-        dot: '#6366F1',
+        bg: ReceiptColors.pendingBg,
+        text: ReceiptColors.pendingText,
+        dot: ReceiptColors.pendingDot,
         tone: 'processing',
       };
     case 'failed':

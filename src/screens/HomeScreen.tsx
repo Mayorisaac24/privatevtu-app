@@ -5,6 +5,7 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
@@ -34,7 +35,8 @@ import {
   pullToRefreshWalletFunding,
   type WalletFundingSnapshot,
 } from '../lib/wallet-funding-cache';
-import { Colors, Spacing } from '../theme';
+import {Colors, Spacing , Palette, FormColors, BRAND, Overlays, useColors, useTheme, useCardGlassVariant, useThemedStyles, useGradients } from '../theme';
+import { gradientStops, withAlpha } from '../theme/gradient-utils';
 import { Skeleton } from '../components/ui/Skeleton';
 import { openNotifications } from '../lib/navigation';
 import { useServiceAvailability } from '../hooks/useServiceAvailability';
@@ -75,6 +77,10 @@ function QuickActionTile({
   available: boolean;
   tileWidth: number;
 }) {
+  const styles = useStyles();
+  const colors = useColors();
+  const cardVariant = useCardGlassVariant();
+
   const { setTab } = useTabContext();
   const onPress = () => {
     if (!available) {
@@ -95,9 +101,9 @@ function QuickActionTile({
       onPress={onPress}
       activeOpacity={available ? 0.72 : 1}
     >
-      <GlassSurface variant="light" borderRadius={14} style={styles.qaTile} contentStyle={styles.qaTileInner}>
-        <View style={[styles.qaTileIcon, { backgroundColor: item.bg }, !available && styles.qaTileIconDisabled]}>
-          <Ionicons name={item.icon as any} size={26} color={available ? item.color : Colors.mutedLight} />
+      <GlassSurface variant={cardVariant} borderRadius={14} style={styles.qaTile} contentStyle={styles.qaTileInner}>
+        <View style={[styles.qaTileIcon, { backgroundColor: withAlpha(colors.primary, 0.1) }, !available && styles.qaTileIconDisabled]}>
+          <Ionicons name={item.icon as any} size={26} color={available ? colors.primary : colors.mutedLight} />
         </View>
         <Text style={[styles.qaTileLabel, !available && styles.qaTileLabelDisabled]}>{item.title}</Text>
         {!available && (
@@ -111,6 +117,8 @@ function QuickActionTile({
 }
 
 function BalanceAmount({ kobo, visible }: { kobo: string; visible: boolean }) {
+  const styles = useStyles();
+
   if (!visible) return <Text style={styles.balanceHidden}>{MASKED_BALANCE}</Text>;
   const { whole, decimal } = getBalanceParts(kobo);
   return (
@@ -123,6 +131,12 @@ function BalanceAmount({ kobo, visible }: { kobo: string; visible: boolean }) {
 }
 
 export default function HomeScreen() {
+  const styles = useStyles();
+  const gradients = useGradients();
+  const colors = useColors();
+  const { isDark } = useTheme();
+  const cardVariant = useCardGlassVariant();
+
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
   const { balance, homeTransactions, balanceVisible, toggleBalanceVisible, dataHydrated, dashboardVersion } = useWalletStore();
@@ -240,7 +254,12 @@ export default function HomeScreen() {
         <ScreenContent centered style={styles.scrollInner}>
         <BroadcastBanner screen="HOME" />
         <AdBanner screen="HOME" placement="TOP_BANNER" />
-        <View style={styles.balanceCard}>
+        <LinearGradient
+          colors={gradientStops(gradients.hero)}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.balanceCard}
+        >
           <View style={styles.blob1} />
           <View style={styles.blob2} />
           <View style={styles.blob3} />
@@ -248,14 +267,12 @@ export default function HomeScreen() {
 
           <View style={styles.cardHeaderRow}>
             <Text style={styles.cardBalLabel}>Available Balance</Text>
-            <TouchableOpacity activeOpacity={0.75} onPress={toggleBalanceVisible}>
-              <GlassSurface variant="dark" borderRadius={16} style={styles.eyeBtnGlass} contentStyle={styles.eyeBtn}>
-                <Ionicons
-                  name={balanceVisible ? 'eye-outline' : 'eye-off-outline'}
-                  size={16}
-                  color="rgba(255,255,255,0.9)"
-                />
-              </GlassSurface>
+            <TouchableOpacity activeOpacity={0.75} onPress={toggleBalanceVisible} style={styles.eyeBtn}>
+              <Ionicons
+                name={balanceVisible ? 'eye-outline' : 'eye-off-outline'}
+                size={16}
+                color={colors.textOnHero}
+              />
             </TouchableOpacity>
           </View>
 
@@ -291,7 +308,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.btnSendWrap, !transferUsable && styles.btnActionDisabled]}
+              style={[styles.btnSend, !transferUsable && styles.btnActionDisabled]}
               activeOpacity={transferUsable ? 0.85 : 1}
               onPress={() => {
                 if (!transferUsable) {
@@ -301,13 +318,11 @@ export default function HomeScreen() {
                 router.push('/wallet/transfer' as any);
               }}
             >
-              <GlassSurface variant="dark" borderRadius={14} style={styles.btnSendGlass} contentStyle={styles.btnSend}>
-                <Ionicons name="paper-plane-outline" size={16} color={Colors.white} />
-                <Text style={styles.btnSendText}>Send</Text>
-              </GlassSurface>
+              <Ionicons name="paper-plane-outline" size={16} color={colors.textOnHero} />
+              <Text style={styles.btnSendText}>Send</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </LinearGradient>
 
         <WalletAccountCard
           funding={funding}
@@ -363,7 +378,7 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        <GlassSurface variant="light" borderRadius={16} style={styles.txCard}>
+        <GlassSurface variant={cardVariant} borderRadius={16} style={styles.txCard}>
           {showInitialLoading ? (
             [1, 2, 3].map((i) => (
               <View key={i} style={[styles.txItem, i < 3 && styles.txBorder]}>
@@ -412,12 +427,12 @@ export default function HomeScreen() {
 
       <View style={[styles.glassHeader, { height: headerInset }]} pointerEvents="box-none">
         <BlurView
-          intensity={28}
-          tint="light"
+          intensity={isDark ? 0 : 28}
+          tint={isDark ? 'dark' : 'light'}
           style={StyleSheet.absoluteFill}
           experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined}
         />
-        <View style={styles.glassHeaderOverlay} pointerEvents="none" />
+        <View style={[styles.glassHeaderOverlay, { backgroundColor: colors.headerGlass }]} pointerEvents="none" />
         <View style={[styles.headerContent, { paddingTop: insets.top + 10, paddingHorizontal: pagePadding }]}>
           <View style={styles.topBar}>
             <View style={styles.greetRow}>
@@ -426,7 +441,7 @@ export default function HomeScreen() {
                 firstName={user?.firstName}
                 lastName={user?.lastName}
                 size="sm"
-                variant="light"
+                variant={isDark ? 'brand' : 'light'}
               />
               <View>
                 <Text style={styles.greetSmall}>{greeting}</Text>
@@ -461,7 +476,7 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../theme/types').ThemeColors, gradients: import('../theme/types').ThemeGradients) => StyleSheet.create({
   root: { flex: 1 },
 
   gapSpinner: {
@@ -483,9 +498,8 @@ const styles = StyleSheet.create({
   },
   glassHeaderOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(244, 245, 250, 0.88)',
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(15, 23, 42, 0.06)',
+    borderBottomColor: colors.glassBorder,
   },
   headerContent: {
     flex: 1,
@@ -494,7 +508,7 @@ const styles = StyleSheet.create({
   },
   fixedDivider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(124, 58, 237, 0.08)',
+    backgroundColor: colors.borderSubtle,
     marginTop: 12,
   },
   scrollBody: { flex: 1 },
@@ -515,19 +529,19 @@ const styles = StyleSheet.create({
   avatarRing: {
     padding: 2,
     borderRadius: 24,
-    backgroundColor: 'rgba(124, 58, 237, 0.12)',
+    backgroundColor: Overlays.darkAmbientPrimary,
   },
   avatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  avatarText: { fontSize: 16, color: Colors.white, fontWeight: '700' },
-  greetSmall: { fontSize: 13, color: Colors.muted, marginBottom: 1 },
-  greetName: { fontSize: 18, fontWeight: '700', color: Colors.dark, letterSpacing: -0.3 },
+  avatarText: { fontSize: 16, color: colors.white, fontWeight: '700' },
+  greetSmall: { fontSize: 13, color: colors.muted, marginBottom: 1 },
+  greetName: { fontSize: 18, fontWeight: '700', color: colors.dark, letterSpacing: -0.3 },
   notifBtnOuter: {
     position: 'relative',
   },
@@ -535,7 +549,7 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.18)',
+    borderColor: colors.glassBorder,
   },
   notifBtn: {
     width: 46,
@@ -551,28 +565,27 @@ const styles = StyleSheet.create({
     height: 18,
     borderRadius: 9,
     paddingHorizontal: 4,
-    backgroundColor: Colors.error,
+    backgroundColor: colors.error,
     borderWidth: 2,
-    borderColor: Colors.pageBg,
+    borderColor: colors.pageBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
   notifBadgeText: {
-    color: Colors.white,
+    color: colors.white,
     fontSize: 10,
     fontWeight: '800',
     lineHeight: 12,
   },
 
-  // Dark balance card
+  // Hero balance card
   balanceCard: {
-    backgroundColor: Colors.heroDark,
     borderRadius: 22,
     padding: 16,
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.08)',
-    shadowColor: Colors.heroDark,
+    borderColor: Overlays.white08,
+    shadowColor: colors.heroDark,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.28,
     shadowRadius: 16,
@@ -584,7 +597,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: Overlays.white12,
   },
   blob1: {
     position: 'absolute',
@@ -593,7 +606,7 @@ const styles = StyleSheet.create({
     width: 140,
     height: 140,
     borderRadius: 70,
-    backgroundColor: 'rgba(124, 58, 237, 0.35)',
+    backgroundColor: withAlpha(gradients.hero[2], 0.38),
   },
   blob2: {
     position: 'absolute',
@@ -602,7 +615,7 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: 'rgba(99, 102, 241, 0.25)',
+    backgroundColor: withAlpha(gradients.hero[1], 0.28),
   },
   blob3: {
     position: 'absolute',
@@ -611,7 +624,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+    backgroundColor: withAlpha(gradients.hero[0], 0.16),
   },
   cardHeaderRow: {
     flexDirection: 'row',
@@ -621,18 +634,18 @@ const styles = StyleSheet.create({
   },
   cardBalLabel: {
     fontSize: 13,
-    color: 'rgba(255,255,255,0.65)',
+    color: colors.textOnHeroMuted,
     fontWeight: '500',
-  },
-  eyeBtnGlass: {
-    width: 34,
-    height: 34,
   },
   eyeBtn: {
     width: 34,
     height: 34,
+    borderRadius: 17,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: withAlpha(colors.white, 0.14),
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: withAlpha(colors.white, 0.2),
   },
   balanceRow: {
     flexDirection: 'row',
@@ -642,27 +655,27 @@ const styles = StyleSheet.create({
   balanceSymbol: {
     fontSize: 20,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.7)',
+    color: Overlays.rgba255_255_255_07,
     marginRight: 2,
     marginBottom: 5,
   },
   balanceWhole: {
     fontSize: 40,
     fontWeight: '800',
-    color: Colors.white,
+    color: colors.white,
     letterSpacing: -1.5,
     lineHeight: 46,
   },
   balanceDecimal: {
     fontSize: 18,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.55)',
+    color: Overlays.white55,
     marginBottom: 5,
   },
   balanceHidden: {
     fontSize: 34,
     fontWeight: '700',
-    color: 'rgba(255,255,255,0.85)',
+    color: Overlays.white85,
     letterSpacing: 3,
     marginBottom: 4,
   },
@@ -676,17 +689,17 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: colors.primaryLight,
   },
   liveDotIdle: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: 'rgba(167, 139, 250, 0.45)',
+    backgroundColor: withAlpha(gradients.hero[2], 0.55),
   },
   lastUpdated: {
     fontSize: 11,
-    color: 'rgba(255,255,255,0.45)',
+    color: colors.textOnHeroSubtle,
     fontWeight: '500',
   },
   inlineActions: {
@@ -699,10 +712,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     borderRadius: 14,
     paddingVertical: 13,
-    shadowColor: Colors.primary,
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 8,
@@ -711,25 +724,24 @@ const styles = StyleSheet.create({
   btnFundText: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.white,
-  },
-  btnSendWrap: {
-    flex: 1,
-  },
-  btnSendGlass: {
-    flex: 1,
+    color: colors.white,
   },
   btnSend: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
     paddingVertical: 13,
+    borderRadius: 14,
+    backgroundColor: withAlpha(colors.primaryDeep, 0.82),
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: withAlpha(colors.white, 0.16),
   },
   btnSendText: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.white,
+    color: colors.textOnHero,
   },
   btnActionDisabled: {
     opacity: 0.45,
@@ -747,13 +759,13 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     justifyContent: 'center',
     alignItems: 'center',
   },
   kycBannerText: { flex: 1 },
-  kycBannerTitle: { fontSize: 13, fontWeight: '600', color: Colors.dark, marginBottom: 1 },
-  kycBannerSub: { fontSize: 11, color: Colors.muted },
+  kycBannerTitle: { fontSize: 13, fontWeight: '600', color: colors.dark, marginBottom: 1 },
+  kycBannerSub: { fontSize: 11, color: colors.muted },
 
   // Sections
   sectionHeader: {
@@ -765,11 +777,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: Colors.dark,
+    color: colors.dark,
     letterSpacing: -0.2,
   },
   seeAllBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  seeAll: { fontSize: 13, color: Colors.primary, fontWeight: '600' },
+  seeAll: { fontSize: 13, color: colors.primary, fontWeight: '600' },
 
   // Quick actions — square tiles
   qaGrid: {
@@ -798,17 +810,17 @@ const styles = StyleSheet.create({
   qaTileLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.mid,
+    color: colors.darkAlt,
     textAlign: 'center',
   },
   qaTileDisabled: { opacity: 0.65 },
   qaTileIconDisabled: { opacity: 0.7 },
-  qaTileLabelDisabled: { color: Colors.muted },
+  qaTileLabelDisabled: { color: colors.muted },
   qaSoonBadge: {
     position: 'absolute',
     top: 6,
     right: 6,
-    backgroundColor: 'rgba(15, 23, 42, 0.08)',
+    backgroundColor: colors.borderSubtle,
     borderRadius: 999,
     paddingHorizontal: 5,
     paddingVertical: 2,
@@ -816,7 +828,7 @@ const styles = StyleSheet.create({
   qaSoonText: {
     fontSize: 7,
     fontWeight: '700',
-    color: Colors.muted,
+    color: colors.muted,
   },
 
   // Transactions
@@ -830,7 +842,7 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     gap: 12,
   },
-  txBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.borderSubtle },
+  txBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.borderSubtle },
   txIcon: {
     width: 40,
     height: 40,
@@ -839,10 +851,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   txMeta: { flex: 1 },
-  txTitle: { fontSize: 14, fontWeight: '600', color: Colors.dark, marginBottom: 2 },
-  txSub: { fontSize: 11, color: Colors.muted },
+  txTitle: { fontSize: 14, fontWeight: '600', color: colors.dark, marginBottom: 2 },
+  txSub: { fontSize: 11, color: colors.muted },
   txAmt: { fontSize: 14, fontWeight: '700' },
   emptyWrap: { alignItems: 'center', paddingVertical: 32, gap: 6 },
-  emptyTitle: { fontSize: 14, fontWeight: '600', color: Colors.muted },
-  emptySub: { fontSize: 12, color: Colors.mutedLight },
+  emptyTitle: { fontSize: 14, fontWeight: '600', color: colors.muted },
+  emptySub: { fontSize: 12, color: colors.mutedLight },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

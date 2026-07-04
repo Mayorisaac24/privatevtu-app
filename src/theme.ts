@@ -1,9 +1,9 @@
 /**
- * PrivateVTU Design System
+ * Datamart Design System
  *
- * Color constants live in `src/theme/colors/` (palette, overlays, semantic).
- * Active theme colors: `useColors()` from `src/theme/hooks`.
- * Static default (violet light): `Colors` export for legacy StyleSheets.
+ * **Change app colors:** `src/theme/colors/app-colors.ts` — the only file with hex values.
+ * Runtime hooks: `useColors()` / `useGradients()` from `src/theme/hooks`.
+ * Legacy StyleSheets: `Colors` export from `src/theme`.
  */
 export * from './theme/index';
 export { Spacing, Radius, Shadow, Typography, FontFamily, HERO_DARK } from './theme-legacy';

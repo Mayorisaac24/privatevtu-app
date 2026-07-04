@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Bank } from '../lib/api';
 import { enrichTransferBank } from '../lib/transfer-banks';
 import { BankLogo } from './BankLogo';
-import { Colors, Gradients, Radius, Shadow, Spacing } from '../theme';
+import {Colors, Gradients, Radius, Shadow, Spacing , Palette, FormColors, BRAND, Overlays, useThemedStyles } from '../theme';
 import { ThemedScreen } from '../components/ui/ThemedScreen';
 import { GradientButton } from '../components/ui/GradientButton';
 import { useGradients } from '../theme/hooks';
@@ -36,6 +36,8 @@ type Props = {
 };
 
 function SuccessCheckmark() {
+  const styles = useStyles();
+
   const scale = useRef(new Animated.Value(0)).current;
   const ring = useRef(new Animated.Value(0)).current;
 
@@ -105,6 +107,8 @@ export function TransferSuccessModal({
   reference,
   onDone,
 }: Props) {
+  const styles = useStyles();
+
   const insets = useSafeAreaInsets();
   const gradients = useGradients();
   const fade = useRef(new Animated.Value(0)).current;
@@ -248,7 +252,7 @@ export function TransferSuccessModal({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   root: {
     flex: 1,
   },
@@ -265,7 +269,7 @@ const styles = StyleSheet.create({
     width: 140,
     height: 140,
     borderRadius: 70,
-    backgroundColor: 'rgba(255,255,255,0.07)',
+    backgroundColor: Overlays.white07,
   },
   heroBlob2: {
     position: 'absolute',
@@ -274,7 +278,7 @@ const styles = StyleSheet.create({
     width: 90,
     height: 90,
     borderRadius: 45,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: Overlays.rgba255_255_255_005,
   },
   checkStage: {
     width: 96,
@@ -289,15 +293,15 @@ const styles = StyleSheet.create({
     height: 96,
     borderRadius: 48,
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.55)',
+    borderColor: Overlays.white55,
   },
   checkCircle: {
     width: 76,
     height: 76,
     borderRadius: 38,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: Overlays.white18,
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.35)',
+    borderColor: Overlays.glassShine,
     alignItems: 'center',
     justifyContent: 'center',
     ...Shadow.md,
@@ -305,7 +309,7 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.78)',
+    color: Overlays.white78,
     letterSpacing: 0.6,
     textTransform: 'uppercase',
     marginBottom: 6,
@@ -313,7 +317,7 @@ const styles = StyleSheet.create({
   heroAmount: {
     fontSize: 40,
     fontWeight: '800',
-    color: Colors.white,
+    color: colors.white,
     letterSpacing: -1,
     marginBottom: 14,
   },
@@ -324,20 +328,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: Radius.full,
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: Overlays.white14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: Overlays.rgba255_255_255_02,
   },
   statusDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#A7F3D0',
+    backgroundColor: Palette.successSoft,
   },
   statusText: {
     fontSize: 12,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.9)',
+    color: Overlays.white90,
   },
   body: {
     flex: 1,
@@ -352,7 +356,7 @@ const styles = StyleSheet.create({
   receiptLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.muted,
+    color: colors.muted,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
     marginBottom: 12,
@@ -366,7 +370,7 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -375,7 +379,7 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -386,25 +390,25 @@ const styles = StyleSheet.create({
   recipientName: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.dark,
+    color: colors.dark,
     lineHeight: 18,
   },
   recipientMeta: {
     fontSize: 12,
-    color: Colors.muted,
+    color: colors.muted,
     fontWeight: '500',
   },
   sentBadge: {
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
   divider: {
     height: 1,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: colors.surfaceAlt,
     marginVertical: 14,
   },
   summaryRows: {
@@ -419,26 +423,26 @@ const styles = StyleSheet.create({
     marginTop: 2,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    borderTopColor: colors.surfaceAlt,
   },
   summaryKey: {
     fontSize: 13,
-    color: Colors.muted,
+    color: colors.muted,
   },
   summaryValue: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.dark,
+    color: colors.dark,
   },
   summaryKeyStrong: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.primary,
+    color: colors.primary,
   },
   summaryValueStrong: {
     fontSize: 16,
     fontWeight: '800',
-    color: Colors.primary,
+    color: colors.primary,
   },
   referenceRow: {
     gap: 4,
@@ -446,14 +450,14 @@ const styles = StyleSheet.create({
   referenceLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: Colors.muted,
+    color: colors.muted,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
   referenceValue: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.mid,
+    color: colors.mid,
   },
   noticeRow: {
     flexDirection: 'row',
@@ -465,9 +469,13 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     lineHeight: 17,
-    color: Colors.muted,
+    color: colors.muted,
   },
   doneWrap: {
     marginTop: 'auto',
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

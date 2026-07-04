@@ -12,7 +12,7 @@ import {
   getEducationProviderShortName,
 } from '../lib/education-providers';
 import { EducationProviderLogo } from './EducationProviderLogo';
-import { Colors, Typography, Radius } from '../theme';
+import {Colors, Typography, Radius, useColors, useThemedStyles } from '../theme';
 import { isAndroid } from '../lib/platform-ui';
 
 type EducationProviderGridProps = {
@@ -33,6 +33,8 @@ function EducationChip({
   onPress: () => void;
   ringSize: number;
 }) {
+  const styles = useStyles();
+  const colors = useColors();
   const code = getEducationProviderCode(provider);
   const label = getEducationProviderShortName(provider);
   const innerSize = ringSize - 6;
@@ -47,8 +49,8 @@ function EducationChip({
             width: ringSize,
             height: ringSize,
             borderRadius: ringSize / 2,
-            borderColor: selected ? Colors.primary : Colors.borderMid,
-            backgroundColor: selected ? Colors.primaryMuted : Colors.white,
+            borderColor: selected ? colors.primary : colors.borderMid,
+            backgroundColor: selected ? colors.inputFilled : colors.surfaceAlt,
           },
           selected && styles.logoRingSelected,
         ]}
@@ -79,6 +81,8 @@ export function EducationProviderGrid({
   onSelect,
   loading = false,
 }: EducationProviderGridProps) {
+  const styles = useStyles();
+
   const { width: screenWidth } = useWindowDimensions();
 
   if (loading && providers.length === 0) {
@@ -116,14 +120,14 @@ export function EducationProviderGrid({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   track: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: Radius.lg,
     paddingVertical: 12,
     paddingHorizontal: 10,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     overflow: 'hidden',
   },
   row: {
@@ -153,7 +157,7 @@ const styles = StyleSheet.create({
     ...(isAndroid
       ? { elevation: 2 }
       : {
-          shadowColor: Colors.primary,
+          shadowColor: colors.primary,
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.18,
           shadowRadius: 4,
@@ -166,18 +170,18 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     borderWidth: 2,
-    borderColor: Colors.white,
+    borderColor: colors.white,
   },
   chipLabel: {
     ...Typography.caption,
-    color: Colors.muted,
+    color: colors.muted,
     fontWeight: '500',
     textAlign: 'center',
   },
   chipLabelSelected: {
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: '700',
   },
   loadRow: {
@@ -189,12 +193,16 @@ const styles = StyleSheet.create({
   },
   loadText: {
     ...Typography.small,
-    color: Colors.muted,
+    color: colors.muted,
   },
   emptyText: {
     ...Typography.small,
-    color: Colors.muted,
+    color: colors.muted,
     textAlign: 'center',
     paddingVertical: 12,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

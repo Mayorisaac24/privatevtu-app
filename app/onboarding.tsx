@@ -12,8 +12,9 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GradientButton } from '../src/components/ui/GradientButton';
 import { markOnboardingComplete } from '../src/lib/onboarding';
+import { POWERED_BY_LABEL } from '../src/constants/brand';
 import { ScreenStatusBar } from '../src/hooks/useStatusBarStyle';
-import { Colors, FontFamily, Radius, Spacing } from '../src/theme';
+import { Colors, FontFamily, Radius, Spacing, useThemedStyles } from '../src/theme';
 
 const APP_ICON = require('../assets/icon.png');
 
@@ -36,6 +37,8 @@ const FEATURES = [
 ];
 
 export default function OnboardingScreen() {
+  const styles = useStyles();
+
   const insets = useSafeAreaInsets();
 
   const finishOnboarding = useCallback(async () => {
@@ -91,15 +94,16 @@ export default function OnboardingScreen() {
       <View style={styles.footer}>
         <GradientButton title="Get started" onPress={() => void finishOnboarding()} />
         <Text style={styles.footerNote}>Secure · Encrypted · Always on</Text>
+        <Text style={styles.poweredByNote}>{POWERED_BY_LABEL}</Text>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../src/theme/types').ThemeColors) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: Colors.white,
+    backgroundColor: colors.card,
   },
   scroll: {
     paddingHorizontal: Spacing.lg,
@@ -125,14 +129,14 @@ const styles = StyleSheet.create({
   brandName: {
     fontSize: 18,
     fontWeight: '800',
-    color: Colors.dark,
+    color: colors.dark,
     fontFamily: FontFamily.bold,
     letterSpacing: -0.2,
   },
   skipText: {
     fontSize: 15,
     fontWeight: '600',
-    color: Colors.muted,
+    color: colors.muted,
     fontFamily: FontFamily.medium,
   },
   hero: {
@@ -142,7 +146,7 @@ const styles = StyleSheet.create({
   headline: {
     fontSize: 32,
     fontWeight: '800',
-    color: Colors.dark,
+    color: colors.dark,
     lineHeight: 38,
     letterSpacing: -0.6,
     fontFamily: FontFamily.bold,
@@ -150,7 +154,7 @@ const styles = StyleSheet.create({
   subhead: {
     fontSize: 16,
     lineHeight: 24,
-    color: Colors.muted,
+    color: colors.muted,
     fontFamily: FontFamily.regular,
   },
   featureList: {
@@ -162,15 +166,15 @@ const styles = StyleSheet.create({
     gap: 14,
     padding: 16,
     borderRadius: Radius.lg,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
   },
   featureIconWrap: {
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -181,13 +185,13 @@ const styles = StyleSheet.create({
   featureTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.dark,
+    color: colors.dark,
     fontFamily: FontFamily.semibold,
   },
   featureDescription: {
     fontSize: 14,
     lineHeight: 20,
-    color: Colors.muted,
+    color: colors.muted,
     fontFamily: FontFamily.regular,
   },
   footer: {
@@ -197,7 +201,18 @@ const styles = StyleSheet.create({
   footerNote: {
     textAlign: 'center',
     fontSize: 12,
-    color: Colors.mutedLight,
+    color: colors.mutedLight,
     fontFamily: FontFamily.medium,
   },
+  poweredByNote: {
+    textAlign: 'center',
+    fontSize: 11,
+    color: colors.mutedLight,
+    fontFamily: FontFamily.medium,
+    opacity: 0.85,
+  },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

@@ -1,4 +1,4 @@
-// PrivateVTU Mobile API Client
+// Datamart Mobile API Client
 // Matches exactly the web frontend's client.ts endpoints
 
 import {
@@ -228,6 +228,30 @@ export interface RegisterData {
   firstName: string;
   lastName: string;
   referralCode?: string;
+}
+
+export interface ReferralSummary {
+  referralCode: string;
+  shareLink: string;
+  shareMessage: string;
+  activePrograms: Array<{
+    id: string;
+    name: string;
+    description?: string | null;
+    triggerEvent: string;
+    kycTier?: string | null;
+    referrerRewardKobo: string;
+    refereeRewardKobo: string;
+  }>;
+  referredUsers: Array<{
+    firstName: string;
+    lastName: string;
+    joinedAt: string;
+  }>;
+  stats: {
+    totalReferred: number;
+    totalEarnedKobo: string;
+  };
 }
 
 export interface LedgerEntry {
@@ -722,7 +746,7 @@ class ApiClient {
     const wasAuthenticated = useAuthStore.getState().isAuthenticated;
     await this.clearTokens();
     if (wasAuthenticated) {
-      void notifySessionExpired(resolveSessionLogoutReason(data));
+      await notifySessionExpired(resolveSessionLogoutReason(data));
     }
   }
 
@@ -1035,6 +1059,15 @@ class ApiClient {
 
   async getProfile(): Promise<ApiResponse<User>> {
     return this.request('/users/me');
+  }
+
+  async validateReferralCode(code: string): Promise<ApiResponse<{ valid: boolean; referrerFirstName?: string }>> {
+    const encoded = encodeURIComponent(code.trim());
+    return this.request(`/referrals/validate/${encoded}`);
+  }
+
+  async getMyReferralSummary(): Promise<ApiResponse<ReferralSummary>> {
+    return this.request('/referrals/me');
   }
 
   async getNotificationSettings(): Promise<ApiResponse<NotificationSettings>> {

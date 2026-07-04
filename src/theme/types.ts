@@ -51,6 +51,11 @@ export type ThemeColors = {
   card: string;
   white: string;
   pageBg: string;
+  formBg: string;
+  formBgAlt: string;
+  formBgNeutral: string;
+  inputFilled: string;
+  pinFilled: string;
   heroDark: string;
   textOnHero: string;
   textOnHeroMuted: string;

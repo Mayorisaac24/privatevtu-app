@@ -8,11 +8,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { ProfileSubScreen } from '../../src/components/profile/ProfileSubScreen';
+import { DEFAULT_SUPPORT_EMAIL } from '../../src/lib/brand';
 import { GlassCard } from '../../src/components/ui/GlassCard';
 import { GlassSurface } from '../../src/components/ui/GlassSurface';
 import { refreshUserProfile } from '../../src/lib/profile-sync';
 import { useAuthStore } from '../../src/stores';
-import { Colors, Radius, Spacing } from '../../src/theme';
+import {Colors, Radius, Spacing , Palette, FormColors, BRAND, Overlays, useThemedStyles } from '../../src/theme';
 
 function DetailRow({
   icon,
@@ -27,6 +28,8 @@ function DetailRow({
   verified?: boolean;
   isLast?: boolean;
 }) {
+  const styles = useStyles();
+
   return (
     <View style={[styles.detailRow, !isLast && styles.detailRowBorder]}>
       <View style={styles.detailIconWrap}>
@@ -41,7 +44,7 @@ function DetailRow({
           <Ionicons
             name={verified ? 'checkmark-circle' : 'alert-circle-outline'}
             size={13}
-            color={verified ? '#059669' : '#94A3B8'}
+            color={verified ? Colors.success : Colors.mutedLight}
           />
           <Text style={[styles.verifiedText, verified ? styles.verifiedTextOn : styles.verifiedTextOff]}>
             {verified ? 'Verified' : 'Unverified'}
@@ -53,6 +56,8 @@ function DetailRow({
 }
 
 export default function PersonalInfoScreen() {
+  const styles = useStyles();
+
   const { user } = useAuthStore();
 
   const firstName = user?.firstName || '';
@@ -96,7 +101,7 @@ export default function PersonalInfoScreen() {
         <View style={styles.noteCopy}>
           <Text style={styles.noteTitle}>Need to update your details?</Text>
           <Text style={styles.noteBody}>
-            Name, email and phone can only be changed by support for security. Contact support@privatevtu.com if something looks wrong.
+            Name, email and phone can only be changed by support for security. Contact {DEFAULT_SUPPORT_EMAIL} if something looks wrong.
           </Text>
         </View>
       </GlassSurface>
@@ -104,15 +109,14 @@ export default function PersonalInfoScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../src/theme/types').ThemeColors) => StyleSheet.create({
   detailsCard: {
-    backgroundColor: Colors.white,
     paddingHorizontal: 4,
     paddingTop: 18,
     paddingBottom: 8,
     ...Platform.select({
       ios: {
-        shadowColor: '#0F172A',
+        shadowColor: colors.dark,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.05,
         shadowRadius: 10,
@@ -129,13 +133,13 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 12,
     fontWeight: '800',
-    color: Colors.muted,
+    color: colors.muted,
     textTransform: 'uppercase',
     letterSpacing: 0.9,
   },
   sectionSub: {
     fontSize: 12,
-    color: Colors.mutedLight,
+    color: colors.mutedLight,
   },
   detailRow: {
     flexDirection: 'row',
@@ -146,13 +150,13 @@ const styles = StyleSheet.create({
   },
   detailRowBorder: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(15, 23, 42, 0.07)',
+    borderBottomColor: Overlays.borderFaint,
   },
   detailIconWrap: {
     width: 42,
     height: 42,
     borderRadius: 13,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -160,14 +164,14 @@ const styles = StyleSheet.create({
   detailLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.mutedLight,
+    color: colors.mutedLight,
     textTransform: 'uppercase',
     letterSpacing: 0.55,
   },
   detailValue: {
     fontSize: 16,
     fontWeight: '600',
-    color: Colors.dark,
+    color: colors.dark,
     lineHeight: 22,
   },
   verifiedBadge: {
@@ -178,11 +182,11 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 999,
   },
-  verifiedOn: { backgroundColor: 'rgba(5, 150, 105, 0.1)' },
-  verifiedOff: { backgroundColor: 'rgba(148, 163, 184, 0.12)' },
+  verifiedOn: { backgroundColor: Overlays.emerald14 },
+  verifiedOff: { backgroundColor: Overlays.slateMuted12 },
   verifiedText: { fontSize: 11, fontWeight: '700' },
-  verifiedTextOn: { color: '#059669' },
-  verifiedTextOff: { color: '#94A3B8' },
+  verifiedTextOn: { color: colors.success },
+  verifiedTextOff: { color: colors.mutedLight },
   noteCard: {
     flexDirection: 'row',
     gap: 12,
@@ -193,7 +197,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: 'rgba(124, 58, 237, 0.1)',
+    backgroundColor: Overlays.violet10,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -201,11 +205,15 @@ const styles = StyleSheet.create({
   noteTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.dark,
+    color: colors.dark,
   },
   noteBody: {
     fontSize: 13,
-    color: Colors.muted,
+    color: colors.muted,
     lineHeight: 19,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

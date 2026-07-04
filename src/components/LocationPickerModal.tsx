@@ -15,7 +15,7 @@ import {
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Radius } from '../theme';
+import { Colors, Radius , Palette, FormColors, BRAND, Overlays, useThemedStyles } from '../theme';
 
 const SHEET_HEIGHT = Math.round(Dimensions.get('window').height * 0.88);
 const POP_GAP = 10;
@@ -46,6 +46,7 @@ export function LocationPickerModal({
   onClose,
   onSelect,
 }: Props) {
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState('');
 
@@ -191,11 +192,11 @@ export function LocationPickerModal({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../theme/types').ThemeColors) => StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    backgroundColor: Overlays.rgba15_23_42_045,
   },
   backdropPress: {
     ...StyleSheet.absoluteFillObject,
@@ -204,7 +205,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.card,
   },
   sheetContent: {
     flex: 1,
@@ -212,14 +213,14 @@ const styles = StyleSheet.create({
   },
   fixedHeader: {
     paddingTop: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.card,
     zIndex: 1,
   },
   handle: {
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: colors.borderMid,
     alignSelf: 'center',
     marginBottom: 14,
   },
@@ -233,11 +234,11 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingRight: 12,
   },
-  title: { fontSize: 20, fontWeight: '700', color: Colors.dark, letterSpacing: -0.3 },
+  title: { fontSize: 20, fontWeight: '700', color: colors.dark, letterSpacing: -0.3 },
   subtitle: {
     fontSize: 14,
     fontWeight: '500',
-    color: Colors.mid,
+    color: colors.mid,
     marginTop: 4,
     lineHeight: 20,
   },
@@ -245,7 +246,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: colors.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -253,22 +254,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     borderRadius: Radius.lg,
     paddingHorizontal: 14,
     height: 48,
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.18)',
+    borderColor: Overlays.borderPrimary18,
     marginBottom: 16,
   },
-  searchInput: { flex: 1, fontSize: 15, color: Colors.dark, paddingVertical: 0 },
+  searchInput: { flex: 1, fontSize: 15, color: colors.dark, paddingVertical: 0 },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
-  loadingText: { fontSize: 13, color: Colors.muted },
+  loadingText: { fontSize: 13, color: colors.muted },
   section: { marginBottom: 18 },
   sectionLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.mid,
+    color: colors.mid,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
     marginBottom: 10,
@@ -282,20 +283,20 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: Radius.lg,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.12)',
+    borderColor: Overlays.darkAmbientPrimary,
   },
   popularChipActive: {
-    backgroundColor: '#FAF5FF',
-    borderColor: 'rgba(124, 58, 237, 0.35)',
+    backgroundColor: colors.pinFilled,
+    borderColor: Overlays.violet35,
   },
   popularText: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.mid,
+    color: colors.mid,
   },
-  popularTextActive: { color: Colors.primary },
+  popularTextActive: { color: colors.primary },
   listContent: { paddingBottom: 12, flexGrow: 1 },
   rowSeparator: { height: 8 },
   row: {
@@ -304,18 +305,22 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 14,
     borderRadius: Radius.lg,
-    backgroundColor: '#FAFBFC',
+    backgroundColor: colors.formBg,
     borderWidth: 1,
-    borderColor: 'rgba(15, 23, 42, 0.05)',
+    borderColor: Overlays.rgba15_23_42_005,
   },
   rowActive: {
-    backgroundColor: '#FAF5FF',
-    borderColor: 'rgba(124, 58, 237, 0.25)',
+    backgroundColor: colors.pinFilled,
+    borderColor: Overlays.rgba124_58_237_025,
   },
   rowPressed: {
     opacity: 0.88,
   },
-  rowText: { flex: 1, fontSize: 15, fontWeight: '600', color: Colors.dark },
+  rowText: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.dark },
   empty: { alignItems: 'center', paddingVertical: 32, gap: 8 },
-  emptyText: { fontSize: 13, color: Colors.muted },
+  emptyText: { fontSize: 13, color: colors.muted },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

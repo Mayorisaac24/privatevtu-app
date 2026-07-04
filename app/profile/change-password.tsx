@@ -14,7 +14,7 @@ import { GlassCard } from '../../src/components/ui/GlassCard';
 import { GlassSurface } from '../../src/components/ui/GlassSurface';
 import { LoadingOverlay } from '../../src/components/ui/LoadingOverlay';
 import { api, isResponseSuccess } from '../../src/lib/api';
-import { Colors, Radius, Spacing } from '../../src/theme';
+import {Colors, Radius, Spacing , Palette, FormColors, BRAND, Overlays, useThemedStyles } from '../../src/theme';
 import { useGradients } from '../../src/theme/hooks';
 import { gradientStops } from '../../src/theme/gradient-utils';
 import { showToast } from '../../src/components/ui/Toast';
@@ -53,6 +53,8 @@ function strengthMeta(password: string) {
 }
 
 export default function ChangePasswordScreen() {
+  const styles = useStyles();
+
   const gradients = useGradients();
   const [step, setStep] = useState<Step>('current');
   const [currentPassword, setCurrentPassword] = useState('');
@@ -335,6 +337,7 @@ function PasswordField({
   icon: keyof typeof Ionicons.glyphMap;
   autoFocus?: boolean;
 }) {
+  const styles = useStyles();
   const [show, setShow] = useState(false);
   const [focused, setFocused] = useState(false);
 
@@ -364,6 +367,8 @@ function PasswordField({
 }
 
 function TipRow({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: string }) {
+  const styles = useStyles();
+
   return (
     <View style={styles.tipRow}>
       <View style={styles.tipIcon}>
@@ -374,7 +379,7 @@ function TipRow({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: st
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../src/theme/types').ThemeColors) => StyleSheet.create({
   securityBanner: {
     flexDirection: 'row',
     gap: 12,
@@ -385,15 +390,14 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: 'rgba(124, 58, 237, 0.12)',
+    backgroundColor: Overlays.darkAmbientPrimary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   securityCopy: { flex: 1, gap: 3 },
-  securityTitle: { fontSize: 14, fontWeight: '700', color: Colors.dark },
-  securityBody: { fontSize: 13, color: Colors.muted, lineHeight: 18 },
+  securityTitle: { fontSize: 14, fontWeight: '700', color: colors.dark },
+  securityBody: { fontSize: 13, color: colors.muted, lineHeight: 18 },
   card: {
-    backgroundColor: Colors.white,
     paddingHorizontal: 20,
     paddingTop: 0,
     paddingBottom: 24,
@@ -418,22 +422,22 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 14,
     borderWidth: 2,
-    borderColor: Colors.borderMid,
+    borderColor: colors.borderMid,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.white,
+    backgroundColor: colors.surface,
   },
-  progressDotActive: { borderColor: Colors.primary },
-  progressDotDone: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  progressNum: { fontSize: 12, fontWeight: '700', color: Colors.mutedLight },
-  progressNumActive: { color: Colors.primary },
+  progressDotActive: { borderColor: colors.primary },
+  progressDotDone: { backgroundColor: colors.primary, borderColor: colors.primary },
+  progressNum: { fontSize: 12, fontWeight: '700', color: colors.mutedLight },
+  progressNumActive: { color: colors.primary },
   progressLine: {
     width: 42,
     height: 2,
-    backgroundColor: Colors.borderMid,
+    backgroundColor: colors.borderMid,
     marginHorizontal: 6,
   },
-  progressLineDone: { backgroundColor: Colors.primary },
+  progressLineDone: { backgroundColor: colors.primary },
   toolbar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -454,17 +458,17 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
   stepBadge: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.primary,
+    color: colors.primary,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 999,
@@ -478,13 +482,13 @@ const styles = StyleSheet.create({
   stepTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: Colors.dark,
+    color: colors.dark,
     letterSpacing: -0.3,
     textAlign: 'center',
   },
   stepSubtitle: {
     fontSize: 13,
-    color: Colors.muted,
+    color: colors.muted,
     textAlign: 'center',
     lineHeight: 18,
   },
@@ -492,15 +496,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: Colors.borderSubtle,
+    borderColor: colors.borderSubtle,
     borderRadius: 16,
-    backgroundColor: '#FAFBFC',
+    backgroundColor: colors.formBg,
     paddingHorizontal: 14,
     minHeight: 56,
   },
   fieldWrapFocused: {
-    borderColor: Colors.primary,
-    backgroundColor: '#FAF5FF',
+    borderColor: colors.primary,
+    backgroundColor: colors.pinFilled,
   },
   fieldIcon: {
     marginRight: 10,
@@ -508,7 +512,7 @@ const styles = StyleSheet.create({
   fieldInput: {
     flex: 1,
     fontSize: 16,
-    color: Colors.dark,
+    color: colors.dark,
     paddingVertical: 14,
   },
   eyeBtn: {
@@ -527,7 +531,7 @@ const styles = StyleSheet.create({
   strengthTitle: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.muted,
+    color: colors.muted,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -543,7 +547,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 5,
     borderRadius: 999,
-    backgroundColor: Colors.borderMid,
+    backgroundColor: colors.borderMid,
   },
   requirementGrid: {
     flexDirection: 'row',
@@ -558,21 +562,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 7,
     borderRadius: 999,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.borderSubtle,
+    borderColor: colors.borderSubtle,
   },
   requirementChipMet: {
-    backgroundColor: Colors.successLight,
-    borderColor: 'rgba(16, 185, 129, 0.2)',
+    backgroundColor: colors.successLight,
+    borderColor: Overlays.rgba16_185_129_02,
   },
   requirementText: {
     fontSize: 12,
-    color: Colors.mutedLight,
+    color: colors.mutedLight,
     fontWeight: '500',
   },
   requirementMet: {
-    color: Colors.successDark,
+    color: colors.successDark,
     fontWeight: '600',
   },
   matchRow: {
@@ -582,24 +586,28 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: -4,
   },
-  matchText: { fontSize: 13, fontWeight: '600', color: Colors.success },
-  mismatchText: { fontSize: 13, fontWeight: '600', color: Colors.error },
+  matchText: { fontSize: 13, fontWeight: '600', color: colors.success },
+  mismatchText: { fontSize: 13, fontWeight: '600', color: colors.error },
   tipsCard: {
-    backgroundColor: Colors.white,
+    backgroundColor: colors.surface,
     borderRadius: Radius.lg,
     padding: 16,
     gap: 12,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.borderSubtle,
+    borderColor: colors.borderSubtle,
   },
   tipRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   tipIcon: {
     width: 30,
     height: 30,
     borderRadius: 10,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tipText: { flex: 1, fontSize: 13, color: Colors.muted, lineHeight: 18 },
+  tipText: { flex: 1, fontSize: 13, color: colors.muted, lineHeight: 18 },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

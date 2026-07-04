@@ -8,36 +8,38 @@ import { Skeleton } from '../../src/components/ui/Skeleton';
 import { ContentPageSections } from '../../src/components/support/ContentPageSections';
 import { useSupportContent } from '../../src/hooks/useSupportContent';
 import { formatContentUpdatedAt, parseContentPageBody } from '../../src/lib/content-page';
-import { Colors, Radius } from '../../src/theme';
+import {Colors, Radius, PrivacyHighlightColors, useThemedStyles } from '../../src/theme';
 
 const PRIVACY_HIGHLIGHTS = [
   {
     icon: 'finger-print-outline' as const,
     title: 'Minimal data',
     text: 'Only what we need for wallet, VTU, and transfers',
-    accent: '#7C3AED',
+    accent: PrivacyHighlightColors.minimal,
   },
   {
     icon: 'shield-checkmark-outline' as const,
     title: 'Secure storage',
     text: 'Encrypted in transit with strict access controls',
-    accent: '#2563EB',
+    accent: PrivacyHighlightColors.secure,
   },
   {
     icon: 'hand-left-outline' as const,
     title: 'Your control',
     text: 'Request access, correction, or deletion anytime',
-    accent: '#059669',
+    accent: PrivacyHighlightColors.control,
   },
   {
     icon: 'ban-outline' as const,
     title: 'Never sold',
     text: 'We do not sell or rent your personal information',
-    accent: '#DC2626',
+    accent: PrivacyHighlightColors.neverSold,
   },
 ];
 
 function PrivacyLoadingState() {
+  const styles = useStyles();
+
   return (
     <View style={styles.loadingStack}>
       <GlassCard variant="tinted" borderRadius={Radius.xl} padding={18} contentStyle={styles.hero}>
@@ -81,6 +83,8 @@ function PrivacyLoadingState() {
 }
 
 export default function PrivacyPolicyScreen() {
+  const styles = useStyles();
+
   const { page, loading } = useSupportContent('privacy');
   const title = page.title || 'Privacy Policy';
   const body = page.body;
@@ -177,14 +181,14 @@ export default function PrivacyPolicyScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../src/theme/types').ThemeColors) => StyleSheet.create({
   loadingStack: { gap: 14 },
   hero: { alignItems: 'center', gap: 8 },
   heroIcon: {
     width: 56,
     height: 56,
     borderRadius: 18,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,
@@ -192,13 +196,13 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: Colors.dark,
+    color: colors.dark,
     letterSpacing: -0.2,
   },
   heroSub: {
     fontSize: 13,
     lineHeight: 20,
-    color: Colors.muted,
+    color: colors.muted,
     textAlign: 'center',
     maxWidth: 320,
   },
@@ -210,12 +214,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: Radius.full,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
   },
   updatedText: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.primary,
+    color: colors.primary,
   },
   highlightGrid: {
     gap: 10,
@@ -240,12 +244,12 @@ const styles = StyleSheet.create({
   highlightTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.dark,
+    color: colors.dark,
   },
   highlightText: {
     fontSize: 12,
     lineHeight: 17,
-    color: Colors.muted,
+    color: colors.muted,
   },
   policyHeader: {
     flexDirection: 'row',
@@ -257,14 +261,14 @@ const styles = StyleSheet.create({
   policyLabel: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.muted,
+    color: colors.muted,
     letterSpacing: 0.4,
     textTransform: 'uppercase',
   },
   policyHint: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.mutedLight,
+    color: colors.mutedLight,
   },
   sectionSkeleton: { gap: 10 },
   contactCard: {
@@ -277,7 +281,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -285,12 +289,12 @@ const styles = StyleSheet.create({
   contactTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.dark,
+    color: colors.dark,
   },
   contactSub: {
     fontSize: 13,
     lineHeight: 19,
-    color: Colors.muted,
+    color: colors.muted,
   },
   supportBtn: {
     flexDirection: 'row',
@@ -299,12 +303,12 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 14,
     borderRadius: Radius.lg,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
   },
   supportBtnText: {
     fontSize: 15,
     fontWeight: '700',
-    color: Colors.white,
+    color: colors.white,
   },
   termsLink: {
     flexDirection: 'row',
@@ -316,6 +320,10 @@ const styles = StyleSheet.create({
   termsText: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.primary,
+    color: colors.primary,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

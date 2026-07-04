@@ -22,7 +22,7 @@ import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Radius } from '../theme';
+import {Colors, Radius , Palette, FormColors, BRAND, Overlays, useThemedStyles } from '../theme';
 import {
   createBlinkTracker,
   getPositionIssue,
@@ -168,6 +168,8 @@ export function FaceLivenessScanner({
   onClose,
   onComplete,
 }: Props) {
+  const styles = useStyles();
+
   const steps = useMemo(() => buildSteps(challenges), [challenges]);
   const insets = useSafeAreaInsets();
   const cameraRef = useRef<VisionCameraType>(null);
@@ -662,7 +664,7 @@ export function FaceLivenessScanner({
               ) : (
                 <View style={styles.stepHeading}>
                   <View style={[styles.stepIconWrap, styles.stepIconWrapSuccess]}>
-                    <Ionicons name="shield-checkmark" size={18} color="#86EFAC" />
+                    <Ionicons name="shield-checkmark" size={18} color={Palette.gotvBorder} />
                   </View>
                   <Text style={styles.stepLabel}>Complete</Text>
                 </View>
@@ -698,10 +700,10 @@ export function FaceLivenessScanner({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F172A',
+    backgroundColor: colors.dark,
   },
   centered: {
     alignItems: 'center',
@@ -719,13 +721,13 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: Overlays.white12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerText: { flex: 1 },
-  headerTitle: { fontSize: 18, fontWeight: '800', color: Colors.white },
-  headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.65)', marginTop: 2 },
+  headerTitle: { fontSize: 18, fontWeight: '800', color: colors.white },
+  headerSub: { fontSize: 12, color: Overlays.white65, marginTop: 2 },
   permissionWrap: {
     flex: 1,
     alignItems: 'center',
@@ -733,22 +735,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     gap: 10,
   },
-  permissionTitle: { fontSize: 18, fontWeight: '700', color: Colors.white, textAlign: 'center' },
-  permissionSub: { fontSize: 14, color: 'rgba(255,255,255,0.7)', textAlign: 'center', lineHeight: 20 },
+  permissionTitle: { fontSize: 18, fontWeight: '700', color: colors.white, textAlign: 'center' },
+  permissionSub: { fontSize: 14, color: Overlays.rgba255_255_255_07, textAlign: 'center', lineHeight: 20 },
   permissionBtn: {
     marginTop: 8,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     paddingHorizontal: 18,
     paddingVertical: 12,
     borderRadius: Radius.full,
   },
-  permissionBtnText: { color: Colors.white, fontWeight: '700', fontSize: 14 },
+  permissionBtnText: { color: colors.white, fontWeight: '700', fontSize: 14 },
   cameraWrap: {
     flex: 1,
     marginHorizontal: 16,
     borderRadius: 24,
     overflow: 'hidden',
-    backgroundColor: '#111827',
+    backgroundColor: Palette.scannerSurface,
     minHeight: 280,
   },
   camera: { flex: 1 },
@@ -762,16 +764,16 @@ const styles = StyleSheet.create({
     aspectRatio: 0.72,
     borderRadius: 999,
     borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.55)',
-    backgroundColor: 'rgba(124, 58, 237, 0.06)',
+    borderColor: Overlays.white55,
+    backgroundColor: Overlays.violet06,
   },
   faceOvalActive: {
-    borderColor: 'rgba(167, 139, 250, 0.95)',
-    backgroundColor: 'rgba(124, 58, 237, 0.1)',
+    borderColor: Overlays.rgba167_139_250_095,
+    backgroundColor: Overlays.violet10,
   },
   captureOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15, 23, 42, 0.35)',
+    backgroundColor: Overlays.rgba15_23_42_035,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -785,19 +787,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: Radius.full,
-    backgroundColor: 'rgba(22, 163, 74, 0.92)',
+    backgroundColor: Overlays.rgba22_163_74_092,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
+    borderColor: Overlays.rgba255_255_255_025,
   },
   reviewBadgeText: {
-    color: Colors.white,
+    color: colors.white,
     fontSize: 13,
     fontWeight: '700',
   },
   progressTrack: {
     height: 6,
     borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: Overlays.white12,
     marginHorizontal: 16,
     marginTop: 14,
     overflow: 'hidden',
@@ -805,16 +807,16 @@ const styles = StyleSheet.create({
   progressFill: {
     height: '100%',
     borderRadius: 3,
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: colors.primaryLight,
   },
   instructionCard: {
     marginHorizontal: 16,
     marginTop: 14,
     padding: 16,
     borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: Overlays.white08,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: Overlays.white08,
     gap: 6,
   },
   stepHeading: {
@@ -826,40 +828,40 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: 'rgba(124, 58, 237, 0.22)',
+    backgroundColor: Overlays.borderPrimary22,
     alignItems: 'center',
     justifyContent: 'center',
   },
   stepIconWrapSuccess: {
-    backgroundColor: 'rgba(22, 163, 74, 0.22)',
+    backgroundColor: Overlays.rgba22_163_74_022,
   },
   stepLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: 'rgba(255,255,255,0.55)',
+    color: Overlays.white55,
     letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
   stepTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: Colors.white,
+    color: colors.white,
   },
   stepSub: {
     fontSize: 13,
-    color: 'rgba(255,255,255,0.72)',
+    color: Overlays.white72,
     lineHeight: 18,
   },
   errorText: {
     fontSize: 12,
-    color: '#FCA5A5',
+    color: Palette.red300,
     lineHeight: 17,
     marginTop: 4,
   },
   autoHint: {
     marginTop: 8,
     fontSize: 12,
-    color: 'rgba(255,255,255,0.5)',
+    color: Overlays.rgba255_255_255_05,
     textAlign: 'center',
   },
   retryBtn: {
@@ -868,11 +870,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: Radius.full,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
   },
   retryBtnText: {
-    color: Colors.white,
+    color: colors.white,
     fontWeight: '700',
     fontSize: 14,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

@@ -13,7 +13,8 @@ import {
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Colors, Gradients, Radius } from '../../theme';
+import {Colors, Radius , Overlays, useThemedStyles, useGradients } from '../../theme';
+import { gradientStops } from '../../theme/gradient-utils';
 import { GlassSurface } from './GlassSurface';
 
 type LoadingOverlayProps = {
@@ -27,6 +28,8 @@ type LoadingOverlayProps = {
 };
 
 function BounceDot({ delay }: { delay: number }) {
+  const styles = useStyles();
+
   const anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -85,6 +88,9 @@ function LoadingOverlayContent({
   pulse: Animated.Value;
   spin: Animated.Value;
 }) {
+  const styles = useStyles();
+  const gradients = useGradients();
+
   const glowScale = pulse.interpolate({
     inputRange: [0, 1],
     outputRange: [1, 1.12],
@@ -133,7 +139,7 @@ function LoadingOverlayContent({
           </Animated.View>
 
           <LinearGradient
-            colors={Gradients.cardSoft as [string, string, ...string[]]}
+            colors={gradientStops(gradients.cardSoft)}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.iconBadge}
@@ -163,6 +169,8 @@ export function LoadingOverlay({
   style,
   embedded = false,
 }: LoadingOverlayProps) {
+  const styles = useStyles();
+
   const pulse = useRef(new Animated.Value(0)).current;
   const spin = useRef(new Animated.Value(0)).current;
 
@@ -239,7 +247,7 @@ export function LoadingOverlay({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   embeddedRoot: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 1000,
@@ -253,14 +261,14 @@ const styles = StyleSheet.create({
   },
   backdropTint: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15, 23, 42, 0.32)',
+    backgroundColor: Overlays.rgba15_23_42_032,
   },
   glow: {
     position: 'absolute',
     width: 220,
     height: 220,
     borderRadius: 110,
-    backgroundColor: Colors.primaryGlow,
+    backgroundColor: colors.primaryGlow,
   },
   card: {
     width: '100%',
@@ -285,7 +293,7 @@ const styles = StyleSheet.create({
     height: 88,
     borderRadius: 44,
     borderWidth: 2,
-    borderColor: 'rgba(124, 58, 237, 0.18)',
+    borderColor: Overlays.borderPrimary18,
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'flex-start',
@@ -294,7 +302,7 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     marginTop: -5,
   },
   iconBadge: {
@@ -307,7 +315,7 @@ const styles = StyleSheet.create({
   message: {
     fontSize: 17,
     fontWeight: '700',
-    color: Colors.dark,
+    color: colors.dark,
     textAlign: 'center',
     letterSpacing: -0.2,
   },
@@ -315,7 +323,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontSize: 13,
     lineHeight: 18,
-    color: Colors.muted,
+    color: colors.muted,
     textAlign: 'center',
   },
   dotsRow: {
@@ -328,6 +336,10 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

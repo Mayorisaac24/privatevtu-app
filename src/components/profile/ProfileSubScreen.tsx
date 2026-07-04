@@ -11,8 +11,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Typography } from '../../theme';
+import {Colors, Typography , Palette, FormColors, BRAND, Overlays, useThemedStyles } from '../../theme';
 import { useGradients } from '../../theme/hooks';
+import { gradientStops, withAlpha } from '../../theme/gradient-utils';
 import { ThemedScreen } from '../ui/ThemedScreen';
 import { navigateBack } from '../../lib/navigation';
 import { useStatusBarStyle } from '../../hooks/useStatusBarStyle';
@@ -40,6 +41,8 @@ export function ProfileSubScreen({
   footer,
   refreshControl,
 }: ProfileSubScreenProps) {
+  const styles = useStyles();
+
   useStatusBarStyle('light');
   const insets = useSafeAreaInsets();
   const { pagePadding } = useLayout();
@@ -58,7 +61,7 @@ export function ProfileSubScreen({
       >
         <View style={styles.flex}>
           <LinearGradient
-            colors={[...gradients.hero]}
+            colors={gradientStops(gradients.hero)}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={[styles.header, { paddingTop: insets.top + 10, paddingHorizontal: pagePadding }]}
@@ -115,7 +118,7 @@ export function ProfileSubScreen({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors, gradients: import('../../theme/types').ThemeGradients) => StyleSheet.create({
   root: { flex: 1 },
   flex: { flex: 1 },
   header: { paddingBottom: isAndroid ? 18 : 22, overflow: 'hidden' },
@@ -126,7 +129,7 @@ const styles = StyleSheet.create({
     width: 132,
     height: 132,
     borderRadius: 66,
-    backgroundColor: 'rgba(124, 58, 237, 0.28)',
+    backgroundColor: withAlpha(gradients.hero[2], 0.38),
   },
   headerBlobSecondary: {
     position: 'absolute',
@@ -135,34 +138,34 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: withAlpha(gradients.hero[0], 0.16),
   },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   backBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: Overlays.white12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerText: { flex: 1, gap: 3 },
-  headerTitle: { ...Typography.h3, fontSize: 20, color: Colors.white, letterSpacing: -0.3 },
-  headerSub: { ...Typography.small, color: 'rgba(255,255,255,0.72)' },
+  headerTitle: { ...Typography.h3, fontSize: 20, color: colors.white, letterSpacing: -0.3 },
+  headerSub: { ...Typography.small, color: colors.textOnHeroMuted },
   headerIconWrap: {
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: Overlays.white12,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.18)',
+    borderColor: Overlays.white18,
     alignItems: 'center',
     justifyContent: 'center',
   },
   curve: {
     height: 20,
     marginTop: -20,
-    backgroundColor: Colors.pageBg,
+    backgroundColor: colors.pageBg,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
   },
@@ -170,8 +173,12 @@ const styles = StyleSheet.create({
   content: { gap: 14 },
   footer: {
     paddingTop: 12,
-    backgroundColor: Colors.white,
+    backgroundColor: colors.card,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(15, 23, 42, 0.08)',
+    borderTopColor: colors.borderSubtle,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

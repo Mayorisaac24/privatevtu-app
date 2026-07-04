@@ -8,7 +8,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Colors, Radius, FontFamily } from '../../theme';
+import {Colors, Radius, FontFamily , Palette, FormColors, BRAND, Overlays, useThemedStyles } from '../../theme';
 import { useGradients } from '../../theme/hooks';
 import { gradientStops } from '../../theme/gradient-utils';
 import {
@@ -75,6 +75,8 @@ export function GradientButton({
   style,
   gradientStyle,
 }: GradientButtonProps) {
+  const styles = useStyles();
+
   const gradients = useGradients();
   const metrics = getButtonMetrics(size);
   const muted = inactive || (disabled && !isLoading);
@@ -119,7 +121,7 @@ export function GradientButton({
           {children ?? (
             isLoading ? (
               <>
-                <ActivityIndicator color="#FFFFFF" size="small" />
+                <ActivityIndicator color={Palette.white} size="small" />
                 {title ? (
                   <Text style={[styles.text, { fontSize: metrics.fontSize }]} numberOfLines={1}>
                     {loadingLabel ?? title}
@@ -149,12 +151,12 @@ export function GradientButton({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   wrap: {
     borderRadius: Radius.md,
     overflow: 'hidden',
     ...(isAndroid ? {} : {
-      shadowColor: Colors.primary,
+      shadowColor: colors.primary,
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.22,
       shadowRadius: 10,
@@ -175,7 +177,7 @@ const styles = StyleSheet.create({
   text: {
     fontWeight: '700',
     fontFamily: FontFamily.bold,
-    color: '#FFFFFF',
+    color: colors.card,
     letterSpacing: isAndroid ? 0.1 : 0.2,
     lineHeight: 20,
     flexShrink: 1,
@@ -183,3 +185,7 @@ const styles = StyleSheet.create({
     ...(isAndroid ? { includeFontPadding: false, textAlignVertical: 'center' } : null),
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

@@ -2,7 +2,6 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Image,
   ActivityIndicator,
   StyleSheet,
   ScrollView,
@@ -11,12 +10,10 @@ import {
 import type { AirtimeProvider } from '../lib/api';
 import {
   getProviderCode,
-  getProviderLogo,
-  getProviderLogoScale,
   getProviderShortName,
-  getProviderStyle,
 } from '../lib/providers';
-import { Colors, Typography, Radius } from '../theme';
+import { NetworkProviderLogo } from './NetworkProviderLogo';
+import {Colors, Typography, Radius, useColors, useThemedStyles } from '../theme';
 import { isAndroid } from '../lib/platform-ui';
 
 type NetworkProviderGridProps = {
@@ -39,13 +36,9 @@ function ProviderChip({
   ringSize: number;
   layout: 'row' | 'scroll';
 }) {
+  const styles = useStyles();
+  const colors = useColors();
   const code = getProviderCode(provider);
-  const style = getProviderStyle(code, {
-    bg: Colors.surface,
-    border: Colors.borderMid,
-    text: Colors.mid,
-  });
-  const logoScale = getProviderLogoScale(code);
   const label = getProviderShortName(provider);
   const innerSize = ringSize - 6;
 
@@ -62,36 +55,12 @@ function ProviderChip({
             width: ringSize,
             height: ringSize,
             borderRadius: ringSize / 2,
-            borderColor: selected ? Colors.primary : Colors.borderMid,
-            backgroundColor: selected ? Colors.primaryMuted : Colors.white,
+            borderColor: selected ? colors.primary : colors.borderMid,
           },
           selected && styles.logoRingSelected,
         ]}
       >
-        <View
-          style={[
-            styles.logoInner,
-            {
-              width: innerSize,
-              height: innerSize,
-              borderRadius: innerSize / 2,
-              backgroundColor: style.bg,
-            },
-          ]}
-        >
-          <Image
-            source={getProviderLogo(provider)}
-            style={[
-              styles.logo,
-              {
-                width: ringSize * 0.72,
-                height: ringSize * 0.44,
-                transform: [{ scale: logoScale }],
-              },
-            ]}
-            resizeMode="contain"
-          />
-        </View>
+        <NetworkProviderLogo provider={provider} size={innerSize} />
         {selected ? <View style={styles.selectedDot} /> : null}
       </View>
       <Text
@@ -122,6 +91,8 @@ export function NetworkProviderGrid({
   onSelect,
   loading = false,
 }: NetworkProviderGridProps) {
+  const styles = useStyles();
+
   const { width: screenWidth } = useWindowDimensions();
 
   if (loading && providers.length === 0) {
@@ -170,14 +141,14 @@ export function NetworkProviderGrid({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   track: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.card,
     borderRadius: Radius.lg,
     paddingVertical: 12,
     paddingHorizontal: 10,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     overflow: 'hidden',
   },
   row: {
@@ -208,24 +179,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+    overflow: 'hidden',
   },
   logoRingSelected: {
     borderWidth: 2,
     ...(isAndroid
       ? { elevation: 2 }
       : {
-          shadowColor: Colors.primary,
+          shadowColor: colors.primary,
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.18,
           shadowRadius: 4,
         }),
   },
-  logoInner: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  logo: {},
   selectedDot: {
     position: 'absolute',
     bottom: 2,
@@ -233,18 +199,18 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     borderWidth: 2,
-    borderColor: Colors.white,
+    borderColor: colors.white,
   },
   chipLabel: {
     ...Typography.caption,
-    color: Colors.muted,
+    color: colors.muted,
     fontWeight: '500',
     textAlign: 'center',
   },
   chipLabelSelected: {
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: '700',
   },
   loadRow: {
@@ -256,12 +222,16 @@ const styles = StyleSheet.create({
   },
   loadText: {
     ...Typography.small,
-    color: Colors.muted,
+    color: colors.muted,
   },
   emptyText: {
     ...Typography.small,
-    color: Colors.muted,
+    color: colors.muted,
     textAlign: 'center',
     paddingVertical: 12,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

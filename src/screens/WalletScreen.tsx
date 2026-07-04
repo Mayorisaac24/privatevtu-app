@@ -22,7 +22,8 @@ import {
 } from '../lib/dashboard-data';
 import { useWalletStore } from '../stores';
 import { useTabContext } from '../stores/tab-context';
-import { Colors, Spacing, Radius } from '../theme';
+import {Colors, Spacing, Radius , Palette, FormColors, BRAND, Overlays, useColors, useThemedStyles } from '../theme';
+import { gradientStops, withAlpha } from '../theme/gradient-utils';
 import { Skeleton } from '../components/ui/Skeleton';
 import { useServiceAvailability } from '../hooks/useServiceAvailability';
 import { SERVICE_CODES } from '../lib/service-availability';
@@ -66,6 +67,9 @@ function WalletMoneyOverview({
   loading: boolean;
   balanceVisible: boolean;
 }) {
+  const styles = useStyles();
+  const colors = useColors();
+
   const totalFlow = insights.moneyIn + insights.moneyOut;
   const inShare = totalFlow > 0n
     ? Math.min(100, Math.max(8, Number((insights.moneyIn * 100n) / totalFlow)))
@@ -78,11 +82,11 @@ function WalletMoneyOverview({
   const txTotal = insights.inCount + insights.outCount;
 
   return (
-    <GlassCard borderRadius={20} contentStyle={styles.overviewCard}>
+    <GlassCard variant="solid" borderRadius={20} contentStyle={styles.overviewCard}>
       <View style={styles.overviewHeader}>
         <View style={styles.overviewHeaderLeft}>
           <View style={styles.overviewHeaderIcon}>
-            <Ionicons name="calendar-outline" size={15} color={Colors.primary} />
+            <Ionicons name="calendar-outline" size={15} color={colors.primary} />
           </View>
           <Text style={styles.overviewTitle}>{monthLabel} overview</Text>
         </View>
@@ -97,7 +101,7 @@ function WalletMoneyOverview({
         <View style={[styles.overviewTile, styles.overviewTileIn]}>
           <View style={styles.overviewTileTop}>
             <View style={[styles.overviewTileIcon, styles.overviewTileIconIn]}>
-              <Ionicons name="arrow-down" size={16} color={Colors.successDark} />
+              <Ionicons name="arrow-down" size={16} color={colors.success} />
             </View>
             <Text style={styles.overviewTileLabel}>Money in</Text>
           </View>
@@ -116,7 +120,7 @@ function WalletMoneyOverview({
         <View style={[styles.overviewTile, styles.overviewTileOut]}>
           <View style={styles.overviewTileTop}>
             <View style={[styles.overviewTileIcon, styles.overviewTileIconOut]}>
-              <Ionicons name="arrow-up" size={16} color={Colors.errorDark} />
+              <Ionicons name="arrow-up" size={16} color={colors.error} />
             </View>
             <Text style={styles.overviewTileLabel}>Money out</Text>
           </View>
@@ -151,6 +155,8 @@ function WalletMoneyOverview({
 }
 
 function BalanceAmount({ kobo, visible }: { kobo: string; visible: boolean }) {
+  const styles = useStyles();
+
   if (!visible) {
     return <Text style={styles.balanceHidden}>{MASKED_BALANCE}</Text>;
   }
@@ -164,6 +170,9 @@ function BalanceAmount({ kobo, visible }: { kobo: string; visible: boolean }) {
 }
 
 export default function WalletScreen() {
+  const styles = useStyles();
+  const colors = useColors();
+
   const insets = useSafeAreaInsets();
   const gradients = useGradients();
   const { pagePadding } = useLayout();
@@ -239,7 +248,7 @@ export default function WalletScreen() {
   return (
     <ThemedScreen>
       <LinearGradient
-        colors={[...gradients.hero]}
+        colors={gradientStops(gradients.hero)}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.hero, { paddingTop: insets.top + 8, paddingHorizontal: pagePadding }]}
@@ -261,9 +270,9 @@ export default function WalletScreen() {
             accessibilityLabel="Refresh wallet"
           >
             {refreshing ? (
-              <ActivityIndicator size="small" color="rgba(255,255,255,0.95)" />
+              <ActivityIndicator size="small" color={Overlays.white95} />
             ) : (
-              <Ionicons name="refresh-outline" size={18} color="rgba(255,255,255,0.9)" />
+              <Ionicons name="refresh-outline" size={18} color={Overlays.white90} />
             )}
           </TouchableOpacity>
         </View>
@@ -280,7 +289,7 @@ export default function WalletScreen() {
               <Ionicons
                 name={balanceVisible ? 'eye-outline' : 'eye-off-outline'}
                 size={17}
-                color="rgba(255,255,255,0.75)"
+                color={Overlays.white75}
               />
             </TouchableOpacity>
           </View>
@@ -295,7 +304,7 @@ export default function WalletScreen() {
             onPress={openFund}
             activeOpacity={fundUsable ? 0.88 : 1}
           >
-            <Ionicons name="add" size={18} color={Colors.heroDark} />
+            <Ionicons name="add" size={18} color={colors.white} />
             <Text style={styles.heroActionPrimaryText}>Add money</Text>
           </TouchableOpacity>
 
@@ -322,7 +331,7 @@ export default function WalletScreen() {
             onRefresh={onRefresh}
             tintColor={Colors.primary}
             colors={[Colors.primary]}
-            progressBackgroundColor={Colors.white}
+            progressBackgroundColor={colors.card}
           />
         }
       >
@@ -351,7 +360,7 @@ export default function WalletScreen() {
               <Skeleton width="100%" height={64} borderRadius={14} />
             </View>
           ) : walletActivity.length === 0 ? (
-            <GlassCard borderRadius={Radius.xl} contentStyle={styles.emptyState}>
+            <GlassCard borderRadius={Radius.xl} variant="solid" contentStyle={styles.emptyState}>
               <View style={styles.emptyIcon}>
                 <Ionicons name="swap-horizontal-outline" size={22} color={Colors.primary} />
               </View>
@@ -365,6 +374,7 @@ export default function WalletScreen() {
               {walletActivity.map((tx, index) => (
                 <GlassCard
                   key={tx.id}
+                  variant="solid"
                   borderRadius={Radius.lg}
                   padding={0}
                   style={index < walletActivity.length - 1 ? styles.activityItemGap : undefined}
@@ -391,7 +401,7 @@ export default function WalletScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../theme/types').ThemeColors, gradients: import('../theme/types').ThemeGradients) => StyleSheet.create({
   root: { flex: 1 },
 
   hero: {
@@ -405,7 +415,7 @@ const styles = StyleSheet.create({
     width: 140,
     height: 140,
     borderRadius: 70,
-    backgroundColor: 'rgba(139, 92, 246, 0.25)',
+    backgroundColor: withAlpha(gradients.hero[2], 0.38),
   },
   blobB: {
     position: 'absolute',
@@ -414,7 +424,7 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: 'rgba(99, 102, 241, 0.18)',
+    backgroundColor: withAlpha(gradients.hero[1], 0.28),
   },
   heroTop: {
     flexDirection: 'row',
@@ -425,7 +435,7 @@ const styles = StyleSheet.create({
   },
   heroEyebrow: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.55)',
+    color: Overlays.white55,
     fontWeight: '500',
     letterSpacing: 0.6,
     textTransform: 'uppercase',
@@ -434,18 +444,18 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: Colors.textOnHero,
+    color: colors.textOnHero,
     letterSpacing: -0.3,
   },
   heroIconBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: Overlays.white10,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: Overlays.white12,
     zIndex: 2,
   },
 
@@ -459,7 +469,7 @@ const styles = StyleSheet.create({
   balanceNaira: {
     fontSize: 26,
     fontWeight: '500',
-    color: 'rgba(255,255,255,0.65)',
+    color: Overlays.white65,
     marginBottom: 6,
     marginRight: 2,
   },
@@ -470,21 +480,21 @@ const styles = StyleSheet.create({
   balanceWhole: {
     fontSize: 42,
     fontWeight: '600',
-    color: Colors.textOnHero,
+    color: colors.textOnHero,
     letterSpacing: -1.5,
     lineHeight: 48,
   },
   balanceDecimal: {
     fontSize: 20,
     fontWeight: '500',
-    color: 'rgba(255,255,255,0.5)',
+    color: Overlays.rgba255_255_255_05,
     marginBottom: 5,
     marginLeft: 1,
   },
   balanceHidden: {
     fontSize: 36,
     fontWeight: '500',
-    color: 'rgba(255,255,255,0.85)',
+    color: Overlays.white85,
     letterSpacing: 4,
   },
   eyeBtn: {
@@ -494,7 +504,7 @@ const styles = StyleSheet.create({
   },
   syncText: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.45)',
+    color: Overlays.white65,
     fontWeight: '400',
   },
 
@@ -508,14 +518,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.primary,
     borderRadius: 14,
     paddingVertical: 13,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   heroActionPrimaryText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: Colors.heroDark,
+    fontWeight: '700',
+    color: colors.white,
   },
   heroActionGhost: {
     flex: 1,
@@ -523,22 +538,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: withAlpha(colors.primaryDeep, 0.82),
     borderRadius: 14,
     paddingVertical: 13,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.18)',
+    borderColor: withAlpha(colors.white, 0.16),
   },
   heroActionGhostText: {
     fontSize: 14,
     fontWeight: '500',
-    color: Colors.textOnHero,
+    color: colors.textOnHero,
   },
   heroActionDisabled: { opacity: 0.45 },
 
   sheet: {
     flex: 1,
-    backgroundColor: Colors.pageBg,
+    backgroundColor: colors.pageBg,
     borderTopLeftRadius: 26,
     borderTopRightRadius: 26,
     marginTop: -6,
@@ -565,26 +580,26 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 9,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
   overviewTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.dark,
+    color: colors.dark,
     letterSpacing: -0.2,
   },
   overviewTxBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: Radius.full,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
   },
   overviewTxBadgeText: {
     fontSize: 10,
     fontWeight: '700',
-    color: Colors.primary,
+    color: colors.primaryLight,
   },
   overviewTiles: {
     flexDirection: 'row',
@@ -597,14 +612,14 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   overviewTileIn: {
-    backgroundColor: Colors.successLight,
+    backgroundColor: colors.successLight,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(5, 150, 105, 0.12)',
+    borderColor: Overlays.borderSuccess12,
   },
   overviewTileOut: {
-    backgroundColor: Colors.errorLight,
+    backgroundColor: colors.errorLight,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(220, 38, 38, 0.1)',
+    borderColor: Overlays.borderDanger10,
   },
   overviewTileTop: {
     flexDirection: 'row',
@@ -619,34 +634,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   overviewTileIconIn: {
-    backgroundColor: 'rgba(5, 150, 105, 0.14)',
+    backgroundColor: Overlays.emerald14,
   },
   overviewTileIconOut: {
-    backgroundColor: 'rgba(220, 38, 38, 0.12)',
+    backgroundColor: Overlays.walletOutIconBg,
   },
   overviewTileLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: Colors.muted,
+    color: colors.mid,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
   overviewIn: {
     fontSize: 20,
     fontWeight: '700',
-    color: Colors.successDark,
+    color: colors.success,
     letterSpacing: -0.4,
   },
   overviewOut: {
     fontSize: 20,
     fontWeight: '700',
-    color: Colors.errorDark,
+    color: colors.error,
     letterSpacing: -0.4,
   },
   overviewTileMeta: {
     fontSize: 11,
     fontWeight: '500',
-    color: Colors.mutedLight,
+    color: colors.mid,
   },
   overviewFlow: {
     gap: 8,
@@ -655,14 +670,14 @@ const styles = StyleSheet.create({
   overviewFlowTrack: {
     height: 6,
     borderRadius: 3,
-    backgroundColor: Colors.errorLight,
+    backgroundColor: colors.errorLight,
     overflow: 'hidden',
     flexDirection: 'row',
   },
   overviewFlowIn: {
     height: '100%',
     borderRadius: 3,
-    backgroundColor: Colors.success,
+    backgroundColor: colors.success,
   },
   overviewFlowFoot: {
     flexDirection: 'row',
@@ -676,15 +691,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   overviewFlowNetPos: {
-    color: Colors.successDark,
+    color: colors.success,
   },
   overviewFlowNetNeg: {
-    color: Colors.errorDark,
+    color: colors.error,
   },
   overviewFlowRatio: {
     fontSize: 11,
     fontWeight: '500',
-    color: Colors.mutedLight,
+    color: colors.mid,
   },
 
   activitySection: { gap: 10 },
@@ -697,13 +712,13 @@ const styles = StyleSheet.create({
   activityTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: Colors.dark,
+    color: colors.dark,
     letterSpacing: -0.2,
   },
   activityLink: {
     fontSize: 13,
     fontWeight: '500',
-    color: Colors.primary,
+    color: colors.primary,
   },
   activityList: { gap: 0 },
   activityItemGap: { marginBottom: 8 },
@@ -717,7 +732,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
@@ -725,12 +740,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 15,
     fontWeight: '500',
-    color: Colors.dark,
+    color: colors.dark,
     marginBottom: 4,
   },
   emptySub: {
     fontSize: 13,
-    color: Colors.muted,
+    color: colors.muted,
     textAlign: 'center',
     lineHeight: 18,
     fontWeight: '400',
@@ -745,7 +760,11 @@ const styles = StyleSheet.create({
   },
   trustText: {
     fontSize: 11,
-    color: Colors.mutedLight,
+    color: colors.muted,
     fontWeight: '400',
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

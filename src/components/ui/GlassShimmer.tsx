@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, View, ViewStyle } from 'react-native';
-import { Colors } from '../../theme';
+import {Colors , Overlays, useThemedStyles } from '../../theme';
 import { GlassSurface } from './GlassSurface';
 
 
@@ -12,6 +12,8 @@ type GlassShimmerProps = {
 };
 
 function PulseDot({ delay }: { delay: number }) {
+  const styles = useStyles();
+
   const anim = useRef(new Animated.Value(0.35)).current;
 
   useEffect(() => {
@@ -45,6 +47,8 @@ export function GlassShimmer({
   style,
   compact = false,
 }: GlassShimmerProps) {
+  const styles = useStyles();
+
   const sweep = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -92,6 +96,8 @@ export function GlassShimmer({
 }
 
 export function GlassRefreshVeil({ borderRadius = 16 }: { borderRadius?: number }) {
+  const styles = useStyles();
+
   return (
     <View style={[StyleSheet.absoluteFill, styles.veilWrap, { borderRadius }]} pointerEvents="none">
       <GlassSurface
@@ -111,7 +117,7 @@ export function GlassRefreshVeil({ borderRadius = 16 }: { borderRadius?: number 
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
   body: {
     minHeight: 92,
     alignItems: 'center',
@@ -126,7 +132,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     width: 90,
-    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+    backgroundColor: Overlays.glassShine,
     transform: [{ skewX: '-18deg' }],
   },
   dotsRow: {
@@ -138,7 +144,7 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 3.5,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
   },
   veilWrap: {
     overflow: 'hidden',
@@ -148,6 +154,10 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: Overlays.white08,
   },
 });
+
+function useStyles() {
+  return useThemedStyles(createStyles);
+}

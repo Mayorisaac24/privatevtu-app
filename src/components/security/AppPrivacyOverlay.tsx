@@ -1,6 +1,8 @@
-import { Platform, StyleSheet, Text, View } from 'react-native';
-import { BlurView } from 'expo-blur';
+import { StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Typography } from '../../theme';
+import { useColors, useGradients } from '../../theme/hooks';
+import { gradientStops, withAlpha } from '../../theme/gradient-utils';
 import { AppLogo } from '../ui/AppLogo';
 
 type AppPrivacyOverlayProps = {
@@ -8,23 +10,36 @@ type AppPrivacyOverlayProps = {
 };
 
 export function AppPrivacyOverlay({ visible }: AppPrivacyOverlayProps) {
-  if (!visible) return null;
+  const colors = useColors();
+  const gradients = useGradients();
 
-  const useBlur = Platform.OS === 'ios';
+  if (!visible) return null;
 
   return (
     <View style={styles.root} pointerEvents="auto">
-      {useBlur ? (
-        <BlurView
-          intensity={55}
-          tint="dark"
-          style={StyleSheet.absoluteFill}
-        />
-      ) : null}
-      <View style={styles.scrim} />
+      <LinearGradient
+        colors={gradientStops(gradients.heroAuth)}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <View
+        pointerEvents="none"
+        style={[
+          styles.blobPrimary,
+          { backgroundColor: withAlpha(gradients.hero[2], 0.22) },
+        ]}
+      />
+      <View
+        pointerEvents="none"
+        style={[
+          styles.blobSecondary,
+          { backgroundColor: withAlpha(gradients.hero[0], 0.14) },
+        ]}
+      />
       <View style={styles.content}>
-        <AppLogo size={132} />
-        <Text style={styles.subtitle}>Secured session</Text>
+        <AppLogo size={132} variant="onDark" />
+        <Text style={[styles.subtitle, { color: colors.textOnHeroMuted }]}>Secured session</Text>
       </View>
     </View>
   );
@@ -35,10 +50,23 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: 99999,
     elevation: 99999,
+    overflow: 'hidden',
   },
-  scrim: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(76, 29, 149, 0.42)',
+  blobPrimary: {
+    position: 'absolute',
+    top: -40,
+    right: -30,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+  },
+  blobSecondary: {
+    position: 'absolute',
+    bottom: -20,
+    left: -40,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
   },
   content: {
     flex: 1,
@@ -48,7 +76,6 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     ...Typography.small,
-    color: 'rgba(255,255,255,0.82)',
     fontWeight: '600',
     letterSpacing: 0.3,
   },
