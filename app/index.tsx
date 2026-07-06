@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
-import { BootSplashView } from '../src/components/BootSplashView';
+// import { BootSplashView } from '../src/components/BootSplashView';
 import { resolveBootDestination } from '../src/lib/boot-navigation';
 import { markBootStarted, setBootComplete } from '../src/lib/boot-state';
 import { safeReplace } from '../src/lib/navigation';
@@ -25,8 +25,8 @@ function destinationHref(
 }
 
 /**
- * Boot route: keep native splash visible, resolve session once, then replace.
- * No duplicate React splash — native boot-splash.png already matches branding.
+ * Boot route: native splash only (boot-splash.png) until routing finishes.
+ * React BootSplashView is disabled — native asset matches the branded boot screen.
  */
 export default function BootScreen() {
   useEffect(() => {
@@ -52,6 +52,7 @@ export default function BootScreen() {
     })();
   }, []);
 
-  // Native splash covers this route until hideAsync runs after navigation.
-  return <BootSplashView showSpinner={false} />;
+  // Native splash stays visible until hideAsync in the effect above.
+  // return <BootSplashView showSpinner={false} />;
+  return null;
 }
