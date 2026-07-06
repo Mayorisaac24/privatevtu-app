@@ -40,7 +40,7 @@ export async function resolveBootDestination(): Promise<BootDestination> {
         return destinationForGuest(onboardingDone);
       }
 
-      await api.getValidToken({ logoutOnAuthFailure: true });
+      await api.clearTokens();
       return { type: 'login' };
     }
 

@@ -7,7 +7,7 @@ export default function AuthLayout() {
     <>
       <FocusStatusBar style="light" />
       <Stack screenOptions={{ ...stackScreenOptions, gestureEnabled: false, fullScreenGestureEnabled: false }}>
-      <Stack.Screen name="login" />
+      <Stack.Screen name="login" options={{ animation: 'fade' }} />
       <Stack.Screen name="index" />
       <Stack.Screen name="verify-otp" />
       <Stack.Screen name="forgot-password" />

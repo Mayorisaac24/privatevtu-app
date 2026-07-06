@@ -61,6 +61,7 @@ export function SessionBootstrap() {
 
   useEffect(() => {
     if (!isNavigationReady) return;
+    if (!isBootComplete()) return;
     if (isAuthenticated || onAuthRoute) return;
 
     const root = segments[0] || '';
