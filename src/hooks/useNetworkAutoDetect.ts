@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AirtimeProvider } from '../lib/api';
 import { detectNetworkFromPhone, getNumberPrefixesCached, peekNumberPrefixes } from '../lib/number-prefix-cache';
 import {
@@ -97,11 +97,18 @@ export function useNetworkAutoDetect({
 
   const normalizedPhone = normalizeNigerianPhone(phone);
 
+  const networkResolvedByPrefix = useMemo(() => {
+    if (!isCompleteNigerianPhone(phone) || !selectedNetwork) return false;
+    const detected = detectNetworkFromPhone(phone);
+    return detected?.networkCode === selectedNetwork.toLowerCase();
+  }, [phone, selectedNetwork]);
+
   return {
     onPhoneChange,
     detectedNet,
     detecting,
     normalizedPhone,
     isPhoneComplete: isCompleteNigerianPhone(phone),
+    networkResolvedByPrefix,
   };
 }

@@ -161,10 +161,68 @@ export interface ApiClientSnapshot {
   isActive: boolean;
   responseFormat: 'PLATFORM' | 'MSORG';
   allowedServices: string[];
+  allowedIps?: string[];
   webhookUrl?: string | null;
   testPublicKey: string;
   livePublicKey: string;
   lastUsedAt?: string | null;
+}
+
+export interface ExtendableServiceType {
+  id: string;
+  code: string;
+  displayName: string;
+  description?: string | null;
+}
+
+export interface DeveloperPortalSnapshot {
+  baseUrl: string;
+  authHeader: string;
+  extendableServices: ExtendableServiceType[];
+  client: {
+    id: string;
+    name: string | null;
+    environment: 'TEST' | 'LIVE';
+    responseFormat: 'PLATFORM' | 'MSORG';
+    allowedServices: string[];
+    allowedIps: string[];
+    maskedPublicKey: string | null;
+    testPublicKey: string | null;
+    livePublicKey: string | null;
+    webhookUrl?: string | null;
+    rateLimit: number;
+    lastUsedAt?: string | null;
+  } | null;
+}
+
+export interface DeveloperApiEndpointDoc {
+  id: string;
+  serviceCode?: string;
+  method: 'GET' | 'POST';
+  path: string;
+  title: string;
+  description: string;
+  fields?: Array<{
+    name: string;
+    label: string;
+    type: string;
+    required?: boolean;
+    placeholder?: string;
+    options?: Array<{ value: string; label: string }>;
+  }>;
+  samples: {
+    curl: string;
+    php: string;
+    python: string;
+    node: string;
+  };
+}
+
+export interface DeveloperDocumentation {
+  baseUrl: string;
+  responseFormat: 'PLATFORM' | 'MSORG';
+  hasActiveClient: boolean;
+  endpoints: DeveloperApiEndpointDoc[];
 }
 
 export interface ApiAccessSnapshot {
@@ -2239,10 +2297,44 @@ class ApiClient {
     responseFormat?: 'PLATFORM' | 'MSORG';
     allowedServices?: string[];
     webhookUrl?: string | null;
+    allowedIps?: string[];
   }): Promise<ApiResponse<ApiClientSnapshot>> {
     return this.request('/api-access/settings', {
       method: 'PATCH',
       body: JSON.stringify(data),
+    });
+  }
+
+  async getDeveloperPortal(): Promise<ApiResponse<DeveloperPortalSnapshot>> {
+    return this.request('/developer/portal');
+  }
+
+  async getExtendableServices(): Promise<ApiResponse<ExtendableServiceType[]>> {
+    return this.request('/developer/extendable-services');
+  }
+
+  async getDeveloperDocumentation(): Promise<ApiResponse<DeveloperDocumentation>> {
+    return this.request('/developer/docs');
+  }
+
+  async getDeveloperCatalog(): Promise<ApiResponse<Record<string, unknown>>> {
+    return this.request('/developer/catalog');
+  }
+
+  async rotateApiKeys(environment: 'TEST' | 'LIVE' = 'TEST'): Promise<ApiResponse<{
+    client: ApiClientSnapshot;
+    credentials: { environment: string; publicKey: string; secretKey: string };
+  }>> {
+    return this.request('/api-access/rotate-keys', {
+      method: 'POST',
+      body: JSON.stringify({ environment }),
+    });
+  }
+
+  async updateApiIpWhitelist(allowedIps: string[]): Promise<ApiResponse<ApiClientSnapshot>> {
+    return this.request('/api-access/ip-whitelist', {
+      method: 'PATCH',
+      body: JSON.stringify({ allowedIps }),
     });
   }
 

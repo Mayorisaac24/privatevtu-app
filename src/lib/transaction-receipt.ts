@@ -61,6 +61,10 @@ function formatPaymentMethod(type: string): string {
   }
 }
 
+/**
+ * Customer-facing share receipt — proof of purchase only.
+ * Omits wallet internals (balance, discounted debit) that belong on the in-app detail screen.
+ */
 export function buildTransactionReceiptData(
   tx: EnrichedTransaction,
   config?: Pick<SupportConfig, 'appName' | 'supportEmail'> | null,
@@ -71,7 +75,6 @@ export function buildTransactionReceiptData(
   const statusMeta = getStatusMeta(enriched.displayStatus || enriched.status);
   const displayAmount = enriched.displayAmountKobo || enriched.displayAmount || enriched.amount;
   const feeKobo = getTransactionFeeKobo(enriched);
-  const hasFee = BigInt(feeKobo || '0') > 0n;
   const isTransfer = txType === 'WITHDRAWAL' || txType === 'TRANSFER';
   const transfer = enriched.transferDetails;
   const rows: ReceiptRow[] = [];
@@ -130,22 +133,19 @@ export function buildTransactionReceiptData(
   }
 
   rows.push({
-    label: 'Amount',
+    label: isTransfer ? 'Amount sent' : 'Amount',
     value: enriched.formattedDisplayAmount || formatCurrencyVisible(displayAmount, true),
     highlight: true,
   });
 
-  if (hasFee) {
+  // Transfer fees are disclosed on receipts (regulatory / customer expectation).
+  // VTU program discounts are internal — receipt shows face value only.
+  if (isTransfer && BigInt(feeKobo || '0') > 0n) {
     rows.push({
-      label: 'Fee',
+      label: 'Transfer fee',
       value: enriched.formattedFee || formatCurrencyVisible(feeKobo, true),
     });
-    if (enriched.formattedTotalDebited) {
-      rows.push({ label: 'Total debited', value: enriched.formattedTotalDebited, highlight: true });
-    }
   }
-
-  rows.push({ label: 'Payment method', value: formatPaymentMethod(txType) });
 
   if (enriched.providerRef) {
     rows.push({ label: 'Provider reference', value: enriched.providerRef });

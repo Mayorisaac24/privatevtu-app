@@ -284,7 +284,7 @@ export default function LoginScreen() {
               <BiometricKeyGlyph
                 presentation={bioPresentation}
                 color={Colors.primary}
-                compact
+                variant="auth"
               />
             ) : (
               <Ionicons name="finger-print-outline" size={24} color={Colors.primary} />
@@ -330,7 +330,7 @@ const createStyles = (colors: import('../../src/theme/types').ThemeColors) => St
     borderRadius: Radius.lg,
     borderWidth: 1.5,
     borderColor: Overlays.rgba124_58_237_03,
-    backgroundColor: colors.card,
+    backgroundColor: colors.primaryMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },

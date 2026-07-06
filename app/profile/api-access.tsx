@@ -7,8 +7,9 @@ import {
   ActivityIndicator,
   TouchableOpacity,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import { ProfileSubScreen } from '../../src/components/profile/ProfileSubScreen';
 import { GlassCard } from '../../src/components/ui/GlassCard';
 import { GradientButton } from '../../src/components/ui/GradientButton';
@@ -16,6 +17,8 @@ import {
   api,
   isResponseSuccess,
   type ApiAccessSnapshot,
+  type DeveloperPortalSnapshot,
+  type ExtendableServiceType,
 } from '../../src/lib/api';
 import {Colors, Radius, Spacing, useThemedStyles } from '../../src/theme';
 import { showToast } from '../../src/components/ui/Toast';
@@ -26,7 +29,6 @@ import {
   readApiAccessFormState,
 } from '../../src/lib/api-access-cache';
 
-const SERVICE_OPTIONS = ['airtime', 'data', 'electricity', 'cable', 'betting'] as const;
 const FORMAT_OPTIONS = [
   { value: 'PLATFORM' as const, label: 'Platform JSON', desc: 'Native Datamart response format' },
   { value: 'MSORG' as const, label: 'MSORG compatible', desc: 'Drop-in for MSORG integrators' },
@@ -34,17 +36,22 @@ const FORMAT_OPTIONS = [
 
 export default function ApiAccessScreen() {
   const styles = useStyles();
+  const router = useRouter();
 
   const initialCache = peekApiAccessCache();
   const initialForm = initialCache ? readApiAccessFormState(initialCache) : null;
   const [loading, setLoading] = useState(!initialCache);
   const [submitting, setSubmitting] = useState(false);
   const [snapshot, setSnapshot] = useState<ApiAccessSnapshot | null>(() => initialCache);
+  const [portal, setPortal] = useState<DeveloperPortalSnapshot | null>(null);
+  const [serviceOptions, setServiceOptions] = useState<ExtendableServiceType[]>([]);
   const [clientName, setClientName] = useState(() => initialForm?.clientName ?? '');
   const [responseFormat, setResponseFormat] = useState<'PLATFORM' | 'MSORG'>(() => initialForm?.responseFormat ?? 'PLATFORM');
-  const [allowedServices, setAllowedServices] = useState<string[]>(() => initialForm?.allowedServices ?? [...SERVICE_OPTIONS]);
+  const [allowedServices, setAllowedServices] = useState<string[]>(() => initialForm?.allowedServices ?? []);
   const [webhookUrl, setWebhookUrl] = useState(() => initialForm?.webhookUrl ?? '');
+  const [allowedIpsText, setAllowedIpsText] = useState('');
   const [userNote, setUserNote] = useState(() => initialForm?.userNote ?? '');
+  const [rotatedSecret, setRotatedSecret] = useState<string | null>(null);
 
   const applySnapshot = useCallback((data: ApiAccessSnapshot) => {
     setSnapshot(data);
@@ -62,10 +69,24 @@ export default function ApiAccessScreen() {
     const showSpinner = options?.showSpinner ?? !peekApiAccessCache();
     if (showSpinner) setLoading(true);
     try {
-      const data = options?.force
-        ? await pullToRefreshApiAccess()
-        : await getApiAccessData();
-      if (data) applySnapshot(data);
+      const [accessRes, servicesRes, portalRes] = await Promise.all([
+        options?.force ? pullToRefreshApiAccess() : getApiAccessData(),
+        api.getExtendableServices(),
+        api.getDeveloperPortal(),
+      ]);
+
+      if (servicesRes && isResponseSuccess(servicesRes) && servicesRes.data?.length) {
+        setServiceOptions(servicesRes.data);
+        setAllowedServices((prev) => (prev.length ? prev : servicesRes.data!.map((s) => s.code)));
+      }
+
+      if (portalRes && isResponseSuccess(portalRes)) {
+        setPortal(portalRes.data ?? null);
+        const ips = portalRes.data?.client?.allowedIps ?? [];
+        setAllowedIpsText(ips.join('\n'));
+      }
+
+      if (accessRes) applySnapshot(accessRes);
       else if (!peekApiAccessCache()) {
         showToast({ type: 'error', text1: 'Could not load API access status' });
       }
@@ -168,6 +189,10 @@ export default function ApiAccessScreen() {
         responseFormat,
         allowedServices,
         webhookUrl: webhookUrl.trim() || null,
+        allowedIps: allowedIpsText
+          .split(/[\n,]/)
+          .map((ip) => ip.trim())
+          .filter(Boolean),
       });
       if (isResponseSuccess(res)) {
         showToast({
@@ -187,6 +212,30 @@ export default function ApiAccessScreen() {
     }
   };
 
+  const handleRotateKeys = async () => {
+    setSubmitting(true);
+    try {
+      const res = await api.rotateApiKeys('TEST');
+      if (isResponseSuccess(res) && res.data?.credentials?.secretKey) {
+        setRotatedSecret(res.data.credentials.secretKey);
+        showToast({ type: 'success', text1: 'Keys rotated', text2: 'Copy the new secret now — it will not be shown again' });
+        await load({ force: true, showSpinner: false });
+      } else {
+        showToast({ type: 'error', text1: 'Could not rotate keys', text2: res.message });
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Could not rotate keys';
+      showToast({ type: 'error', text1: 'Could not rotate keys', text2: message });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const copyText = async (label: string, value: string) => {
+    await Clipboard.setStringAsync(value);
+    showToast({ type: 'success', text1: `${label} copied` });
+  };
+
   const activeClient = snapshot?.activeClient;
   const pending = snapshot?.pending;
   const latest = snapshot?.latest;
@@ -195,10 +244,19 @@ export default function ApiAccessScreen() {
 
   return (
     <ProfileSubScreen
-      title="API Access"
-      subtitle="Request developer API credentials"
+      title="Developer's API"
+      subtitle="Manage integrations on the web dashboard"
       headerIcon="code-slash-outline"
     >
+      <GlassCard variant="solid" borderRadius={Radius.lg} padding={16} style={styles.webNotice}>
+        <View style={styles.statusHeader}>
+          <Ionicons name="desktop-outline" size={22} color={Colors.primary} />
+          <Text style={styles.statusTitle}>Web dashboard required</Text>
+        </View>
+        <Text style={styles.meta}>
+          API access requests, key rotation, documentation, and live endpoint testing are available on the PrivateVTU web app under Developer&apos;s API.
+        </Text>
+      </GlassCard>
       {loading ? (
         <ActivityIndicator color={Colors.primary} style={styles.loader} />
       ) : hasAccess ? (
@@ -208,16 +266,41 @@ export default function ApiAccessScreen() {
               <Ionicons name="checkmark-circle" size={22} color={Colors.success} />
               <Text style={styles.statusTitle}>API access active</Text>
             </View>
-            <Text style={styles.meta}>Live key: {activeClient?.livePublicKey}</Text>
-            <Text style={styles.meta}>Test key: {activeClient?.testPublicKey}</Text>
-            {activeClient?.lastUsedAt ? (
-              <Text style={styles.meta}>
-                Last used: {new Date(activeClient.lastUsedAt).toLocaleString()}
-              </Text>
+            {portal?.baseUrl ? (
+              <TouchableOpacity style={styles.copyRow} onPress={() => void copyText('Base URL', portal.baseUrl)}>
+                <Text style={styles.meta}>Base URL: {portal.baseUrl}</Text>
+                <Ionicons name="copy-outline" size={16} color={Colors.primary} />
+              </TouchableOpacity>
             ) : null}
-            <Text style={styles.hint}>
-              Secret keys are only shown once when access is approved. Contact support if you need a reset.
-            </Text>
+            <TouchableOpacity
+              style={styles.copyRow}
+              onPress={() => void copyText('Public key', portal?.client?.maskedPublicKey || activeClient?.testPublicKey || '')}
+            >
+              <Text style={styles.meta}>
+                API key: {portal?.client?.maskedPublicKey || activeClient?.testPublicKey}
+              </Text>
+              <Ionicons name="copy-outline" size={16} color={Colors.primary} />
+            </TouchableOpacity>
+            {rotatedSecret ? (
+              <TouchableOpacity style={styles.secretBox} onPress={() => void copyText('Secret key', rotatedSecret)}>
+                <Text style={styles.secretLabel}>New secret (tap to copy)</Text>
+                <Text style={styles.secretValue}>{rotatedSecret}</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={styles.hint}>
+                Secret keys are only shown when access is approved or after a reset.
+              </Text>
+            )}
+            <View style={styles.actionRow}>
+              <TouchableOpacity style={styles.secondaryBtn} onPress={() => void handleRotateKeys()} disabled={submitting}>
+                <Ionicons name="refresh-outline" size={16} color={Colors.primary} />
+                <Text style={styles.secondaryBtnText}>Reset keys</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.push('/profile/api-documentation')}>
+                <Ionicons name="book-outline" size={16} color={Colors.primary} />
+                <Text style={styles.secondaryBtnText}>Documentation</Text>
+              </TouchableOpacity>
+            </View>
           </GlassCard>
 
           <GlassCard variant="solid" borderRadius={Radius.lg} padding={16}>
@@ -258,7 +341,7 @@ export default function ApiAccessScreen() {
 
             <Text style={[styles.fieldLabel, styles.fieldGap]}>Services</Text>
             <View style={styles.chipRow}>
-              {SERVICE_OPTIONS.map((service) => {
+              {(serviceOptions.length ? serviceOptions.map((s) => s.code) : allowedServices).map((service) => {
                 const checked = allowedServices.includes(service);
                 return (
                   <TouchableOpacity
@@ -283,6 +366,18 @@ export default function ApiAccessScreen() {
               autoCapitalize="none"
               style={styles.input}
             />
+
+            <Text style={[styles.fieldLabel, styles.fieldGap]}>IP whitelist (optional)</Text>
+            <TextInput
+              value={allowedIpsText}
+              onChangeText={setAllowedIpsText}
+              placeholder={'192.168.1.1\n10.0.0.1'}
+              placeholderTextColor={Colors.muted}
+              autoCapitalize="none"
+              multiline
+              style={[styles.input, styles.textArea]}
+            />
+            <Text style={styles.hint}>One IP per line or comma-separated. Leave empty to allow all IPs.</Text>
           </GlassCard>
 
           <GradientButton
@@ -347,7 +442,7 @@ export default function ApiAccessScreen() {
 
                 <Text style={[styles.fieldLabel, styles.fieldGap]}>Services</Text>
                 <View style={styles.chipRow}>
-                  {SERVICE_OPTIONS.map((service) => {
+                  {(serviceOptions.length ? serviceOptions.map((s) => s.code) : allowedServices).map((service) => {
                     const checked = allowedServices.includes(service);
                     return (
                       <TouchableOpacity
@@ -416,6 +511,7 @@ export default function ApiAccessScreen() {
 
 const createStyles = (colors: import('../../src/theme/types').ThemeColors) => StyleSheet.create({
   loader: { marginTop: 24 },
+  webNotice: { marginBottom: Spacing.md },
   stack: { gap: Spacing.md },
   sectionTitle: {
     fontSize: 15,
@@ -444,6 +540,52 @@ const createStyles = (colors: import('../../src/theme/types').ThemeColors) => St
     fontSize: 12,
     lineHeight: 18,
     color: colors.muted,
+  },
+  copyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginTop: 6,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 14,
+    flexWrap: 'wrap',
+  },
+  secondaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: colors.borderMid,
+  },
+  secondaryBtnText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  secretBox: {
+    marginTop: 10,
+    padding: 12,
+    borderRadius: Radius.md,
+    backgroundColor: colors.primaryMuted,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  secretLabel: {
+    fontSize: 12,
+    color: colors.mid,
+    marginBottom: 4,
+  },
+  secretValue: {
+    fontFamily: 'monospace',
+    fontSize: 12,
+    color: colors.dark,
   },
   fieldLabel: {
     fontSize: 13,

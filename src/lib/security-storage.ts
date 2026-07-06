@@ -16,8 +16,8 @@ export type SecurityPrefs = {
   lockImmediatelyFromBackground: boolean;
 };
 
-/** Unified inactive threshold before the app lock screen is required. */
-export const INACTIVE_LOCK_SECONDS = 5;
+/** Unified inactive threshold before the app lock screen is required (seconds). */
+export const INACTIVE_LOCK_SECONDS = 15;
 
 export const DEFAULT_SECURITY_PREFS: SecurityPrefs = {
   authWithBiometric: false,
@@ -41,13 +41,15 @@ function normalizeSecurityPrefs(raw: Record<string, unknown>): SecurityPrefs {
   );
   const transactionsWithBiometric = !!raw.transactionsWithBiometric;
 
+  const storedLockSeconds =
+    typeof raw.inactiveLockSeconds === 'number' && raw.inactiveLockSeconds > 0
+      ? raw.inactiveLockSeconds
+      : INACTIVE_LOCK_SECONDS;
+
   return {
     authWithBiometric,
     transactionsWithBiometric,
-    inactiveLockSeconds:
-      typeof raw.inactiveLockSeconds === 'number' && raw.inactiveLockSeconds > 0
-        ? raw.inactiveLockSeconds
-        : INACTIVE_LOCK_SECONDS,
+    inactiveLockSeconds: storedLockSeconds === 5 ? INACTIVE_LOCK_SECONDS : storedLockSeconds,
     lockImmediatelyFromBackground: false,
   };
 }
@@ -73,7 +75,12 @@ export async function getSecurityPrefs(): Promise<SecurityPrefs> {
   try {
     const raw = await SecureStore.getItemAsync(KEYS.SECURITY_PREFS);
     if (!raw) return { ...DEFAULT_SECURITY_PREFS };
-    return normalizeSecurityPrefs(JSON.parse(raw) as Record<string, unknown>);
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const prefs = normalizeSecurityPrefs(parsed);
+    if (parsed.inactiveLockSeconds === 5 && prefs.inactiveLockSeconds === INACTIVE_LOCK_SECONDS) {
+      await saveSecurityPrefs(prefs);
+    }
+    return prefs;
   } catch {
     return { ...DEFAULT_SECURITY_PREFS };
   }

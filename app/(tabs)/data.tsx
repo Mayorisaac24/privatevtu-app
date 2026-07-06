@@ -57,6 +57,7 @@ export default function DataScreen() {
     detecting,
     normalizedPhone,
     isPhoneComplete,
+    networkResolvedByPrefix,
   } = useNetworkAutoDetect({
     phone,
     setPhone,
@@ -82,7 +83,13 @@ export default function DataScreen() {
   const handlePurchase = async (auth: TransactionAuthPayload) => {
     setLoading(true);
     try {
-      const res = await api.purchaseData({ provider: selectedNetwork, phone: normalizedPhone, bundleId: selectedPlan!.id, ...auth });
+      const res = await api.purchaseData({
+        provider: selectedNetwork,
+        phone: normalizedPhone,
+        bundleId: selectedPlan!.id,
+        bypassValidation: networkResolvedByPrefix,
+        ...auth,
+      });
       if (res.success) {
         const balRes = await api.getWalletBalance();
         if (isResponseSuccess(balRes)) setBalance(parseWalletBalanceKobo(balRes.data));

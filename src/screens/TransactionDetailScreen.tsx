@@ -31,6 +31,8 @@ import {
   getTransactionFeeKobo,
   getTransactionMeta,
   getTransactionVisual,
+  getTransactionWalletDebitKobo,
+  hasTransactionPricingDiscount,
 } from '../lib/transaction-display';
 import { showToast } from '../components/ui/Toast';
 import { ThemedScreen } from '../components/ui/ThemedScreen';
@@ -471,6 +473,8 @@ export default function TransactionDetailScreen({ id }: Props) {
   const isProcessing = statusMeta.tone === 'processing' || statusMeta.tone === 'pending';
   const isFunding = tx.type === 'WALLET_FUND' || tx.type === 'ADMIN_CREDIT';
   const displayAmount = tx.displayAmountKobo || tx.displayAmount || tx.amount;
+  const walletDebitKobo = getTransactionWalletDebitKobo(tx);
+  const hasPricingDiscount = hasTransactionPricingDiscount(tx);
   const feeKobo = getTransactionFeeKobo(tx);
   const hasFee = BigInt(feeKobo || '0') > 0n;
   const accountNumber = transfer?.accountNumber || readMetaString(tx.metadata, 'accountNumber');
@@ -500,6 +504,13 @@ export default function TransactionDetailScreen({ id }: Props) {
     value: tx.formattedDisplayAmount || formatCurrencyVisible(displayAmount, true),
   });
 
+  if (hasPricingDiscount) {
+    detailRows.push({
+      label: 'Debited amount',
+      value: tx.formattedTotalDebited || formatCurrencyVisible(walletDebitKobo, true),
+    });
+  }
+
   if (hasFee) {
     detailRows.push({
       label: 'Fee',
@@ -515,11 +526,17 @@ export default function TransactionDetailScreen({ id }: Props) {
   if (tx.providerRef) {
     detailRows.push({ label: 'Provider reference', value: tx.providerRef, copyValue: tx.providerRef, mono: true });
   }
-  if (tx.formattedBalanceBefore) {
-    detailRows.push({ label: 'Balance before', value: tx.formattedBalanceBefore });
+  if (tx.formattedBalanceBefore || tx.balanceBefore) {
+    detailRows.push({
+      label: 'Balance before',
+      value: tx.formattedBalanceBefore || formatCurrencyVisible(tx.balanceBefore || '0', true),
+    });
   }
-  if (tx.formattedBalanceAfter) {
-    detailRows.push({ label: 'Balance after', value: tx.formattedBalanceAfter });
+  if (tx.formattedBalanceAfter || tx.balanceAfter) {
+    detailRows.push({
+      label: 'Balance after',
+      value: tx.formattedBalanceAfter || formatCurrencyVisible(tx.balanceAfter || '0', true),
+    });
   }
 
   return (

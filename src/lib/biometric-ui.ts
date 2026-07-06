@@ -1,11 +1,10 @@
 import { Platform } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-export type BiometricIconName = keyof typeof MaterialCommunityIcons.glyphMap;
+export type BiometricGlyphKind = 'face-scan' | 'fingerprint' | 'generic';
 
 export type BiometricUiPresentation = {
-  icon: BiometricIconName;
+  kind: BiometricGlyphKind;
   shortLabel: string;
   accessibilityLabel: string;
 };
@@ -18,7 +17,7 @@ export function getBiometricUiFromTypes(
 
   if (hasFace) {
     return {
-      icon: 'face-recognition',
+      kind: 'face-scan',
       shortLabel: Platform.OS === 'ios' ? 'Face ID' : 'Face',
       accessibilityLabel:
         Platform.OS === 'ios' ? 'Unlock with Face ID' : 'Unlock with face recognition',
@@ -27,7 +26,7 @@ export function getBiometricUiFromTypes(
 
   if (hasFingerprint) {
     return {
-      icon: 'fingerprint',
+      kind: 'fingerprint',
       shortLabel: Platform.OS === 'ios' ? 'Touch ID' : 'Fingerprint',
       accessibilityLabel:
         Platform.OS === 'ios' ? 'Unlock with Touch ID' : 'Unlock with fingerprint',
@@ -35,7 +34,7 @@ export function getBiometricUiFromTypes(
   }
 
   return {
-    icon: 'shield-lock-outline',
+    kind: 'generic',
     shortLabel: 'Biometric',
     accessibilityLabel: 'Unlock with biometrics',
   };

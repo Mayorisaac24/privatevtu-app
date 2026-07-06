@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Overlays, useColors, useThemedStyles } from '../../theme';
+import { Colors, Overlays, useThemedStyles } from '../../theme';
 import { isAndroid } from '../../lib/platform-ui';
 import type { BiometricUiPresentation } from '../../lib/biometric-ui';
 import { BiometricKeyGlyph } from './BiometricKeyGlyph';
@@ -106,7 +106,6 @@ export function PinKeypad({
   loadingLabel = 'Verifying PIN…',
 }: PinKeypadProps) {
   const styles = useStyles();
-  const colors = useColors();
 
   const isDark = variant === 'dark';
   const minimal = keyVariant === 'minimal' && !isDark;
@@ -146,9 +145,8 @@ export function PinKeypad({
             const actionBusy = busy || bottomLeftAction.loading || bottomLeftAction.disabled;
             const bioColor = isDark
               ? Colors.white
-              : isAndroid
-                ? Colors.primaryDeep
-                : colors.dark;
+              : Colors.primaryDeep;
+            const bioVariant = isDark ? 'keypad-dark' : 'keypad-light';
             return (
               <TouchableOpacity
                 key="bio"
@@ -166,6 +164,7 @@ export function PinKeypad({
                   style={[
                     styles.key,
                     isDark ? styles.keyDark : minimal ? styles.keyMinimal : styles.keyLight,
+                    isDark ? styles.keyBiometricDark : styles.keyBiometricLight,
                     actionBusy && styles.keyDisabled,
                   ]}
                 >
@@ -173,7 +172,8 @@ export function PinKeypad({
                     presentation={bottomLeftAction.presentation}
                     color={bioColor}
                     loading={bottomLeftAction.loading}
-                    showLabel={isAndroid}
+                    variant={bioVariant}
+                    showLabel={isAndroid && !isDark}
                   />
                 </View>
               </TouchableOpacity>
@@ -349,6 +349,14 @@ const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleS
   },
   keyDisabled: {
     opacity: 0.45,
+  },
+  keyBiometricLight: {
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+  },
+  keyBiometricDark: {
+    backgroundColor: 'transparent',
+    borderWidth: 0,
   },
   keyText: {
     fontSize: 30,

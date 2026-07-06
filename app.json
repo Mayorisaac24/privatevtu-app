@@ -20,7 +20,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.devnex.datamartng",
-      "buildNumber": "7",
+      "buildNumber": "8",
       "infoPlist": {
         "CFBundleDisplayName": "Datamart",
         "NSCameraUsageDescription": "Allow camera for KYC live face scan and document capture",
@@ -40,7 +40,7 @@
       },
       "icon": "./assets/icon.png",
       "package": "com.devnex.datamartng",
-      "versionCode": 4,
+      "versionCode": 7,
       "googleServicesFile": "./google-services.json",
       "permissions": [
         "android.permission.CAMERA",

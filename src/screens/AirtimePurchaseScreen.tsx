@@ -52,6 +52,7 @@ export default function AirtimePurchaseScreen() {
     detecting,
     normalizedPhone,
     isPhoneComplete,
+    networkResolvedByPrefix,
   } = useNetworkAutoDetect({
     phone,
     setPhone,
@@ -72,7 +73,13 @@ export default function AirtimePurchaseScreen() {
   const handlePurchase = async (auth: TransactionAuthPayload) => {
     setLoading(true);
     try {
-      const res = await api.purchaseAirtime({ network: selectedNetwork, phone: normalizedPhone, amount: parseFloat(amount), ...auth });
+      const res = await api.purchaseAirtime({
+        network: selectedNetwork,
+        phone: normalizedPhone,
+        amount: parseFloat(amount),
+        bypassValidation: networkResolvedByPrefix,
+        ...auth,
+      });
       if (res.success) {
         const balRes = await api.getWalletBalance();
         if (isResponseSuccess(balRes)) setBalance(parseWalletBalanceKobo(balRes.data));

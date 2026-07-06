@@ -159,13 +159,6 @@ export default function ProfileScreen() {
           action: () => router.push('/profile/referrals'),
         },
         {
-          icon: 'code-slash-outline',
-          label: 'API Access',
-          subtitle: apiAccessSubtitle,
-          badge: apiAccessBadge,
-          action: () => router.push('/profile/api-access'),
-        },
-        {
           icon: 'lock-closed-outline',
           label: 'Change PIN',
           subtitle: 'Update your transaction PIN',

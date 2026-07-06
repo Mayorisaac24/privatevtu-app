@@ -68,6 +68,17 @@ function readMetadataRecord(metadata: unknown): Record<string, unknown> | null {
   return metadata as Record<string, unknown>;
 }
 
+function resolveRechargeAmountKobo(tx: Transaction): bigint | null {
+  const meta = readMetadataRecord(tx.metadata);
+  if (meta?.rechargeAmount != null && String(meta.rechargeAmount).length > 0) {
+    return BigInt(String(meta.rechargeAmount));
+  }
+  if (meta?.amountKobo != null && String(meta.amountKobo).length > 0) {
+    return BigInt(String(meta.amountKobo));
+  }
+  return null;
+}
+
 function resolveDisplayAmountKobo(tx: Transaction): string {
   if (tx.displayAmount) return tx.displayAmount;
 
@@ -84,7 +95,29 @@ function resolveDisplayAmountKobo(tx: Transaction): string {
     return String(transferAmount);
   }
 
+  const rechargeAmount = resolveRechargeAmountKobo(tx);
+  if (rechargeAmount != null && INSTANT_SERVICE_TYPES.includes(type)) {
+    return rechargeAmount.toString();
+  }
+
   return storedAmount;
+}
+
+function resolveWalletDebitKobo(tx: Transaction): string {
+  if (tx.totalDebited && BigInt(tx.totalDebited) > 0n) {
+    return tx.totalDebited;
+  }
+  return String(tx.amount || '0');
+}
+
+export function getTransactionWalletDebitKobo(tx: Transaction): string {
+  return resolveWalletDebitKobo(tx);
+}
+
+export function hasTransactionPricingDiscount(tx: Transaction): boolean {
+  const face = BigInt(resolveDisplayAmountKobo(tx));
+  const debit = BigInt(resolveWalletDebitKobo(tx));
+  return face > debit;
 }
 
 function resolveFeeKobo(tx: Transaction): string {
@@ -227,6 +260,7 @@ export function enrichTransaction(tx: Transaction): EnrichedTransaction {
 
   const isCredit = txType === 'WALLET_FUND' || txType === 'ADMIN_CREDIT' || Boolean(tx.isCredit);
   const displayAmountKobo = resolveDisplayAmountKobo(tx);
+  const walletDebitKobo = resolveWalletDebitKobo(tx);
 
   return {
     ...tx,
@@ -240,6 +274,7 @@ export function enrichTransaction(tx: Transaction): EnrichedTransaction {
     logoKey,
     isCredit,
     displayAmountKobo,
+    totalDebited: tx.totalDebited || walletDebitKobo,
   };
 }
 
