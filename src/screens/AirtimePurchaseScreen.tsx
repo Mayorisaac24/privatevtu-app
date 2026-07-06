@@ -9,7 +9,7 @@ import {Colors, Spacing, Typography, Radius, useThemedStyles } from '../theme';
 import { showToast } from '../components/ui/Toast';
 import { NetworkProviderGrid } from '../components/NetworkProviderGrid';
 import { PhoneNumberInput } from '../components/PhoneNumberInput';
-import { ServiceScreenHeader } from '../components/ServiceScreenHeader';
+import { ServiceScreenHeader, SERVICE_SCROLL_TOP_INSET } from '../components/ServiceScreenHeader';
 import { getProviderCode } from '../lib/providers';
 import { useHardwareBack } from '../hooks/useHardwareBack';
 import { navigateBack } from '../lib/navigation';
@@ -241,7 +241,7 @@ export default function AirtimePurchaseScreen() {
 }
 
 const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleSheet.create({
-  scroll: { paddingBottom: 40 },
+  scroll: { paddingTop: SERVICE_SCROLL_TOP_INSET, paddingBottom: 40 },
   amountWrap: {
     flexDirection: 'row', alignItems: 'center',
     borderWidth: 1.5, borderColor: colors.borderMid,

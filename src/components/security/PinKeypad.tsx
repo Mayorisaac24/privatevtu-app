@@ -1,12 +1,14 @@
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import {Colors , Palette, FormColors, BRAND, Overlays, useThemedStyles } from '../../theme';
+import { Colors, Overlays, useColors, useThemedStyles } from '../../theme';
 import { isAndroid } from '../../lib/platform-ui';
+import type { BiometricUiPresentation } from '../../lib/biometric-ui';
+import { BiometricKeyGlyph } from './BiometricKeyGlyph';
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'bio', '0', 'back'] as const;
 
 type PinKeypadBottomAction = {
-  icon: keyof typeof Ionicons.glyphMap;
+  presentation: BiometricUiPresentation;
   onPress: () => void;
   loading?: boolean;
   disabled?: boolean;
@@ -104,6 +106,7 @@ export function PinKeypad({
   loadingLabel = 'Verifying PIN…',
 }: PinKeypadProps) {
   const styles = useStyles();
+  const colors = useColors();
 
   const isDark = variant === 'dark';
   const minimal = keyVariant === 'minimal' && !isDark;
@@ -141,6 +144,11 @@ export function PinKeypad({
             }
 
             const actionBusy = busy || bottomLeftAction.loading || bottomLeftAction.disabled;
+            const bioColor = isDark
+              ? Colors.white
+              : isAndroid
+                ? Colors.primaryDeep
+                : colors.dark;
             return (
               <TouchableOpacity
                 key="bio"
@@ -149,7 +157,10 @@ export function PinKeypad({
                 disabled={actionBusy}
                 activeOpacity={0.72}
                 accessibilityRole="button"
-                accessibilityLabel={bottomLeftAction.accessibilityLabel || 'Unlock with biometric'}
+                accessibilityLabel={
+                  bottomLeftAction.accessibilityLabel
+                  || bottomLeftAction.presentation.accessibilityLabel
+                }
               >
                 <View
                   style={[
@@ -158,15 +169,12 @@ export function PinKeypad({
                     actionBusy && styles.keyDisabled,
                   ]}
                 >
-                  {bottomLeftAction.loading ? (
-                    <ActivityIndicator color={isDark ? Colors.white : Colors.primary} size="small" />
-                  ) : (
-                    <Ionicons
-                      name={bottomLeftAction.icon}
-                      size={26}
-                      color={isDark ? Colors.white : Colors.primary}
-                    />
-                  )}
+                  <BiometricKeyGlyph
+                    presentation={bottomLeftAction.presentation}
+                    color={bioColor}
+                    loading={bottomLeftAction.loading}
+                    showLabel={isAndroid}
+                  />
                 </View>
               </TouchableOpacity>
             );
@@ -296,12 +304,12 @@ const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleS
   },
   grid: {
     width: '100%',
-    maxWidth: 300,
+    maxWidth: 328,
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    rowGap: 12,
-    columnGap: 18,
+    rowGap: 14,
+    columnGap: 26,
   },
   keySlot: {
     width: KEY_SIZE,
@@ -317,19 +325,19 @@ const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleS
     justifyContent: 'center',
   },
   keyDark: {
-    backgroundColor: Overlays.white10,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     borderWidth: 1,
-    borderColor: Overlays.white16,
+    borderColor: 'rgba(255,255,255,0.16)',
   },
   keyLight: {
     backgroundColor: colors.primaryMuted,
     borderWidth: 1,
-    borderColor: Overlays.darkAmbientPrimary,
+    borderColor: 'rgba(124, 58, 237, 0.12)',
   },
   keyMinimal: {
     backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: Overlays.violet08,
+    borderColor: 'rgba(124, 58, 237, 0.08)',
     ...(isAndroid
       ? { elevation: 2 }
       : {

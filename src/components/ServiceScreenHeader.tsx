@@ -41,7 +41,7 @@ export function ServiceScreenHeader({
         colors={gradientStops(gradients.hero)}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[styles.header, { paddingTop: insets.top + 12 }]}
+        style={[styles.header, stepProgress ? styles.headerWithSteps : null, { paddingTop: insets.top + 12 }]}
       >
         <View style={styles.headerBlob1} />
         <View style={styles.headerBlob2} />
@@ -75,17 +75,25 @@ export function ServiceScreenHeader({
         </View>
 
         {stepProgress ? (
-          <ServiceStepProgress
-            activeIndex={stepProgress.activeIndex}
-            labels={stepProgress.labels}
-            variant="hero"
-          />
+          <View style={styles.stepProgressWrap}>
+            <ServiceStepProgress
+              activeIndex={stepProgress.activeIndex}
+              labels={stepProgress.labels}
+              variant="hero"
+            />
+          </View>
         ) : null}
 
         {footer}
       </LinearGradient>
 
-      <View style={[styles.contentCurve, { backgroundColor: colors.pageBg }]} />
+      <View
+        style={[
+          styles.contentCurve,
+          stepProgress ? styles.contentCurveWithSteps : null,
+          { backgroundColor: colors.pageBg },
+        ]}
+      />
     </>
   );
 }
@@ -95,6 +103,12 @@ const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleS
     paddingHorizontal: Spacing.page,
     paddingBottom: 20,
     overflow: 'hidden',
+  },
+  headerWithSteps: {
+    paddingBottom: 24,
+  },
+  stepProgressWrap: {
+    zIndex: 2,
   },
   headerBlob1: {
     position: 'absolute',
@@ -173,7 +187,13 @@ const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleS
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
   },
+  contentCurveWithSteps: {
+    marginTop: -20,
+  },
 });
+
+/** Extra top inset for scroll content below {@link ServiceScreenHeader} step pills. */
+export const SERVICE_SCROLL_TOP_INSET = 4;
 
 function useStyles() {
   return useThemedStyles(createStyles);

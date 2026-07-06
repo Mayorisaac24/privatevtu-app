@@ -154,3 +154,13 @@ export function showToast(options: ShowToastOptions) {
     visibilityTime: options.visibilityTime ?? 2800,
   });
 }
+
+/** Show a toast after a Modal overlay has unmounted (e.g. LoadingOverlay). */
+export function showToastAfterModalDismiss(
+  options: ShowToastOptions,
+  dismissDelayMs = 80,
+) {
+  requestAnimationFrame(() => {
+    setTimeout(() => showToast(options), dismissDelayMs);
+  });
+}

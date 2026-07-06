@@ -47,7 +47,7 @@ import { useWalletStore } from '../../src/stores';
 import {Colors, Spacing, Shadow, Radius , Palette, FormColors, BRAND, Overlays, useThemedStyles } from '../../src/theme';
 import { useGradients, useColors } from '../../src/theme/hooks';
 import { gradientStops } from '../../src/theme/gradient-utils';
-import { showToast } from '../../src/components/ui/Toast';
+import { showToast, showToastAfterModalDismiss, type ShowToastOptions } from '../../src/components/ui/Toast';
 import { useHardwareBack } from '../../src/hooks/useHardwareBack';
 import { useStatusBarStyle } from '../../src/hooks/useStatusBarStyle';
 import { navigateBack } from '../../src/lib/navigation';
@@ -472,29 +472,31 @@ function FundWalletScreen() {
       return;
     }
     setStaticAccountOverlayVisible(true);
+    let toast: ShowToastOptions | null = null;
     try {
       const res = await api.createStaticVirtualAccount(bankCodes);
       if (isResponseSuccess(res) && res.data) {
         const createdCount = res.data.allAccounts?.length ?? bankCodes.length;
-        showToast({
+        toast = {
           type: 'success',
           text1: createdCount > 1 ? `${createdCount} accounts created` : 'Permanent account ready',
-        });
+        };
         const accountsRes = await api.getVirtualAccounts();
         if (isResponseSuccess(accountsRes)) setVirtualAccounts(accountsRes.data ?? []);
         setSelectedBanks(new Set());
         await refreshFundingBanks();
       } else {
-        showToast({
+        toast = {
           type: 'error',
           text1: res.message || 'Error creating permanent virtual account',
-        });
+        };
       }
     } catch {
-      showToast({ type: 'error', text1: 'Error creating permanent virtual account' });
+      toast = { type: 'error', text1: 'Error creating permanent virtual account' };
     } finally {
       setStaticAccountOverlayVisible(false);
     }
+    if (toast) showToastAfterModalDismiss(toast);
   };
 
   const openDynamicBankPicker = async (forceCreate = false) => {

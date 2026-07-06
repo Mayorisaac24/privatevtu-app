@@ -20,6 +20,9 @@ import {
   getQuickSignInEmail,
   hasBiometricSignInEnabled,
 } from '../../src/lib/biometric-auth';
+import { getBiometricUiPresentation } from '../../src/lib/biometric-ui';
+import type { BiometricUiPresentation } from '../../src/lib/biometric-ui';
+import { BiometricKeyGlyph } from '../../src/components/security/BiometricKeyGlyph';
 import { canUseBiometricAuth, getSecurityPrefs } from '../../src/lib/security-storage';
 import { AuthShell, AuthCardHeader, AuthSecurityFooter } from '../../src/components/auth/AuthShell';
 import { AuthInput } from '../../src/components/auth/AuthInput';
@@ -47,6 +50,7 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [bioLoading, setBioLoading] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [bioPresentation, setBioPresentation] = useState<BiometricUiPresentation | null>(null);
   const [quickSignInEmail, setQuickSignInEmail] = useState<string | null>(null);
   const loginInFlight = useRef(false);
   const { setUser } = useAuthStore();
@@ -55,6 +59,10 @@ export default function LoginScreen() {
     void (async () => {
       const capability = await getBiometricCapability();
       setBiometricAvailable(capability.available);
+      if (capability.available) {
+        const presentation = await getBiometricUiPresentation();
+        setBioPresentation(presentation);
+      }
 
       const prefs = await getSecurityPrefs();
       const biometricReady =
@@ -259,11 +267,25 @@ export default function LoginScreen() {
             disabled={bioLoading || isLoading}
             activeOpacity={0.85}
             accessibilityRole="button"
-            accessibilityLabel="Continue with biometric"
-            accessibilityHint="Sign in using Face ID or fingerprint"
+            accessibilityLabel={
+              bioPresentation
+                ? `Continue with ${bioPresentation.shortLabel}`
+                : 'Continue with biometric'
+            }
+            accessibilityHint={
+              bioPresentation
+                ? `Sign in using ${bioPresentation.shortLabel}`
+                : 'Sign in using Face ID or fingerprint'
+            }
           >
             {bioLoading ? (
               <ActivityIndicator color={Colors.primary} size="small" />
+            ) : bioPresentation ? (
+              <BiometricKeyGlyph
+                presentation={bioPresentation}
+                color={Colors.primary}
+                compact
+              />
             ) : (
               <Ionicons name="finger-print-outline" size={24} color={Colors.primary} />
             )}

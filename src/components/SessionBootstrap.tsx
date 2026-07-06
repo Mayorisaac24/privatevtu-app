@@ -17,6 +17,7 @@ import {
 import { refreshServiceCatalogSilently } from '../lib/service-catalog-cache';
 import { syncCatalogRevision } from '../lib/catalog-revision-sync';
 import { safeReplace, setRootNavigationReady } from '../lib/navigation';
+import { isBootComplete } from '../lib/boot-state';
 import { useAuthStore, useSecurityStore } from '../stores';
 import { useNotificationsStore } from '../stores/notifications-store';
 import { useServiceAvailabilityStore } from '../stores/service-availability-store';
@@ -46,6 +47,7 @@ export function SessionBootstrap() {
 
   const onAuthRoute = segments[0] === 'auth';
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isLocked = useSecurityStore((s) => s.isLocked);
   const fetchUnreadCount = useNotificationsStore((s) => s.fetchUnreadCount);
   const fetchNotifications = useNotificationsStore((s) => s.fetchNotifications);
 
@@ -69,6 +71,8 @@ export function SessionBootstrap() {
 
   useEffect(() => {
     if (!isAuthenticated || onAuthRoute) return;
+    if (!isBootComplete()) return;
+    if (isLocked) return;
 
     void (async () => {
       await prefetchAppData();
@@ -81,7 +85,7 @@ export function SessionBootstrap() {
       void fetchNotifications({ page: 1 });
       void fetchUnreadCount();
     })();
-  }, [fetchNotifications, fetchUnreadCount, isAuthenticated, onAuthRoute]);
+  }, [fetchNotifications, fetchUnreadCount, isAuthenticated, isLocked, onAuthRoute]);
 
   useEffect(() => {
     if (!isAuthenticated || onAuthRoute) return;

@@ -35,6 +35,13 @@ function formatWhen(iso: string) {
   });
 }
 
+function resolveNotificationType(item: AppNotification): AppNotificationType {
+  const alertType = typeof item.data?.alertType === 'string' ? item.data.alertType : '';
+  if (alertType === 'account_created') return 'success';
+  if (alertType === 'login_alert' || alertType === 'security_notice') return 'warning';
+  return item.type;
+}
+
 function iconForType(type: AppNotificationType): keyof typeof Ionicons.glyphMap {
   switch (type) {
     case 'success': return 'checkmark-circle';
@@ -279,7 +286,7 @@ export default function NotificationDetailScreen({ id }: Props) {
     );
   }
 
-  const palette = getNotificationTypePalette(notification.type, colors);
+  const palette = getNotificationTypePalette(resolveNotificationType(notification), colors);
 
   return (
     <ThemedScreen>
@@ -304,7 +311,7 @@ export default function NotificationDetailScreen({ id }: Props) {
       <View style={[styles.body, { paddingBottom: insets.bottom + 24 }]}>
         <GlassCard variant={notification.isRead ? 'light' : 'tinted'} borderRadius={18} contentStyle={styles.card}>
           <View style={[styles.iconBadge, { backgroundColor: palette.bg }]}>
-            <Ionicons name={iconForType(notification.type)} size={24} color={palette.color} />
+            <Ionicons name={iconForType(resolveNotificationType(notification))} size={24} color={palette.color} />
           </View>
 
           <Text style={styles.title}>{notification.title}</Text>

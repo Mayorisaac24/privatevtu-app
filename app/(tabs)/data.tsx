@@ -10,7 +10,7 @@ import {Colors, Typography, Radius, useThemedStyles } from '../../src/theme';
 import { showToast } from '../../src/components/ui/Toast';
 import { NetworkProviderGrid } from '../../src/components/NetworkProviderGrid';
 import { PhoneNumberInput } from '../../src/components/PhoneNumberInput';
-import { ServiceScreenHeader } from '../../src/components/ServiceScreenHeader';
+import { ServiceScreenHeader, SERVICE_SCROLL_TOP_INSET } from '../../src/components/ServiceScreenHeader';
 import { useHardwareBack } from '../../src/hooks/useHardwareBack';
 import { navigateBack } from '../../src/lib/navigation';
 import { ThemedScreen } from '../../src/components/ui/ThemedScreen';
@@ -282,7 +282,7 @@ export default function DataScreen() {
 }
 
 const createStyles = (colors: import('../../src/theme/types').ThemeColors) => StyleSheet.create({
-  scroll: { paddingBottom: 40 },
+  scroll: { paddingTop: SERVICE_SCROLL_TOP_INSET, paddingBottom: 40 },
   typePills: { gap: 8, paddingVertical: 2 },
   typePill: {
     paddingHorizontal: 14,

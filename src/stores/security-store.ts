@@ -56,11 +56,12 @@ export const useSecurityStore = create<SecurityState>((set, get) => ({
   })),
 
   shouldLockOnResume: () => {
-    const { lastLeftAt, isLocked } = get();
+    const { lastLeftAt, isLocked, prefs } = get();
     if (isLocked || lastLeftAt == null) return isLocked;
 
+    const thresholdMs = (prefs.inactiveLockSeconds || INACTIVE_LOCK_SECONDS) * 1000;
     const elapsedMs = Date.now() - lastLeftAt;
-    return elapsedMs >= INACTIVE_LOCK_SECONDS * 1000;
+    return elapsedMs >= thresholdMs;
   },
 
   loadPrefs: async (options?: { force?: boolean }) => {

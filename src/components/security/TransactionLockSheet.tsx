@@ -11,7 +11,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTransactionLockAuth, type TransactionAuthPayload } from '../../hooks/useTransactionLockAuth';
-import { getBiometricCapability } from '../../lib/biometric-auth';
+import { getBiometricUiPresentation, getAuthorizeBiometricAccessibilityLabel } from '../../lib/biometric-ui';
+import type { BiometricUiPresentation } from '../../lib/biometric-ui';
 import { useStatusBarStyle } from '../../hooks/useStatusBarStyle';
 import {Colors, Radius, Shadow, Spacing, Typography , Overlays, useThemedStyles } from '../../theme';
 import { useColors, useGradients } from '../../theme/hooks';
@@ -61,7 +62,7 @@ export function TransactionLockSheet({
   const [pin, setPin] = useState('');
   const [bioLoading, setBioLoading] = useState(false);
   const [authorizing, setAuthorizing] = useState(false);
-  const [bioIcon, setBioIcon] = useState<keyof typeof Ionicons.glyphMap>('finger-print-outline');
+  const [bioPresentation, setBioPresentation] = useState<BiometricUiPresentation | null>(null);
   const {
     biometricEnabled,
     biometricVerified,
@@ -80,11 +81,7 @@ export function TransactionLockSheet({
   const recipient = recipientFromSubtitle(subtitle);
 
   useEffect(() => {
-    void getBiometricCapability().then((capability) => {
-      if (capability.label === 'Face ID') {
-        setBioIcon('scan-outline');
-      }
-    });
+    void getBiometricUiPresentation().then(setBioPresentation);
   }, []);
 
   const submitAuthorization = useCallback(async (
@@ -309,13 +306,13 @@ export function TransactionLockSheet({
                 showStatus={false}
                 variant="light"
                 bottomLeftAction={
-                  showBiometric
+                  showBiometric && bioPresentation
                     ? {
-                        icon: bioIcon,
+                        presentation: bioPresentation,
                         onPress: () => void handleBiometric(),
                         loading: bioLoading,
                         disabled: busy,
-                        accessibilityLabel: `Authorize with ${biometricLabel}`,
+                        accessibilityLabel: getAuthorizeBiometricAccessibilityLabel(bioPresentation),
                       }
                     : undefined
                 }

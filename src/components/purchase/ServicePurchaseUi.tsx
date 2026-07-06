@@ -317,7 +317,8 @@ const createStyles = (colors: import('../../theme/types').ThemeColors) => StyleS
   heroStepRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 18,
+    marginTop: 14,
+    marginBottom: 4,
     gap: 8,
   },
   heroStepPill: {

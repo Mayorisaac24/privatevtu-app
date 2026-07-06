@@ -15,9 +15,10 @@ import { gradientStops, withAlpha } from '../../theme/gradient-utils';
 import { UserAvatar } from '../ui/UserAvatar';
 import { PinKeypad } from './PinKeypad';
 import { isAndroid } from '../../lib/platform-ui';
+import type { BiometricUiPresentation } from '../../lib/biometric-ui';
 
 type BiometricAction = {
-  icon: keyof typeof Ionicons.glyphMap;
+  presentation: BiometricUiPresentation;
   onPress: () => void;
   loading?: boolean;
   disabled?: boolean;

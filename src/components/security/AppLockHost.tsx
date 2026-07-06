@@ -1,15 +1,19 @@
 import { useEffect, useRef } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
-import { router, usePathname } from 'expo-router';
+import { usePathname } from 'expo-router';
 import { useAuthStore, useSecurityStore } from '../../stores';
 import { isAppLockEnabled } from '../../lib/security-storage';
 import { AppPrivacyOverlay } from './AppPrivacyOverlay';
+import { AppLockOverlay } from './AppLockOverlay';
 
-const UNLOCK_ROUTE = '/dashboard/unlock';
 const AUTH_PREFIXES = ['/auth', '/dashboard/setup-pin'];
 
 function shouldGuardSession(isAuthenticated: boolean, hasPin: boolean): boolean {
   return isAuthenticated && isAppLockEnabled(hasPin);
+}
+
+function isAuthExemptPath(pathname: string): boolean {
+  return AUTH_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
 export function AppLockHost() {
@@ -27,7 +31,6 @@ export function AppLockHost() {
     prefsLoaded,
   } = useSecurityStore();
   const appState = useRef(AppState.currentState);
-  const redirectingRef = useRef(false);
 
   useEffect(() => {
     void loadPrefs();
@@ -71,33 +74,22 @@ export function AppLockHost() {
   ]);
 
   useEffect(() => {
-    if (!prefsLoaded || !isAuthenticated || !user?.hasPin) return;
-    if (!isLocked) {
-      redirectingRef.current = false;
-      return;
-    }
-    if (pathname === UNLOCK_ROUTE) return;
-    if (AUTH_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return;
-    if (redirectingRef.current) return;
-
-    redirectingRef.current = true;
-    const { lockReturnPath } = useSecurityStore.getState();
-    if (!lockReturnPath) {
-      useSecurityStore.setState({ lockReturnPath: pathname });
-    }
-    router.replace(UNLOCK_ROUTE);
-  }, [isLocked, isAuthenticated, user?.hasPin, pathname, prefsLoaded]);
-
-  useEffect(() => {
     if (!isAuthenticated) {
       unlock();
     }
   }, [isAuthenticated, unlock]);
 
-  const showPrivacy = isPrivacyMode
-    && isAuthenticated
-    && isAppLockEnabled(!!user?.hasPin)
-    && !isLocked;
+  const guarded = prefsLoaded
+    && shouldGuardSession(isAuthenticated, !!user?.hasPin)
+    && !isAuthExemptPath(pathname);
 
-  return <AppPrivacyOverlay visible={showPrivacy} />;
+  const showLock = guarded && isLocked;
+  const showPrivacy = guarded && isPrivacyMode && !isLocked;
+
+  return (
+    <>
+      <AppPrivacyOverlay visible={showPrivacy} />
+      <AppLockOverlay visible={showLock} />
+    </>
+  );
 }

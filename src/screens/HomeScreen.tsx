@@ -50,6 +50,9 @@ import { BroadcastBanner } from '../components/broadcast/BroadcastBanner';
 import { UserAvatar } from '../components/ui/UserAvatar';
 import { ScreenContent } from '../components/ui/ScreenContent';
 import { useGridTileWidth, useLayout } from '../lib/platform-ui';
+import { getKycStatusData, peekKycStatusCache } from '../lib/kyc-status-cache';
+import { shouldShowHomeKycBanner } from '../lib/kyc-display';
+import type { KycStatusData } from '../lib/api';
 
 const HEADER_ROW_H = 52;
 const HEADER_DIVIDER_H = 13;
@@ -143,6 +146,7 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
   const [funding, setFunding] = useState<WalletFundingSnapshot | null>(() => peekWalletFundingCache());
+  const [kycData, setKycData] = useState<KycStatusData | null>(() => peekKycStatusCache());
   const [fundingLoading, setFundingLoading] = useState(() => {
     if (hasWalletFundingAccountsReady()) return false;
     const cached = peekWalletFundingCache();
@@ -158,6 +162,18 @@ export default function HomeScreen() {
   const qaTileWidth = useGridTileWidth({ columns: QA_COLS, gap: QA_GAP, padding: pagePadding });
 
   const lastUpdated = useMemo(() => getHomeLastUpdated(), [dashboardVersion]);
+  const showKycBanner = useMemo(
+    () => user ? shouldShowHomeKycBanner(user.kycStatus, kycData, funding?.kycTier) : false,
+    [user, kycData, funding?.kycTier],
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      void getKycStatusData().then((data) => {
+        if (data) setKycData(data);
+      });
+    }, []),
+  );
 
   const loadFunding = useCallback(async (force = false) => {
     const cached = peekWalletFundingCache();
@@ -339,7 +355,7 @@ export default function HomeScreen() {
           }}
         />
 
-        {user && user.kycStatus !== 'VERIFIED' && (
+        {showKycBanner && (
           <TouchableOpacity activeOpacity={0.85} onPress={() => router.push('/kyc')}>
             <GlassSurface variant="tinted" borderRadius={14} contentStyle={styles.kycBanner}>
               <View style={styles.kycBannerIcon}>
@@ -436,13 +452,21 @@ export default function HomeScreen() {
         <View style={[styles.headerContent, { paddingTop: insets.top + 10, paddingHorizontal: pagePadding }]}>
           <View style={styles.topBar}>
             <View style={styles.greetRow}>
-              <UserAvatar
-                uri={user?.avatar}
-                firstName={user?.firstName}
-                lastName={user?.lastName}
-                size="sm"
-                variant={isDark ? 'brand' : 'light'}
-              />
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setTab('profile')}
+                accessibilityRole="button"
+                accessibilityLabel="Open profile"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <UserAvatar
+                  uri={user?.avatar}
+                  firstName={user?.firstName}
+                  lastName={user?.lastName}
+                  size="sm"
+                  variant={isDark ? 'brand' : 'light'}
+                />
+              </TouchableOpacity>
               <View>
                 <Text style={styles.greetSmall}>{greeting}</Text>
                 <Text style={styles.greetName}>{firstName}</Text>

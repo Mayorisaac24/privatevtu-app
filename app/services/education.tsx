@@ -8,7 +8,7 @@ import { api, formatCurrency, isResponseSuccess, parseWalletBalanceKobo, type Ed
 import { useWalletStore } from '../../src/stores';
 import {Colors, Typography, Radius, useThemedStyles } from '../../src/theme';
 import { showToast } from '../../src/components/ui/Toast';
-import { ServiceScreenHeader } from '../../src/components/ServiceScreenHeader';
+import { ServiceScreenHeader, SERVICE_SCROLL_TOP_INSET } from '../../src/components/ServiceScreenHeader';
 import { useHardwareBack } from '../../src/hooks/useHardwareBack';
 import { navigateBack } from '../../src/lib/navigation';
 import { ThemedScreen } from '../../src/components/ui/ThemedScreen';
@@ -175,8 +175,7 @@ function EducationScreen() {
         balanceLabel={formatCurrency(balance)}
         onBack={handleBack}
         stepProgress={{
-          current: step === 'confirm' ? 2 : 1,
-          total: 2,
+          activeIndex: step === 'confirm' ? 1 : 0,
           labels: ['Details', 'Confirm'],
         }}
       />
@@ -337,7 +336,7 @@ export default function EducationRoute() {
 }
 
 const createStyles = (colors: import('../../src/theme/types').ThemeColors) => StyleSheet.create({
-  stack: { gap: 14, paddingBottom: 24 },
+  stack: { gap: 14, paddingTop: SERVICE_SCROLL_TOP_INSET, paddingBottom: 24 },
   loadRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, justifyContent: 'center' },
   loadText: { ...Typography.small, color: colors.muted },
   planList: { gap: 8 },

@@ -54,6 +54,13 @@ function groupLabel(iso: string) {
   return date.toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
+function resolveNotificationType(item: AppNotification): AppNotificationType {
+  const alertType = typeof item.data?.alertType === 'string' ? item.data.alertType : '';
+  if (alertType === 'account_created') return 'success';
+  if (alertType === 'login_alert' || alertType === 'security_notice') return 'warning';
+  return item.type;
+}
+
 function iconForType(type: AppNotificationType): keyof typeof Ionicons.glyphMap {
   switch (type) {
     case 'success': return 'checkmark-circle';
@@ -90,7 +97,7 @@ function NotificationRow({
 }) {
   const styles = useStyles();
   const colors = useColors();
-  const palette = getNotificationTypePalette(item.type, colors);
+  const palette = getNotificationTypePalette(resolveNotificationType(item), colors);
 
   return (
     <TouchableOpacity
@@ -115,7 +122,7 @@ function NotificationRow({
             </TouchableOpacity>
           ) : null}
           <View style={[styles.iconBadge, { backgroundColor: palette.bg }]}>
-            <Ionicons name={iconForType(item.type)} size={18} color={palette.color} />
+            <Ionicons name={iconForType(resolveNotificationType(item))} size={18} color={palette.color} />
           </View>
           <View style={styles.rowBody}>
             <View style={styles.titleRow}>

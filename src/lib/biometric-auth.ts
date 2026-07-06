@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { api, isResponseSuccess, type TwoFactorMethodType, type User } from './api';
 import { getStableDeviceId } from './device-id';
@@ -23,9 +24,15 @@ export async function getBiometricCapability(): Promise<BiometricCapability> {
   }
 
   const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-  const label = types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)
-    ? 'Face ID'
-    : 'Fingerprint';
+  const hasFace = types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION);
+  const hasFingerprint = types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT);
+
+  let label = 'Biometric';
+  if (hasFace) {
+    label = Platform.OS === 'ios' ? 'Face ID' : 'Face unlock';
+  } else if (hasFingerprint) {
+    label = Platform.OS === 'ios' ? 'Touch ID' : 'Fingerprint';
+  }
 
   return { available: true, enrolled: true, label };
 }

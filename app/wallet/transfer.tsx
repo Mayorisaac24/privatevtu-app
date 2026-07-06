@@ -839,7 +839,7 @@ export default function TransferScreen() {
         colors={gradientStops(gradients.hero)}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[styles.header, { paddingTop: insets.top + 12 }]}
+        style={[styles.header, styles.headerWithSteps, { paddingTop: insets.top + 12 }]}
       >
         <View style={styles.headerBlob1} />
         <View style={styles.headerBlob2} />
@@ -860,18 +860,20 @@ export default function TransferScreen() {
           </View>
         </View>
 
-        <View style={styles.stepRow}>
-          <View style={[styles.stepPill, step === 'form' && styles.stepPillActive]}>
-            <Text style={[styles.stepText, step === 'form' && styles.stepTextActive]}>1. Details</Text>
-          </View>
-          <View style={styles.stepLine} />
-          <View style={[styles.stepPill, step === 'confirm' && styles.stepPillActive]}>
-            <Text style={[styles.stepText, step === 'confirm' && styles.stepTextActive]}>2. Order details</Text>
+        <View style={styles.stepProgressWrap}>
+          <View style={styles.stepRow}>
+            <View style={[styles.stepPill, step === 'form' && styles.stepPillActive]}>
+              <Text style={[styles.stepText, step === 'form' && styles.stepTextActive]}>1. Details</Text>
+            </View>
+            <View style={styles.stepLine} />
+            <View style={[styles.stepPill, step === 'confirm' && styles.stepPillActive]}>
+              <Text style={[styles.stepText, step === 'confirm' && styles.stepTextActive]}>2. Order details</Text>
+            </View>
           </View>
         </View>
       </LinearGradient>
 
-      <View style={[styles.contentCurve, { backgroundColor: colors.pageBg }]} />
+      <View style={[styles.contentCurve, styles.contentCurveWithSteps, { backgroundColor: colors.pageBg }]} />
 
       <KeyboardAvoidingView
         style={styles.flex}
@@ -1444,10 +1446,19 @@ const createStyles = (colors: import('../../src/theme/types').ThemeColors) => St
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
   },
+  contentCurveWithSteps: {
+    marginTop: -20,
+  },
   header: {
     paddingHorizontal: Spacing.page,
     paddingBottom: 20,
     overflow: 'hidden',
+  },
+  headerWithSteps: {
+    paddingBottom: 24,
+  },
+  stepProgressWrap: {
+    zIndex: 2,
   },
   headerBlob1: {
     position: 'absolute',
@@ -1495,7 +1506,8 @@ const createStyles = (colors: import('../../src/theme/types').ThemeColors) => St
   stepRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 18,
+    marginTop: 14,
+    marginBottom: 4,
     gap: 8,
   },
   stepPill: {

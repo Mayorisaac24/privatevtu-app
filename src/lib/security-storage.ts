@@ -17,7 +17,7 @@ export type SecurityPrefs = {
 };
 
 /** Unified inactive threshold before the app lock screen is required. */
-export const INACTIVE_LOCK_SECONDS = 15;
+export const INACTIVE_LOCK_SECONDS = 5;
 
 export const DEFAULT_SECURITY_PREFS: SecurityPrefs = {
   authWithBiometric: false,
@@ -44,7 +44,10 @@ function normalizeSecurityPrefs(raw: Record<string, unknown>): SecurityPrefs {
   return {
     authWithBiometric,
     transactionsWithBiometric,
-    inactiveLockSeconds: INACTIVE_LOCK_SECONDS,
+    inactiveLockSeconds:
+      typeof raw.inactiveLockSeconds === 'number' && raw.inactiveLockSeconds > 0
+        ? raw.inactiveLockSeconds
+        : INACTIVE_LOCK_SECONDS,
     lockImmediatelyFromBackground: false,
   };
 }

@@ -15,6 +15,16 @@ export type ProfileKycDisplay = {
   showMenuBadge: boolean;
 };
 
+export function shouldShowHomeKycBanner(
+  kycStatus: User['kycStatus'] = 'NOT_VERIFIED',
+  kycData?: KycStatusData | null,
+  kycTier?: string | null,
+): boolean {
+  const currentTier = (kycData?.currentTier ?? kycTier ?? kycStatus).toUpperCase();
+  if (currentTier === 'TIER_3') return false;
+  return getProfileKycDisplay(kycStatus, kycData).showMenuBadge;
+}
+
 export function getProfileKycDisplay(
   kycStatus: User['kycStatus'] = 'NOT_VERIFIED',
   kycData?: KycStatusData | null,

@@ -1,6 +1,5 @@
 import 'react-native-gesture-handler';
 import { ReactNode, useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Font from 'expo-font';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,7 +11,6 @@ import {
   Inter_700Bold,
   Inter_800ExtraBold,
 } from '@expo-google-fonts/inter';
-import { useThemedStyles } from '../theme/hooks';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -23,8 +21,6 @@ type FontBootstrapProps = {
 };
 
 export function FontBootstrap({ children }: FontBootstrapProps) {
-  const styles = useStyles();
-
   const [interLoaded, interError] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -34,7 +30,7 @@ export function FontBootstrap({ children }: FontBootstrapProps) {
   });
 
   useEffect(() => {
-    (async () => {
+    void (async () => {
       if (!Font.isLoaded('ionicons')) {
         await Font.loadAsync({ ionicons: IONICONS_FONT });
       }
@@ -46,26 +42,10 @@ export function FontBootstrap({ children }: FontBootstrapProps) {
 
   const fontsReady = interLoaded || interError;
 
-  useEffect(() => {
-    if (fontsReady) {
-      SplashScreen.hideAsync().catch(() => {});
-    }
-  }, [fontsReady]);
-
+  // Keep native splash visible while fonts load — no duplicate boot UI.
   if (!fontsReady) {
-    return <View style={styles.boot} />;
+    return null;
   }
 
   return <>{children}</>;
-}
-
-const createStyles = (colors: import('../theme/types').ThemeColors) => StyleSheet.create({
-  boot: {
-    flex: 1,
-    backgroundColor: colors.pageBg,
-  },
-});
-
-function useStyles() {
-  return useThemedStyles(createStyles);
 }

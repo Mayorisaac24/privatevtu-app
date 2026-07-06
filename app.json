@@ -13,15 +13,14 @@
       "backgroundColor": "#7B2CFE"
     },
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/boot-splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#7B2CFE",
-      "imageWidth": 120
+      "backgroundColor": "#FFFFFF"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.devnex.datamartng",
-      "buildNumber": "6",
+      "buildNumber": "7",
       "infoPlist": {
         "CFBundleDisplayName": "Datamart",
         "NSCameraUsageDescription": "Allow camera for KYC live face scan and document capture",
@@ -36,9 +35,10 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#7B2CFE"
+        "foregroundImage": "./assets/adaptive-icon-foreground.png",
+        "backgroundColor": "#6521EE"
       },
+      "icon": "./assets/icon.png",
       "package": "com.devnex.datamartng",
       "versionCode": 4,
       "googleServicesFile": "./google-services.json",
@@ -99,6 +99,25 @@
           "enableFrameProcessors": true
         }
       ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/boot-splash.png",
+          "imageWidth": 260,
+          "resizeMode": "contain",
+          "backgroundColor": "#FFFFFF",
+          "ios": {
+            "image": "./assets/boot-splash.png",
+            "imageWidth": 260,
+            "backgroundColor": "#FFFFFF"
+          },
+          "android": {
+            "image": "./assets/splash-icon.png",
+            "imageWidth": 88,
+            "backgroundColor": "#FFFFFF"
+          }
+        }
+      ],
       "expo-secure-store",
       [
         "expo-notifications",
@@ -113,6 +132,9 @@
       [
         "expo-build-properties",
         {
+          "android": {
+            "minSdkVersion": 26
+          },
           "ios": {
             "deploymentTarget": "15.5"
           }
