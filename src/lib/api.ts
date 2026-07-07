@@ -353,7 +353,6 @@ export interface Transaction {
   formattedTotalDebited?: string;
   fee?: string;
   formattedFee?: string;
-  providerRef?: string;
   balanceBefore?: string;
   balanceAfter?: string;
   formattedBalanceBefore?: string;
