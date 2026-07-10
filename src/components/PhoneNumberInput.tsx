@@ -1,9 +1,11 @@
-import { useState } from 'react';
-import { View, Text, TextInput, ActivityIndicator, StyleSheet, TouchableOpacity } from 'react-native';
+import { useState, useRef } from 'react';
+import { View, Text, TextInput, ActivityIndicator, StyleSheet, TouchableOpacity, Platform, Keyboard } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {Colors, Typography, Radius, useColors, useThemedStyles } from '../theme';
 import { FIELD_HEIGHT, mergeInputStyle } from '../lib/platform-ui';
 import { pickPhoneFromContacts } from '../lib/contact-picker';
+import { NUMERIC_KEYBOARD_ACCESSORY_ID } from '../lib/keyboard-accessory';
+import { useKeyboardAccessoryFocus } from './ui/KeyboardAccessoryProvider';
 
 type PhoneNumberInputProps = {
   value: string;
@@ -12,6 +14,9 @@ type PhoneNumberInputProps = {
   isComplete?: boolean;
   placeholder?: string;
   enableContactPicker?: boolean;
+  /** iOS toolbar: advance to the next field (e.g. amount). */
+  onAccessoryNext?: () => void;
+  accessoryNextLabel?: string;
 };
 
 export function PhoneNumberInput({
@@ -21,12 +26,35 @@ export function PhoneNumberInput({
   isComplete = false,
   placeholder = '801 234 5678',
   enableContactPicker = true,
+  onAccessoryNext,
+  accessoryNextLabel = 'Next',
 }: PhoneNumberInputProps) {
   const styles = useStyles();
   const colors = useColors();
   const [pickingContact, setPickingContact] = useState(false);
+  const blurClearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { register, clear } = useKeyboardAccessoryFocus();
   const hasValue = value.length > 0;
   const showTrailing = detecting || isComplete || (enableContactPicker && !detecting);
+
+  const handleFocus = () => {
+    if (blurClearTimer.current) {
+      clearTimeout(blurClearTimer.current);
+      blurClearTimer.current = null;
+    }
+    if (onAccessoryNext) {
+      register({ onNext: onAccessoryNext, nextLabel: accessoryNextLabel });
+    } else {
+      clear();
+    }
+  };
+
+  const handleBlur = () => {
+    blurClearTimer.current = setTimeout(() => {
+      clear();
+      blurClearTimer.current = null;
+    }, 120);
+  };
 
   const handleContactPick = async () => {
     if (pickingContact || detecting) return;
@@ -56,7 +84,13 @@ export function PhoneNumberInput({
         placeholderTextColor={colors.mutedLight}
         value={value}
         onChangeText={onChangeText}
-        keyboardType="phone-pad"
+        keyboardType={Platform.OS === 'ios' ? 'phone-pad' : 'phone-pad'}
+        inputAccessoryViewID={Platform.OS === 'ios' ? NUMERIC_KEYBOARD_ACCESSORY_ID : undefined}
+        returnKeyType={Platform.OS === 'android' ? 'done' : undefined}
+        blurOnSubmit={Platform.OS === 'android'}
+        onSubmitEditing={Platform.OS === 'android' ? () => Keyboard.dismiss() : undefined}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
         maxLength={10}
         underlineColorAndroid="transparent"
       />

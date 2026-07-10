@@ -1,10 +1,10 @@
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator, Keyboard,
+  ActivityIndicator, Keyboard,
 } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { api, formatCurrency, isResponseSuccess, parseWalletBalanceKobo, type CablePlan } from '../../src/lib/api';
+import { api, formatCurrency, type CablePlan } from '../../src/lib/api';
 import { useWalletStore } from '../../src/stores';
 import {Colors, Typography, Radius, useThemedStyles } from '../../src/theme';
 import { showToast } from '../../src/components/ui/Toast';
@@ -27,6 +27,19 @@ import { ScreenBody } from '../../src/components/ui/ScreenBody';
 import { CableProviderGrid } from '../../src/components/CableProviderGrid';
 import { getCableProviderDisplayName, getCableProviderLogo } from '../../src/lib/cable-providers';
 import { DataPlanPickerSheet, DataPlanSelectField } from '../../src/components/DataPlanPickerSheet';
+import { PurchaseSuccessModal } from '../../src/components/purchase/PurchaseSuccessModal';
+import { ServicePurchaseScroll } from '../../src/components/purchase/ServicePurchaseScroll';
+import { useNumericInputAccessory } from '../../src/components/ui/KeyboardAccessoryProvider';
+import { BeneficiaryPicker } from '../../src/components/beneficiary/BeneficiaryPicker';
+import { SaveBeneficiaryPrompt } from '../../src/components/beneficiary/SaveBeneficiaryPrompt';
+import { useBeneficiarySelection } from '../../src/hooks/useBeneficiarySelection';
+import {
+  refreshAfterPurchase,
+  usePurchaseSuccessModal,
+  isPurchaseSuccess,
+  extractPurchaseResultData,
+  getPurchaseSuccessPresentation,
+} from '../../src/lib/purchase-success';
 
 export default function CableScreen() {
   const styles = useStyles();
@@ -43,6 +56,16 @@ export default function CableScreen() {
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [showPlanPicker, setShowPlanPicker] = useState(false);
+  const numericAccessory = useNumericInputAccessory();
+
+  const {
+    selectedBeneficiaryId,
+    setSelectedBeneficiaryId,
+    handleFieldEdited,
+    completePurchase,
+    saveDraft,
+    dismissSaveDraft,
+  } = useBeneficiarySelection('cable');
 
   useEffect(() => {
     if (!selectedProvider) return;
@@ -73,15 +96,48 @@ export default function CableScreen() {
     Keyboard.dismiss(); setStep('confirm');
   };
 
+  const resetForm = useCallback(() => {
+    setSmartCard('');
+    setCustomerName('');
+    setSelectedPlan(null);
+    setSelectedProvider('');
+    setStep('details');
+  }, []);
+
+  const {
+    meta: successMeta,
+    visible: showSuccessModal,
+    showSuccess,
+    handleDone: handleSuccessDone,
+    handleViewReceipt,
+  } = usePurchaseSuccessModal(resetForm);
+
   const handlePurchase = async (auth: TransactionAuthPayload) => {
     setLoading(true);
     try {
       const res = await api.purchaseCable({ provider: selectedProvider, smartCardNumber: smartCard, planId: selectedPlan!.id, ...auth });
-      if (res.success) {
-        const balRes = await api.getWalletBalance();
-        if (isResponseSuccess(balRes)) setBalance(parseWalletBalanceKobo(balRes.data));
-        showToast({ type: 'success', text1: 'Subscription Active! 📺', text2: `${selectedPlan!.name} activated for ${customerName}` });
-        setTimeout(() => { setSmartCard(''); setCustomerName(''); setSelectedPlan(null); setSelectedProvider(''); setStep('details'); }, 1500);
+      if (isPurchaseSuccess(res)) {
+        const payload = extractPurchaseResultData<{
+          transactionId?: string;
+          status?: string;
+          amount?: number;
+        }>(res);
+        completePurchase(smartCard, 'smartCardNumber', selectedProvider);
+        showSuccess({
+          transactionId: payload?.transactionId,
+          amountKobo: selectedPlan?.price ?? payload?.amount ?? 0,
+          ...getPurchaseSuccessPresentation('cable', payload?.status),
+          recipientLabel: 'Customer',
+          recipientName: customerName,
+          recipientMeta: `${selectedProvName} · ${smartCard}`,
+          serviceIcon: 'tv-outline',
+          detailRows: [
+            { label: 'Provider', value: selectedProvName },
+            { label: 'Plan', value: selectedPlan!.name },
+            { label: 'Validity', value: selectedPlan?.validity || '—' },
+          ],
+        });
+        void refreshAfterPurchase(setBalance);
       } else {
         showToast({ type: 'error', text1: 'Subscription Failed', text2: res.message || 'Please try again' });
       }
@@ -134,7 +190,7 @@ export default function CableScreen() {
         }}
       />
 
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <ServicePurchaseScroll contentContainerStyle={styles.scroll}>
         <ScreenBody>
         {step === 'details' && (
           <>
@@ -157,8 +213,12 @@ export default function CableScreen() {
                     <Ionicons name="card-outline" size={16} color={Colors.muted} style={{ marginHorizontal: 12 }} />
                     <TextInput style={styles.input} placeholder="Enter card number"
                       placeholderTextColor={Colors.mutedLight} value={smartCard}
-                      onChangeText={(v) => { setSmartCard(v); setCustomerName(''); }}
-                      keyboardType="number-pad" />
+                      onChangeText={(value) => {
+                        handleFieldEdited();
+                        setSmartCard(value);
+                        setCustomerName('');
+                      }}
+                      keyboardType="number-pad" {...numericAccessory} />
                     {verifying && <ActivityIndicator size="small" color={Colors.warning} style={{ marginRight: 8 }} />}
                     {!verifying && customerName && <Ionicons name="checkmark-circle" size={18} color={Colors.success} style={{ marginRight: 8 }} />}
                   </View>
@@ -173,6 +233,18 @@ export default function CableScreen() {
                     <Text style={styles.customerText}>{customerName}</Text>
                   </View>
                 ) : null}
+                <BeneficiaryPicker
+                  serviceType="cable"
+                  identifierField="smartCardNumber"
+                  selectedId={selectedBeneficiaryId}
+                  onSelect={(beneficiary) => {
+                    setSmartCard(beneficiary.smartCardNumber || '');
+                    if (beneficiary.provider) setSelectedProvider(beneficiary.provider);
+                    setSelectedBeneficiaryId(beneficiary.id);
+                    setCustomerName('');
+                    setSelectedPlan(null);
+                  }}
+                />
               </ServicePurchaseCard>
             )}
 
@@ -228,8 +300,8 @@ export default function CableScreen() {
             <ServiceEditLink onPress={() => setStep('details')} />
           </>
         )}
-      </ScreenBody>
-      </ScrollView>
+        </ScreenBody>
+      </ServicePurchaseScroll>
 
       <DataPlanPickerSheet
         visible={showPlanPicker}
@@ -256,6 +328,21 @@ export default function CableScreen() {
         processingSubmessage="Activating your cable TV plan"
         processingIcon="tv-outline"
       />
+
+      {successMeta ? (
+        <PurchaseSuccessModal
+          visible={showSuccessModal}
+          {...successMeta}
+          onDone={() => {
+            dismissSaveDraft();
+            handleSuccessDone();
+          }}
+          onViewReceipt={handleViewReceipt}
+          footerExtra={
+            saveDraft ? <SaveBeneficiaryPrompt draft={saveDraft} onSaved={dismissSaveDraft} /> : null
+          }
+        />
+      ) : null}
     </ThemedScreen>
   );
 }

@@ -1,7 +1,10 @@
 import { View, Image, ActivityIndicator, StyleSheet } from 'react-native';
 import { useColors, useThemedStyles } from '../theme';
 
-const BOOT_SPLASH = require('../../assets/boot-splash.png');
+const SPLASH_LOGO = require('../../assets/images/app-logo.png');
+
+const LOGO_WIDTH = 280;
+const LOGO_HEIGHT = Math.round((425 / 587) * LOGO_WIDTH);
 
 type BootSplashViewProps = {
   onLayout?: () => void;
@@ -15,7 +18,7 @@ export function BootSplashView({ onLayout, showSpinner = true }: BootSplashViewP
   return (
     <View style={styles.root} onLayout={onLayout}>
       <Image
-        source={BOOT_SPLASH}
+        source={SPLASH_LOGO}
         style={styles.art}
         resizeMode="contain"
         accessibilityLabel="Datamart"
@@ -37,8 +40,8 @@ const useStyles = () =>
         justifyContent: 'center',
       },
       art: {
-        width: 280,
-        height: 163,
+        width: LOGO_WIDTH,
+        height: LOGO_HEIGHT,
       },
       spinner: {
         marginTop: 28,

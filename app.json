@@ -13,7 +13,7 @@
       "backgroundColor": "#7B2CFE"
     },
     "splash": {
-      "image": "./assets/boot-splash.png",
+      "image": "./assets/images/app-logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#FFFFFF"
     },
@@ -102,18 +102,18 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/boot-splash.png",
-          "imageWidth": 260,
+          "image": "./assets/images/app-logo.png",
+          "imageWidth": 280,
           "resizeMode": "contain",
           "backgroundColor": "#FFFFFF",
           "ios": {
-            "image": "./assets/boot-splash.png",
-            "imageWidth": 260,
+            "image": "./assets/images/app-logo.png",
+            "imageWidth": 280,
             "backgroundColor": "#FFFFFF"
           },
           "android": {
-            "image": "./assets/splash-icon.png",
-            "imageWidth": 120,
+            "image": "./assets/images/app-logo.png",
+            "imageWidth": 280,
             "backgroundColor": "#FFFFFF"
           }
         }

@@ -1,10 +1,10 @@
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, Keyboard,
+  Keyboard,
 } from 'react-native';
 import { useState, useCallback, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { api, formatCurrency, isResponseSuccess, parseWalletBalanceKobo, type ElectricityProvider } from '../../src/lib/api';
+import { api, formatCurrency, type ElectricityProvider } from '../../src/lib/api';
 import { useWalletStore } from '../../src/stores';
 import {Colors, Typography, Radius , Overlays, useThemedStyles } from '../../src/theme';
 import { showToast } from '../../src/components/ui/Toast';
@@ -33,6 +33,19 @@ import {
   peekCachedElectricityDiscos,
   preloadElectricityDiscos,
 } from '../../src/lib/electricity-discos-cache';
+import { PurchaseSuccessModal } from '../../src/components/purchase/PurchaseSuccessModal';
+import { ServicePurchaseScroll } from '../../src/components/purchase/ServicePurchaseScroll';
+import { useNumericInputAccessory } from '../../src/components/ui/KeyboardAccessoryProvider';
+import { BeneficiaryPicker } from '../../src/components/beneficiary/BeneficiaryPicker';
+import { SaveBeneficiaryPrompt } from '../../src/components/beneficiary/SaveBeneficiaryPrompt';
+import { useBeneficiarySelection } from '../../src/hooks/useBeneficiarySelection';
+import {
+  refreshAfterPurchase,
+  usePurchaseSuccessModal,
+  isPurchaseSuccess,
+  extractPurchaseResultData,
+  getPurchaseSuccessPresentation,
+} from '../../src/lib/purchase-success';
 
 const QUICK_AMOUNTS = [1000, 2000, 5000, 10000, 20000];
 
@@ -52,6 +65,17 @@ export default function ElectricityScreen() {
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [verification, setVerification] = useState<{ customerName?: string; address?: string } | null>(null);
+  const numericAccessory = useNumericInputAccessory();
+  const amountAccessory = useNumericInputAccessory();
+
+  const {
+    selectedBeneficiaryId,
+    setSelectedBeneficiaryId,
+    handleFieldEdited,
+    completePurchase,
+    saveDraft,
+    dismissSaveDraft,
+  } = useBeneficiarySelection('electricity');
 
   const selectedDisco = selectedDiscoProvider?.code || '';
   const selectedDiscoName = selectedDiscoProvider ? getDiscoDisplayName(selectedDiscoProvider) : '';
@@ -94,23 +118,56 @@ export default function ElectricityScreen() {
     setStep('confirm');
   };
 
+  const resetForm = useCallback(() => {
+    setMeterNumber('');
+    setAmount('');
+    setPhone('');
+    setVerification(null);
+    setSelectedDiscoProvider(null);
+    setStep('details');
+  }, []);
+
+  const {
+    meta: successMeta,
+    visible: showSuccessModal,
+    showSuccess,
+    handleDone: handleSuccessDone,
+    handleViewReceipt,
+  } = usePurchaseSuccessModal(resetForm);
+
   const handlePay = async (auth: TransactionAuthPayload) => {
     setLoading(true);
     try {
       const res = await api.purchaseElectricity({ disco: selectedDisco, meterNumber, meterType, amount: parseFloat(amount), phone: phone || undefined, ...auth });
-      if (res.success) {
-        const balRes = await api.getWalletBalance();
-        if (isResponseSuccess(balRes)) setBalance(parseWalletBalanceKobo(balRes.data));
-        const token = res.data?.token || res.data?.purchasedToken;
-        showToast({ type: 'success', text1: 'Payment Successful! ⚡', text2: token ? `Token: ${token}` : `₦${parseFloat(amount).toLocaleString()} electricity purchased` });
-        setTimeout(() => {
-          setMeterNumber('');
-          setAmount('');
-          setPhone('');
-          setVerification(null);
-          setSelectedDiscoProvider(null);
-          setStep('details');
-        }, 2000);
+      if (isPurchaseSuccess(res)) {
+        const payload = extractPurchaseResultData<{
+          transactionId?: string;
+          status?: string;
+          token?: string;
+          purchasedToken?: string;
+          units?: number;
+        }>(res);
+        const token = payload?.token || payload?.purchasedToken;
+        completePurchase(meterNumber, 'meterNumber', selectedDisco);
+        showSuccess({
+          transactionId: payload?.transactionId,
+          amountKobo: requiredKobo,
+          ...getPurchaseSuccessPresentation('electricity', payload?.status, token
+            ? { notice: 'Save your token. You can also find it on the transaction receipt.' }
+            : undefined),
+          recipientLabel: 'Meter',
+          recipientName: verification?.customerName || meterNumber,
+          recipientMeta: `${selectedDiscoName} · ${meterType} · ${meterNumber}`,
+          serviceIcon: 'flash-outline',
+          highlightLabel: token ? 'Token' : undefined,
+          highlightValue: token,
+          detailRows: [
+            { label: 'DISCO', value: selectedDiscoName },
+            { label: 'Meter type', value: meterType.charAt(0).toUpperCase() + meterType.slice(1) },
+            ...(payload?.units ? [{ label: 'Units', value: String(payload.units) }] : []),
+          ],
+        });
+        void refreshAfterPurchase(setBalance);
       } else {
         showToast({ type: 'error', text1: 'Payment Failed', text2: res.message || 'Please try again' });
       }
@@ -169,7 +226,7 @@ export default function ElectricityScreen() {
         }}
       />
 
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <ServicePurchaseScroll contentContainerStyle={styles.scroll}>
         <ScreenBody>
 
         {step === 'details' && (
@@ -214,8 +271,26 @@ export default function ElectricityScreen() {
                 <Ionicons name="barcode-outline" size={18} color={Colors.muted} style={{ marginHorizontal: 12 }} />
                 <TextInput style={styles.input} placeholder="Enter meter number"
                   placeholderTextColor={Colors.mutedLight} value={meterNumber}
-                  onChangeText={setMeterNumber} keyboardType="number-pad" />
+                  onChangeText={(value) => {
+                    handleFieldEdited();
+                    setMeterNumber(value);
+                  }}
+                  keyboardType="number-pad" {...numericAccessory} />
               </View>
+              <BeneficiaryPicker
+                serviceType="electricity"
+                identifierField="meterNumber"
+                selectedId={selectedBeneficiaryId}
+                onSelect={(beneficiary) => {
+                  setMeterNumber(beneficiary.meterNumber || '');
+                  if (beneficiary.provider) {
+                    const match = discos.find((d) => d.code === beneficiary.provider);
+                    if (match) setSelectedDiscoProvider(match);
+                  }
+                  setSelectedBeneficiaryId(beneficiary.id);
+                  setVerification(null);
+                }}
+              />
             </ServicePurchaseCard>
 
             <ServiceContinueButton
@@ -247,7 +322,7 @@ export default function ElectricityScreen() {
                 <Text style={styles.nairaSign}>₦</Text>
                 <TextInput style={styles.amountInput} placeholder="0.00"
                   placeholderTextColor={Colors.borderMid} value={amount}
-                  onChangeText={setAmount} keyboardType="number-pad" autoFocus />
+                  onChangeText={setAmount} keyboardType="number-pad" autoFocus {...amountAccessory} />
               </View>
               <View style={styles.quickRow}>
                 {QUICK_AMOUNTS.map(a => (
@@ -264,7 +339,7 @@ export default function ElectricityScreen() {
                 <Ionicons name="phone-portrait-outline" size={16} color={Colors.muted} style={{ marginHorizontal: 12 }} />
                 <TextInput style={styles.input} placeholder="08012345678 (optional)"
                   placeholderTextColor={Colors.mutedLight} value={phone}
-                  onChangeText={setPhone} keyboardType="phone-pad" maxLength={11} />
+                  onChangeText={setPhone} keyboardType="phone-pad" maxLength={11} {...numericAccessory} />
               </View>
             </ServicePurchaseCard>
 
@@ -309,7 +384,7 @@ export default function ElectricityScreen() {
           </>
         )}
       </ScreenBody>
-      </ScrollView>
+      </ServicePurchaseScroll>
 
       <DiscoPickerModal
         visible={showDiscoPicker}
@@ -335,6 +410,21 @@ export default function ElectricityScreen() {
         processingSubmessage="Purchasing electricity token for your meter"
         processingIcon="flash-outline"
       />
+
+      {successMeta ? (
+        <PurchaseSuccessModal
+          visible={showSuccessModal}
+          {...successMeta}
+          onDone={() => {
+            dismissSaveDraft();
+            handleSuccessDone();
+          }}
+          onViewReceipt={handleViewReceipt}
+          footerExtra={
+            saveDraft ? <SaveBeneficiaryPrompt draft={saveDraft} onSaved={dismissSaveDraft} /> : null
+          }
+        />
+      ) : null}
     </ThemedScreen>
   );
 }

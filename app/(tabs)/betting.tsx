@@ -1,10 +1,10 @@
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, Keyboard,
+  Keyboard,
 } from 'react-native';
 import { useState, useCallback, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { api, formatCurrency, isResponseSuccess, parseWalletBalanceKobo, type BettingPlatform } from '../../src/lib/api';
+import { api, formatCurrency, type BettingPlatform } from '../../src/lib/api';
 import { useWalletStore } from '../../src/stores';
 import {Colors, Typography, Radius , Overlays, useThemedStyles } from '../../src/theme';
 import { showToast } from '../../src/components/ui/Toast';
@@ -27,6 +27,16 @@ import { ScreenBody } from '../../src/components/ui/ScreenBody';
 import { BettingPlatformPickerModal } from '../../src/components/BettingPlatformPickerModal';
 import { BettingPlatformLogo } from '../../src/components/BettingPlatformLogo';
 import { getBettingPlatformDisplayName } from '../../src/lib/betting-platforms';
+import { PurchaseSuccessModal } from '../../src/components/purchase/PurchaseSuccessModal';
+import { ServicePurchaseScroll } from '../../src/components/purchase/ServicePurchaseScroll';
+import { useNumericInputAccessory } from '../../src/components/ui/KeyboardAccessoryProvider';
+import {
+  refreshAfterPurchase,
+  usePurchaseSuccessModal,
+  isPurchaseSuccess,
+  extractPurchaseResultData,
+  getPurchaseSuccessPresentation,
+} from '../../src/lib/purchase-success';
 
 const QUICK_AMOUNTS = [500, 1000, 2000, 5000, 10000];
 
@@ -45,6 +55,8 @@ export default function BettingScreen() {
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [verificationMessage, setVerificationMessage] = useState<string | null>(null);
+  const numericAccessory = useNumericInputAccessory();
+  const amountAccessory = useNumericInputAccessory();
 
   const minAmountNaira = selectedPlatform ? Math.max(100, Math.round(Number(selectedPlatform.minAmount || 10000) / 100)) : 100;
   const maxAmountNaira = selectedPlatform ? Math.round(Number(selectedPlatform.maxAmount || 100000000) / 100) : 1000000;
@@ -121,6 +133,22 @@ export default function BettingScreen() {
     setStep('confirm');
   };
 
+  const resetForm = useCallback(() => {
+    setAccountNumber('');
+    setAmount('');
+    setVerificationMessage(null);
+    setSelectedPlatform(null);
+    setStep('details');
+  }, []);
+
+  const {
+    meta: successMeta,
+    visible: showSuccessModal,
+    showSuccess,
+    handleDone: handleSuccessDone,
+    handleViewReceipt,
+  } = usePurchaseSuccessModal(resetForm);
+
   const handlePay = async (auth: TransactionAuthPayload) => {
     if (!selectedPlatform) return;
     setLoading(true);
@@ -131,21 +159,28 @@ export default function BettingScreen() {
         amount: parseFloat(amount),
         ...auth,
       });
-      if (res.success) {
-        const balRes = await api.getWalletBalance();
-        if (isResponseSuccess(balRes)) setBalance(parseWalletBalanceKobo(balRes.data));
-        showToast({
-          type: 'success',
-          text1: 'Funding submitted',
-          text2: res.message || `₦${parseFloat(amount).toLocaleString()} betting wallet funding is processing`,
+      if (isPurchaseSuccess(res)) {
+        const payload = extractPurchaseResultData<{
+          transactionId?: string;
+          reference?: string;
+          status?: string;
+          message?: string;
+        }>(res);
+        showSuccess({
+          transactionId: payload?.transactionId,
+          reference: payload?.reference,
+          amountKobo: requiredKobo,
+          ...getPurchaseSuccessPresentation('betting', payload?.status),
+          recipientLabel: 'Account',
+          recipientName: selectedPlatform.name,
+          recipientMeta: accountNumber.trim(),
+          serviceIcon: 'trophy-outline',
+          detailRows: [
+            { label: 'Platform', value: selectedPlatform.name },
+            { label: 'Account ID', value: accountNumber.trim() },
+          ],
         });
-        setTimeout(() => {
-          setAccountNumber('');
-          setAmount('');
-          setVerificationMessage(null);
-          setSelectedPlatform(null);
-          setStep('details');
-        }, 2000);
+        void refreshAfterPurchase(setBalance);
       } else {
         showToast({ type: 'error', text1: 'Funding failed', text2: res.message || 'Please try again' });
       }
@@ -196,7 +231,7 @@ export default function BettingScreen() {
         stepProgress={{ activeIndex: stepIndex, labels: STEPS }}
       />
 
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <ServicePurchaseScroll contentContainerStyle={styles.scroll}>
         <ScreenBody>
           {step === 'details' && (
             <>
@@ -233,6 +268,7 @@ export default function BettingScreen() {
                     value={accountNumber}
                     onChangeText={setAccountNumber}
                     keyboardType="number-pad"
+                    {...numericAccessory}
                   />
                 </View>
               </ServicePurchaseCard>
@@ -272,6 +308,7 @@ export default function BettingScreen() {
                     onChangeText={setAmount}
                     keyboardType="number-pad"
                     autoFocus
+                    {...amountAccessory}
                   />
                 </View>
                 <View style={styles.quickRow}>
@@ -316,7 +353,7 @@ export default function BettingScreen() {
             </>
           )}
         </ScreenBody>
-      </ScrollView>
+      </ServicePurchaseScroll>
 
       <BettingPlatformPickerModal
         visible={showPlatformPicker}
@@ -342,6 +379,15 @@ export default function BettingScreen() {
         processingSubmessage="Processing payment to your betting wallet"
         processingIcon="trophy-outline"
       />
+
+      {successMeta ? (
+        <PurchaseSuccessModal
+          visible={showSuccessModal}
+          {...successMeta}
+          onDone={handleSuccessDone}
+          onViewReceipt={handleViewReceipt}
+        />
+      ) : null}
     </ThemedScreen>
   );
 }

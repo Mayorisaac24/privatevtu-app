@@ -13,6 +13,7 @@ import { resetApiAccessCache } from '../lib/api-access-cache';
 import { resetCatalogRevisionSync } from '../lib/catalog-revision-sync';
 import { useServiceAvailabilityStore } from './service-availability-store';
 import { useWalletStore } from './wallet-store';
+import { useBeneficiaryStore } from './beneficiary-store';
 
 interface AuthState {
   user: User | null;
@@ -81,6 +82,7 @@ export const useAuthStore = create<AuthState>()(
         resetEducationCatalogCache();
         resetSupportCache();
         resetCatalogRevisionSync();
+        useBeneficiaryStore.getState().clearAll();
         set({ accessToken: null, user: null, isAuthenticated: false, error: null });
       },
       logout: async () => {

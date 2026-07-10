@@ -1,10 +1,10 @@
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator, Keyboard,
+  ActivityIndicator, Keyboard,
 } from 'react-native';
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { api, formatCurrency, isResponseSuccess, parseWalletBalanceKobo, type EducationPlan } from '../../src/lib/api';
+import { api, formatCurrency, type EducationPlan } from '../../src/lib/api';
 import { useWalletStore } from '../../src/stores';
 import {Colors, Typography, Radius, useThemedStyles } from '../../src/theme';
 import { showToast } from '../../src/components/ui/Toast';
@@ -28,6 +28,16 @@ import { ScreenBody } from '../../src/components/ui/ScreenBody';
 import { EducationProviderGrid } from '../../src/components/EducationProviderGrid';
 import { getEducationProviderDisplayName, getEducationProviderLogo } from '../../src/lib/education-providers';
 import { useCachedEducationPlans, useCachedEducationProviders } from '../../src/hooks/useEducationCatalog';
+import { PurchaseSuccessModal } from '../../src/components/purchase/PurchaseSuccessModal';
+import { ServicePurchaseScroll } from '../../src/components/purchase/ServicePurchaseScroll';
+import { useNumericInputAccessory } from '../../src/components/ui/KeyboardAccessoryProvider';
+import {
+  refreshAfterPurchase,
+  usePurchaseSuccessModal,
+  isPurchaseSuccess,
+  extractPurchaseResultData,
+  getPurchaseSuccessPresentation,
+} from '../../src/lib/purchase-success';
 
 function EducationScreen() {
   const styles = useStyles();
@@ -44,6 +54,7 @@ function EducationScreen() {
   const [showLock, setShowLock] = useState(false);
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const numericAccessory = useNumericInputAccessory();
 
   const requiresProfile = useMemo(
     () => selectedProvider === 'jamb' || providers.find((p) => p.code === selectedProvider)?.requiresProfile,
@@ -109,6 +120,23 @@ function EducationScreen() {
     setStep('confirm');
   };
 
+  const resetForm = useCallback(() => {
+    setPhone('');
+    setProfileId('');
+    setCustomerName('');
+    setSelectedPlan(null);
+    setSelectedProvider('');
+    setStep('details');
+  }, []);
+
+  const {
+    meta: successMeta,
+    visible: showSuccessModal,
+    showSuccess,
+    handleDone: handleSuccessDone,
+    handleViewReceipt,
+  } = usePurchaseSuccessModal(resetForm);
+
   const handlePurchase = async (auth: TransactionAuthPayload) => {
     setLoading(true);
     try {
@@ -120,18 +148,27 @@ function EducationScreen() {
         profileType: selectedPlan?.description || undefined,
         ...auth,
       });
-      if (res.success) {
-        const balRes = await api.getWalletBalance();
-        if (isResponseSuccess(balRes)) setBalance(parseWalletBalanceKobo(balRes.data));
-        showToast({ type: 'success', text1: 'PIN Purchase Started', text2: 'You will be notified when your PIN is ready' });
-        setTimeout(() => {
-          setPhone('');
-          setProfileId('');
-          setCustomerName('');
-          setSelectedPlan(null);
-          setSelectedProvider('');
-          setStep('details');
-        }, 1500);
+      if (isPurchaseSuccess(res)) {
+        const payload = extractPurchaseResultData<{
+          transactionId?: string;
+          status?: string;
+          message?: string;
+        }>(res);
+        showSuccess({
+          transactionId: payload?.transactionId,
+          amountKobo: requiredKobo,
+          ...getPurchaseSuccessPresentation('education', payload?.status),
+          recipientLabel: 'Delivered to',
+          recipientName: phone.trim(),
+          recipientMeta: `${selectedProvName} · ${selectedPlan!.name}`,
+          serviceIcon: 'school-outline',
+          detailRows: [
+            { label: 'Provider', value: selectedProvName },
+            { label: 'Package', value: selectedPlan!.name },
+            ...(requiresProfile ? [{ label: 'Profile', value: customerName || profileId }] : []),
+          ],
+        });
+        void refreshAfterPurchase(setBalance);
       } else {
         showToast({ type: 'error', text1: 'Purchase Failed', text2: res.message || 'Please try again' });
       }
@@ -179,8 +216,8 @@ function EducationScreen() {
           labels: ['Details', 'Confirm'],
         }}
       />
-      <ScreenBody>
-        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ServicePurchaseScroll contentContainerStyle={styles.scrollWrap}>
+        <ScreenBody>
           {step === 'details' ? (
             <View style={styles.stack}>
               <ServicePurchaseCard>
@@ -249,6 +286,7 @@ function EducationScreen() {
                         placeholder="0123456789"
                         keyboardType="number-pad"
                         placeholderTextColor={Colors.muted}
+                        {...numericAccessory}
                       />
                       <TouchableOpacity style={styles.verifyBtn} onPress={handleVerifyProfile} disabled={verifying}>
                         {verifying ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.verifyBtnText}>Verify Profile</Text>}
@@ -270,6 +308,7 @@ function EducationScreen() {
                     placeholder="08012345678"
                     keyboardType="phone-pad"
                     placeholderTextColor={Colors.muted}
+                    {...numericAccessory}
                   />
                   <ServiceContinueButton onPress={handleContinue} />
                 </ServicePurchaseCard>
@@ -303,8 +342,8 @@ function EducationScreen() {
               />
             </View>
           )}
-        </ScrollView>
-      </ScreenBody>
+        </ScreenBody>
+      </ServicePurchaseScroll>
 
       <TransactionLockSheet
         visible={showLock}
@@ -321,6 +360,15 @@ function EducationScreen() {
         processingSubmessage="Completing your exam PIN order"
         processingIcon="school-outline"
       />
+
+      {successMeta ? (
+        <PurchaseSuccessModal
+          visible={showSuccessModal}
+          {...successMeta}
+          onDone={handleSuccessDone}
+          onViewReceipt={handleViewReceipt}
+        />
+      ) : null}
     </ThemedScreen>
   );
 }
@@ -336,6 +384,7 @@ export default function EducationRoute() {
 }
 
 const createStyles = (colors: import('../../src/theme/types').ThemeColors) => StyleSheet.create({
+  scrollWrap: { flexGrow: 1 },
   stack: { gap: 14, paddingTop: SERVICE_SCROLL_TOP_INSET, paddingBottom: 24 },
   loadRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, justifyContent: 'center' },
   loadText: { ...Typography.small, color: colors.muted },

@@ -17,7 +17,6 @@ import {
   api,
   getErrorMessage,
   isResponseSuccess,
-  parseWalletBalanceKobo,
   type UpgradeProgram,
   type UserTypeSnapshot,
   type UserTypeUpgradeRecord,
@@ -32,6 +31,8 @@ import {
   pullToRefreshPrograms,
   preloadProgramsData,
 } from '../../src/lib/programs-cache';
+import { PurchaseSuccessModal } from '../../src/components/purchase/PurchaseSuccessModal';
+import { refreshAfterPurchase, usePurchaseSuccessModal, getPurchaseSuccessPresentation } from '../../src/lib/purchase-success';
 
 function formatNaira(amount: number) {
   return `₦${amount.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
@@ -59,6 +60,17 @@ export default function ProgramsScreen() {
   const [selectedProgram, setSelectedProgram] = useState<UpgradeProgram | null>(null);
   const [showAuth, setShowAuth] = useState(false);
   const [processing, setProcessing] = useState(false);
+
+  const resetAfterUpgrade = useCallback(() => {
+    setSelectedProgram(null);
+  }, []);
+
+  const {
+    meta: successMeta,
+    visible: showSuccessModal,
+    showSuccess,
+    handleDone: handleSuccessDone,
+  } = usePurchaseSuccessModal(resetAfterUpgrade);
 
   const applySnapshot = useCallback((snapshot: NonNullable<ReturnType<typeof peekProgramsCache>>) => {
     setCurrentType(snapshot.currentType);
@@ -94,23 +106,29 @@ export default function ProgramsScreen() {
 
   const handleUpgrade = async (auth: TransactionAuthPayload) => {
     if (!selectedProgram) return;
+    const program = selectedProgram;
     setProcessing(true);
     try {
       const res = await api.purchaseUserTypeUpgrade({
-        pathId: selectedProgram.pathId,
+        pathId: program.pathId,
         ...auth,
       });
       if (isResponseSuccess(res)) {
-        showToast({
-          type: 'success',
-          text1: 'Upgrade successful',
-          text2: res.message || `You are now on ${selectedProgram.toUserType.name}`,
+        showSuccess({
+          reference: res.data?.upgradeId,
+          amountKobo: Number(program.upgradePrice || 0),
+          ...getPurchaseSuccessPresentation('programs'),
+          recipientLabel: 'New plan',
+          recipientName: program.toUserType.name,
+          recipientMeta: program.toUserType.description || undefined,
+          serviceIcon: 'ribbon-outline',
+          detailRows: [
+            { label: 'Previous plan', value: currentType?.name || currentType?.code || 'Default' },
+            { label: 'New plan', value: program.toUserType.name },
+          ],
+          notice: res.message || `You are now on ${program.toUserType.name}. Enjoy better pricing on services.`,
         });
-        setSelectedProgram(null);
-        const balRes = await api.getWalletBalance();
-        if (isResponseSuccess(balRes)) {
-          useWalletStore.getState().setBalance(parseWalletBalanceKobo(balRes.data));
-        }
+        void refreshAfterPurchase(useWalletStore.getState().setBalance);
         await load({ force: true, showSpinner: false });
       } else {
         showToast({ type: 'error', text1: 'Upgrade failed', text2: res.message });
@@ -260,6 +278,14 @@ export default function ProgramsScreen() {
         processingSubmessage="Updating your account tier"
         processingIcon="ribbon-outline"
       />
+
+      {successMeta ? (
+        <PurchaseSuccessModal
+          visible={showSuccessModal}
+          {...successMeta}
+          onDone={handleSuccessDone}
+        />
+      ) : null}
     </ProfileSubScreen>
   );
 }

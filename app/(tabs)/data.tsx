@@ -1,10 +1,10 @@
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator, Keyboard,
+  ActivityIndicator, Keyboard, ScrollView,
 } from 'react-native';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { api, formatCurrency, isResponseSuccess, parseWalletBalanceKobo, type DataPlan } from '../../src/lib/api';
+import { api, formatCurrency, type DataPlan } from '../../src/lib/api';
 import { useWalletStore } from '../../src/stores';
 import {Colors, Typography, Radius, useThemedStyles } from '../../src/theme';
 import { showToast } from '../../src/components/ui/Toast';
@@ -29,13 +29,25 @@ import type { TransactionAuthPayload } from '../../src/hooks/useTransactionLockA
 import { useWalletAffordability } from '../../src/hooks/useWalletAffordability';
 import { useNetworkAutoDetect } from '../../src/hooks/useNetworkAutoDetect';
 import { useCachedDataCatalog, useCachedServiceProviders } from '../../src/hooks/useServiceCatalog';
-import { formatPhoneDisplay } from '../../src/lib/phone';
+import { formatPhoneDisplay, toPhoneInputValue } from '../../src/lib/phone';
 import { ScreenBody } from '../../src/components/ui/ScreenBody';
 import { DataPlanPickerSheet, DataPlanSelectField } from '../../src/components/DataPlanPickerSheet';
+import { BeneficiaryPicker } from '../../src/components/beneficiary/BeneficiaryPicker';
+import { SaveBeneficiaryPrompt } from '../../src/components/beneficiary/SaveBeneficiaryPrompt';
+import { useBeneficiarySelection } from '../../src/hooks/useBeneficiarySelection';
 import {
   filterDataPlansByType,
   shouldShowDataTypeFilters,
 } from '../../src/lib/data-plans';
+import { PurchaseSuccessModal } from '../../src/components/purchase/PurchaseSuccessModal';
+import { ServicePurchaseScroll } from '../../src/components/purchase/ServicePurchaseScroll';
+import {
+  refreshAfterPurchase,
+  usePurchaseSuccessModal,
+  isPurchaseSuccess,
+  extractPurchaseResultData,
+  getPurchaseSuccessPresentation,
+} from '../../src/lib/purchase-success';
 
 export default function DataScreen() {
   const styles = useStyles();
@@ -66,6 +78,23 @@ export default function DataScreen() {
     providers,
   });
 
+  const {
+    selectedBeneficiaryId,
+    setSelectedBeneficiaryId,
+    handleFieldEdited,
+    completePurchase,
+    saveDraft,
+    dismissSaveDraft,
+  } = useBeneficiarySelection('data');
+
+  const handlePhoneChange = useCallback(
+    (value: string) => {
+      handleFieldEdited();
+      onPhoneChange(value);
+    },
+    [handleFieldEdited, onPhoneChange],
+  );
+
   useEffect(() => {
     if (!selectedNetwork) return;
     setSelectedPlan(null);
@@ -80,6 +109,21 @@ export default function DataScreen() {
     Keyboard.dismiss(); setStep('confirm');
   };
 
+  const resetForm = useCallback(() => {
+    setPhone('');
+    setStep('details');
+    setSelectedPlan(null);
+    setSelectedNetwork('');
+  }, []);
+
+  const {
+    meta: successMeta,
+    visible: showSuccessModal,
+    showSuccess,
+    handleDone: handleSuccessDone,
+    handleViewReceipt,
+  } = usePurchaseSuccessModal(resetForm);
+
   const handlePurchase = async (auth: TransactionAuthPayload) => {
     setLoading(true);
     try {
@@ -90,11 +134,27 @@ export default function DataScreen() {
         bypassValidation: networkResolvedByPrefix,
         ...auth,
       });
-      if (res.success) {
-        const balRes = await api.getWalletBalance();
-        if (isResponseSuccess(balRes)) setBalance(parseWalletBalanceKobo(balRes.data));
-        showToast({ type: 'success', text1: 'Data Activated! 📶', text2: `${selectedPlan!.name} sent to ${normalizedPhone}` });
-        setTimeout(() => { setPhone(''); setStep('details'); setSelectedPlan(null); setSelectedNetwork(''); }, 1500);
+      if (isPurchaseSuccess(res)) {
+        const payload = extractPurchaseResultData<{
+          transactionId?: string;
+          status?: string;
+          amount?: number;
+        }>(res);
+        completePurchase(normalizedPhone, 'phone', selectedNetwork);
+        showSuccess({
+          transactionId: payload?.transactionId,
+          amountKobo: selectedPlan?.price ?? payload?.amount ?? 0,
+          ...getPurchaseSuccessPresentation('data', payload?.status),
+          recipientLabel: 'Delivered to',
+          recipientName: formatPhoneDisplay(phone),
+          recipientMeta: `${selectedProv?.name || selectedNetwork} · ${selectedPlan!.name}`,
+          serviceIcon: 'wifi-outline',
+          detailRows: [
+            { label: 'Plan', value: selectedPlan!.name },
+            { label: 'Validity', value: selectedPlan?.validity || '—' },
+          ],
+        });
+        void refreshAfterPurchase(setBalance);
       } else {
         showToast({ type: 'error', text1: 'Purchase Failed', text2: res.message || 'Please try again' });
       }
@@ -115,7 +175,10 @@ export default function DataScreen() {
     }
   }, [showDataTypeFilters, selectedDataType]);
 
-  const selectedProv = providers.find(p => String(p.code || '').toLowerCase() === selectedNetwork.toLowerCase());
+  const selectedProv = useMemo(
+    () => providers.find((p) => String(p.code || '').toLowerCase() === selectedNetwork.toLowerCase()),
+    [providers, selectedNetwork],
+  );
   const requiredKobo = selectedPlan?.price ?? 0;
   const afford = useWalletAffordability(requiredKobo, step === 'confirm');
 
@@ -147,7 +210,7 @@ export default function DataScreen() {
         }}
       />
 
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <ServicePurchaseScroll contentContainerStyle={styles.scroll}>
         <ScreenBody>
         {step === 'details' && (
           <>
@@ -165,11 +228,23 @@ export default function DataScreen() {
               <ServiceSectionLabel title="Phone number" icon="call-outline" />
               <PhoneNumberInput
                 value={phone}
-                onChangeText={onPhoneChange}
+                onChangeText={handlePhoneChange}
                 detecting={detecting}
                 isComplete={isPhoneComplete}
+                onAccessoryNext={() => Keyboard.dismiss()}
+                accessoryNextLabel="Continue"
               />
               {detectedNet ? <ServiceDetectedBadge label={detectedNet} /> : null}
+              <BeneficiaryPicker
+                serviceType="data"
+                identifierField="phone"
+                selectedId={selectedBeneficiaryId}
+                onSelect={(beneficiary) => {
+                  setPhone(toPhoneInputValue(beneficiary.phone || ''));
+                  if (beneficiary.provider) setSelectedNetwork(beneficiary.provider);
+                  setSelectedBeneficiaryId(beneficiary.id);
+                }}
+              />
             </ServicePurchaseCard>
 
             {selectedNetwork && showDataTypeFilters && categories.length > 0 && (
@@ -258,7 +333,7 @@ export default function DataScreen() {
           </>
         )}
         </ScreenBody>
-      </ScrollView>
+      </ServicePurchaseScroll>
 
       <DataPlanPickerSheet
         visible={showPlanPicker}
@@ -284,6 +359,21 @@ export default function DataScreen() {
         processingSubmessage="Processing payment and delivering bundle to your line"
         processingIcon="wifi-outline"
       />
+
+      {successMeta ? (
+        <PurchaseSuccessModal
+          visible={showSuccessModal}
+          {...successMeta}
+          onDone={() => {
+            dismissSaveDraft();
+            handleSuccessDone();
+          }}
+          onViewReceipt={handleViewReceipt}
+          footerExtra={
+            saveDraft ? <SaveBeneficiaryPrompt draft={saveDraft} onSaved={dismissSaveDraft} /> : null
+          }
+        />
+      ) : null}
     </ThemedScreen>
   );
 }

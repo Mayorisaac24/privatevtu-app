@@ -312,6 +312,21 @@ export interface ReferralSummary {
   };
 }
 
+export type BeneficiaryServiceType = 'airtime' | 'data' | 'electricity' | 'cable';
+
+export interface BeneficiaryRecord {
+  id: string;
+  name: string;
+  serviceType: BeneficiaryServiceType;
+  phone?: string | null;
+  meterNumber?: string | null;
+  smartCardNumber?: string | null;
+  provider?: string | null;
+  lastUsed?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface LedgerEntry {
   id: string;
   walletId?: string;
@@ -1125,6 +1140,54 @@ class ApiClient {
 
   async getMyReferralSummary(): Promise<ApiResponse<ReferralSummary>> {
     return this.request('/referrals/me');
+  }
+
+  async getBeneficiaries(serviceType?: BeneficiaryServiceType): Promise<ApiResponse<BeneficiaryRecord[]>> {
+    const suffix = serviceType ? `?serviceType=${encodeURIComponent(serviceType)}` : '';
+    return this.request(`/beneficiaries${suffix}`);
+  }
+
+  async createBeneficiary(data: {
+    name: string;
+    serviceType: BeneficiaryServiceType;
+    phone?: string;
+    meterNumber?: string;
+    smartCardNumber?: string;
+    provider?: string;
+  }): Promise<ApiResponse<BeneficiaryRecord>> {
+    return this.request('/beneficiaries', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateBeneficiary(
+    beneficiaryId: string,
+    data: Partial<{
+      name: string;
+      serviceType: BeneficiaryServiceType;
+      phone: string;
+      meterNumber: string;
+      smartCardNumber: string;
+      provider: string;
+    }>,
+  ): Promise<ApiResponse<BeneficiaryRecord>> {
+    return this.request(`/beneficiaries/${encodeURIComponent(beneficiaryId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteBeneficiary(beneficiaryId: string): Promise<ApiResponse<{ id: string }>> {
+    return this.request(`/beneficiaries/${encodeURIComponent(beneficiaryId)}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async touchBeneficiary(beneficiaryId: string): Promise<ApiResponse<BeneficiaryRecord>> {
+    return this.request(`/beneficiaries/${encodeURIComponent(beneficiaryId)}/touch`, {
+      method: 'POST',
+    });
   }
 
   async getNotificationSettings(): Promise<ApiResponse<NotificationSettings>> {

@@ -1,9 +1,9 @@
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, Keyboard,
+  Keyboard,
 } from 'react-native';
-import { useState, useCallback } from 'react';
-import { api, formatCurrency, isResponseSuccess, parseWalletBalanceKobo } from '../lib/api';
+import { useState, useCallback, useRef } from 'react';
+import { api, formatCurrency } from '../lib/api';
 import { useWalletStore } from '../stores';
 import {Colors, Spacing, Typography, Radius, useThemedStyles } from '../theme';
 import { showToast } from '../components/ui/Toast';
@@ -30,8 +30,21 @@ import { useWalletAffordability } from '../hooks/useWalletAffordability';
 import { nairaToKobo } from '../lib/wallet-affordability';
 import { useCachedServiceProviders } from '../hooks/useServiceCatalog';
 import { useNetworkAutoDetect } from '../hooks/useNetworkAutoDetect';
-import { formatPhoneDisplay } from '../lib/phone';
+import { formatPhoneDisplay, toPhoneInputValue } from '../lib/phone';
 import { ScreenBody } from '../components/ui/ScreenBody';
+import { PurchaseSuccessModal } from '../components/purchase/PurchaseSuccessModal';
+import { ServicePurchaseScroll } from '../components/purchase/ServicePurchaseScroll';
+import { useNumericInputAccessory } from '../components/ui/KeyboardAccessoryProvider';
+import { BeneficiaryPicker } from '../components/beneficiary/BeneficiaryPicker';
+import { SaveBeneficiaryPrompt } from '../components/beneficiary/SaveBeneficiaryPrompt';
+import { useBeneficiarySelection } from '../hooks/useBeneficiarySelection';
+import {
+  refreshAfterPurchase,
+  usePurchaseSuccessModal,
+  isPurchaseSuccess,
+  extractPurchaseResultData,
+  getPurchaseSuccessPresentation,
+} from '../lib/purchase-success';
 
 const QUICK_AMOUNTS = [100, 200, 500, 1000, 2000, 5000];
 
@@ -46,6 +59,11 @@ export default function AirtimePurchaseScreen() {
   const [step, setStep] = useState<'details' | 'confirm'>('details');
   const [showLock, setShowLock] = useState(false);
   const [loading, setLoading] = useState(false);
+  const amountRef = useRef<TextInput>(null);
+  const amountAccessory = useNumericInputAccessory();
+  const focusAmount = useCallback(() => {
+    amountRef.current?.focus();
+  }, []);
   const {
     onPhoneChange,
     detectedNet,
@@ -61,6 +79,23 @@ export default function AirtimePurchaseScreen() {
     providers,
   });
 
+  const {
+    selectedBeneficiaryId,
+    setSelectedBeneficiaryId,
+    handleFieldEdited,
+    completePurchase,
+    saveDraft,
+    dismissSaveDraft,
+  } = useBeneficiarySelection('airtime');
+
+  const handlePhoneChange = useCallback(
+    (value: string) => {
+      handleFieldEdited();
+      onPhoneChange(value);
+    },
+    [handleFieldEdited, onPhoneChange],
+  );
+
   const handleContinue = () => {
     if (!selectedNetwork) { showToast({ type: 'error', text1: 'Select Network', text2: 'Please select a network provider' }); return; }
     if (!isPhoneComplete) { showToast({ type: 'error', text1: 'Invalid Phone', text2: 'Enter a valid Nigerian phone number' }); return; }
@@ -69,6 +104,21 @@ export default function AirtimePurchaseScreen() {
     Keyboard.dismiss();
     setStep('confirm');
   };
+
+  const resetForm = useCallback(() => {
+    setPhone('');
+    setAmount('');
+    setStep('details');
+    setSelectedNetwork('');
+  }, []);
+
+  const {
+    meta: successMeta,
+    visible: showSuccessModal,
+    showSuccess,
+    handleDone: handleSuccessDone,
+    handleViewReceipt,
+  } = usePurchaseSuccessModal(resetForm);
 
   const handlePurchase = async (auth: TransactionAuthPayload) => {
     setLoading(true);
@@ -80,11 +130,25 @@ export default function AirtimePurchaseScreen() {
         bypassValidation: networkResolvedByPrefix,
         ...auth,
       });
-      if (res.success) {
-        const balRes = await api.getWalletBalance();
-        if (isResponseSuccess(balRes)) setBalance(parseWalletBalanceKobo(balRes.data));
-        showToast({ type: 'success', text1: 'Airtime Sent! 🎉', text2: `₦${parseFloat(amount).toLocaleString()} sent to ${normalizedPhone}` });
-        setTimeout(() => { setPhone(''); setAmount(''); setStep('details'); setSelectedNetwork(''); }, 1500);
+      if (isPurchaseSuccess(res)) {
+        const payload = extractPurchaseResultData<{
+          transactionId?: string;
+          status?: string;
+        }>(res);
+        completePurchase(normalizedPhone, 'phone', selectedNetwork);
+        showSuccess({
+          transactionId: payload?.transactionId,
+          amountKobo: requiredKobo,
+          ...getPurchaseSuccessPresentation('airtime', payload?.status),
+          recipientLabel: 'Delivered to',
+          recipientName: formatPhoneDisplay(phone),
+          recipientMeta: selectedProv?.name || selectedNetwork,
+          serviceIcon: 'phone-portrait-outline',
+          detailRows: [
+            { label: 'Network', value: selectedProv?.name || selectedNetwork },
+          ],
+        });
+        void refreshAfterPurchase(setBalance);
       } else {
         showToast({ type: 'error', text1: 'Purchase Failed', text2: res.message || 'Please try again' });
       }
@@ -129,11 +193,7 @@ export default function AirtimePurchaseScreen() {
         }}
       />
 
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
+      <ServicePurchaseScroll contentContainerStyle={styles.scroll}>
         <ScreenBody>
         {step === 'details' && (
           <>
@@ -151,11 +211,22 @@ export default function AirtimePurchaseScreen() {
               <ServiceSectionLabel title="Phone number" icon="call-outline" />
               <PhoneNumberInput
                 value={phone}
-                onChangeText={onPhoneChange}
+                onChangeText={handlePhoneChange}
                 detecting={detecting}
                 isComplete={isPhoneComplete}
+                onAccessoryNext={focusAmount}
               />
               {detectedNet ? <ServiceDetectedBadge label={detectedNet} /> : null}
+              <BeneficiaryPicker
+                serviceType="airtime"
+                identifierField="phone"
+                selectedId={selectedBeneficiaryId}
+                onSelect={(beneficiary) => {
+                  setPhone(toPhoneInputValue(beneficiary.phone || ''));
+                  if (beneficiary.provider) setSelectedNetwork(beneficiary.provider);
+                  setSelectedBeneficiaryId(beneficiary.id);
+                }}
+              />
             </ServicePurchaseCard>
 
             <ServicePurchaseCard>
@@ -163,12 +234,14 @@ export default function AirtimePurchaseScreen() {
               <View style={[styles.amountWrap, amount ? styles.amountWrapFilled : null]}>
                 <Text style={styles.nairaSign}>₦</Text>
                 <TextInput
+                  ref={amountRef}
                   style={styles.amountInput}
                   placeholder="0"
                   placeholderTextColor={Colors.mutedLight}
                   value={amount}
                   onChangeText={setAmount}
                   keyboardType="number-pad"
+                  {...amountAccessory}
                 />
               </View>
               <View style={styles.quickGrid}>
@@ -226,7 +299,7 @@ export default function AirtimePurchaseScreen() {
           </>
         )}
         </ScreenBody>
-      </ScrollView>
+      </ServicePurchaseScroll>
 
       <TransactionLockSheet
         visible={showLock}
@@ -243,6 +316,21 @@ export default function AirtimePurchaseScreen() {
         processingSubmessage="Processing payment and delivering recharge"
         processingIcon="phone-portrait-outline"
       />
+
+      {successMeta ? (
+        <PurchaseSuccessModal
+          visible={showSuccessModal}
+          {...successMeta}
+          onDone={() => {
+            dismissSaveDraft();
+            handleSuccessDone();
+          }}
+          onViewReceipt={handleViewReceipt}
+          footerExtra={
+            saveDraft ? <SaveBeneficiaryPrompt draft={saveDraft} onSaved={dismissSaveDraft} /> : null
+          }
+        />
+      ) : null}
     </ThemedScreen>
   );
 }

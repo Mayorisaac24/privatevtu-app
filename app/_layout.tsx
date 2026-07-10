@@ -12,6 +12,7 @@ import { usePushNotifications } from '../src/hooks/usePushNotifications';
 import { BroadcastModalHost } from '../src/components/broadcast/BroadcastBanner';
 import { FontBootstrap } from '../src/components/FontBootstrap';
 import { ThemeProvider } from '../src/theme/ThemeProvider';
+import { KeyboardAccessoryProvider } from '../src/components/ui/KeyboardAccessoryProvider';
 
 function PushNotificationsBootstrap() {
   usePushNotifications();
@@ -24,6 +25,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <ThemeProvider>
         <FontBootstrap>
+          <KeyboardAccessoryProvider>
           <AppStatusBar />
           <PushNotificationsBootstrap />
           <BroadcastModalHost />
@@ -45,6 +47,7 @@ export default function RootLayout() {
             <SessionBootstrap />
           </View>
           <ToastProvider visibilityTime={3500} />
+          </KeyboardAccessoryProvider>
         </FontBootstrap>
         </ThemeProvider>
       </SafeAreaProvider>

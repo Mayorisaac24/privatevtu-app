@@ -25,7 +25,7 @@ function destinationHref(
 }
 
 /**
- * Boot route: native splash only (boot-splash.png) until routing finishes.
+ * Boot route: native splash only (app-logo.png) until routing finishes.
  * React BootSplashView is disabled — native asset matches the branded boot screen.
  */
 export default function BootScreen() {

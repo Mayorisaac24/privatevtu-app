@@ -42,6 +42,7 @@ import {
   getApiAccessData,
   getApiAccessProfileMeta,
 } from '../lib/api-access-cache';
+import { preloadBeneficiaries } from '../lib/beneficiaries-cache';
 import { getProfileKycDisplay } from '../lib/kyc-display';
 import type { KycStatusData } from '../lib/api';
 import { refreshUserProfile } from '../lib/profile-sync';
@@ -101,6 +102,7 @@ export default function ProfileScreen() {
     preloadNigeriaLocations();
     preloadProgramsData();
     preloadApiAccessData();
+    preloadBeneficiaries();
     void hydrateNotificationSettingsCache();
     void getNotificationSettingsCached().catch(() => undefined);
   }, []);
@@ -151,6 +153,12 @@ export default function ProfileScreen() {
           label: 'Programs',
           subtitle: programSubtitle,
           action: () => router.push('/profile/programs'),
+        },
+        {
+          icon: 'bookmark-outline',
+          label: 'Saved Recipients',
+          subtitle: 'Manage airtime, data, meter & cable beneficiaries',
+          action: () => router.push('/profile/beneficiaries'),
         },
         {
           icon: 'gift-outline',
