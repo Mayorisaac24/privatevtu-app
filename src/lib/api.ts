@@ -14,6 +14,7 @@ import {
 } from './session';
 import { tryNormalizePhone } from './phone';
 import { videoToDataUri } from './face-liveness-media-utils';
+import { buildAppSecurityHeaders } from './mobile-security';
 
 // Set in .env — switch local/live by commenting/uncommenting EXPO_PUBLIC_API_BASE_URL
 const API_URL =
@@ -925,18 +926,6 @@ class ApiClient {
     retry = true
   ): Promise<T> {
     try {
-      const headers: Record<string, string> = {
-        'X-Channel': 'app',
-        ...(options.headers as Record<string, string>),
-      };
-
-      const accessToken = await this.getValidToken();
-      if (accessToken) {
-        headers['Authorization'] = `Bearer ${accessToken}`;
-      } else if (!this.canRequestWithoutSession(endpoint)) {
-        throw new ApiError('Session expired. Please sign in again.', 401, null);
-      }
-
       const { timeoutMs = 30000, ...fetchOptions } = options;
       const method = (fetchOptions.method || 'GET').toUpperCase();
       let body = fetchOptions.body;
@@ -945,6 +934,25 @@ class ApiClient {
         if (['POST', 'PUT', 'PATCH'].includes(method)) {
           body = JSON.stringify({});
         }
+      }
+
+      const securityHeaders = await buildAppSecurityHeaders({
+        baseUrl: this.baseUrl,
+        endpoint,
+        method,
+        body: typeof body === 'string' ? body : undefined,
+      }).catch(() => ({}));
+      const headers: Record<string, string> = {
+        'X-Channel': 'app',
+        ...securityHeaders,
+        ...(options.headers as Record<string, string>),
+      };
+
+      const accessToken = await this.getValidToken();
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      } else if (!this.canRequestWithoutSession(endpoint)) {
+        throw new ApiError('Session expired. Please sign in again.', 401, null);
       }
 
       if (body !== undefined && body !== null && body !== '') {
@@ -2260,10 +2268,18 @@ class ApiClient {
     const timeoutId = setTimeout(() => controller.abort(), 120000);
 
     try {
+      const securityHeaders = await buildAppSecurityHeaders({
+        baseUrl: this.baseUrl,
+        endpoint: '/upload/liveness-recording-file',
+        method: 'POST',
+        isMultipart: true,
+      }).catch(() => ({}));
+
       const res = await fetch(`${this.baseUrl}/upload/liveness-recording-file`, {
         method: 'POST',
         headers: {
           'X-Channel': 'app',
+          ...securityHeaders,
           Authorization: `Bearer ${accessToken}`,
         },
         body: form,

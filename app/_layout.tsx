@@ -13,6 +13,8 @@ import { BroadcastModalHost } from '../src/components/broadcast/BroadcastBanner'
 import { FontBootstrap } from '../src/components/FontBootstrap';
 import { ThemeProvider } from '../src/theme/ThemeProvider';
 import { KeyboardAccessoryProvider } from '../src/components/ui/KeyboardAccessoryProvider';
+import { MobileSecurityBootstrap } from '../src/components/security/MobileSecurityBootstrap';
+import { DeviceTrustBanner } from '../src/components/security/DeviceTrustBanner';
 
 function PushNotificationsBootstrap() {
   usePushNotifications();
@@ -27,8 +29,10 @@ export default function RootLayout() {
         <FontBootstrap>
           <KeyboardAccessoryProvider>
           <AppStatusBar />
+          <MobileSecurityBootstrap />
           <PushNotificationsBootstrap />
           <BroadcastModalHost />
+          <DeviceTrustBanner />
           <View style={{ flex: 1 }}>
             <Stack screenOptions={stackScreenOptions}>
               <Stack.Screen name="index" />
