@@ -8,7 +8,6 @@ import {
   getTransactionFeeKobo,
   getWalletFundingFeeKobo,
   getWalletFundingGrossAmountKobo,
-  hasWalletFundingBreakdown,
 } from './transaction-display';
 import { formatCurrencyVisible } from './api';
 import { formatAccountNumberDisplay, resolveTransferBankForDisplay } from './transfer-banks';
@@ -78,10 +77,15 @@ export function buildTransactionReceiptData(
   const statusMeta = getStatusMeta(enriched.displayStatus || enriched.status);
   const displayAmount = enriched.displayAmountKobo || enriched.displayAmount || enriched.amount;
   const feeKobo = getTransactionFeeKobo(enriched);
-  const isFunding = txType === 'WALLET_FUND' || txType === 'ADMIN_CREDIT';
-  const fundingBreakdown = isFunding && hasWalletFundingBreakdown(enriched);
-  const fundedAmountKobo = fundingBreakdown ? getWalletFundingGrossAmountKobo(enriched) : null;
-  const fundingFeeKobo = isFunding ? getWalletFundingFeeKobo(enriched) : feeKobo;
+  const isWalletFund = txType === 'WALLET_FUND';
+  const fundingFeeKobo = isWalletFund ? getWalletFundingFeeKobo(enriched) : feeKobo;
+  const fundedAmountKobo = isWalletFund
+    ? (getWalletFundingGrossAmountKobo(enriched)
+      ?? (BigInt(fundingFeeKobo || '0') > 0n
+        ? (BigInt(displayAmount) + BigInt(fundingFeeKobo)).toString()
+        : null))
+    : null;
+  const fundingBreakdown = isWalletFund && fundedAmountKobo != null;
   const isTransfer = txType === 'WITHDRAWAL' || txType === 'TRANSFER';
   const transfer = enriched.transferDetails;
   const rows: ReceiptRow[] = [];
@@ -141,7 +145,7 @@ export function buildTransactionReceiptData(
 
   if (fundingBreakdown && fundedAmountKobo) {
     rows.push({
-      label: 'Amount funded',
+      label: 'Amount',
       value: enriched.formattedFundedAmount || formatCurrencyVisible(fundedAmountKobo, true),
       highlight: true,
     });

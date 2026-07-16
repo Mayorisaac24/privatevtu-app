@@ -35,7 +35,6 @@ import {
   getWalletFundingFeeKobo,
   getWalletFundingGrossAmountKobo,
   hasTransactionPricingDiscount,
-  hasWalletFundingBreakdown,
 } from '../lib/transaction-display';
 import { showToast } from '../components/ui/Toast';
 import { ThemedScreen } from '../components/ui/ThemedScreen';
@@ -474,14 +473,18 @@ export default function TransactionDetailScreen({ id }: Props) {
   const isFailed = statusMeta.tone === 'failed';
   const isSuccessful = statusMeta.tone === 'successful';
   const isProcessing = statusMeta.tone === 'processing' || statusMeta.tone === 'pending';
-  const isFunding = tx.type === 'WALLET_FUND' || tx.type === 'ADMIN_CREDIT';
+  const isWalletFund = tx.type === 'WALLET_FUND';
+  const isFunding = isWalletFund || tx.type === 'ADMIN_CREDIT';
   const displayAmount = tx.displayAmountKobo || tx.displayAmount || tx.amount;
   const walletDebitKobo = getTransactionWalletDebitKobo(tx);
-  const hasPricingDiscount = hasTransactionPricingDiscount(tx);
-  const feeKobo = isFunding ? getWalletFundingFeeKobo(tx) : getTransactionFeeKobo(tx);
+  const hasPricingDiscount = !isWalletFund && hasTransactionPricingDiscount(tx);
+  const feeKobo = isWalletFund ? getWalletFundingFeeKobo(tx) : getTransactionFeeKobo(tx);
   const hasFee = BigInt(feeKobo || '0') > 0n;
-  const fundingBreakdown = isFunding && hasWalletFundingBreakdown(tx);
-  const fundedAmountKobo = fundingBreakdown ? getWalletFundingGrossAmountKobo(tx) : null;
+  const fundedAmountKobo = isWalletFund ? getWalletFundingGrossAmountKobo(tx) : null;
+  const resolvedFundedKobo = isWalletFund
+    ? (fundedAmountKobo
+      ?? (hasFee ? (BigInt(displayAmount) + BigInt(feeKobo)).toString() : displayAmount))
+    : null;
   const accountNumber = transfer?.accountNumber || readMetaString(tx.metadata, 'accountNumber');
   const recipientName = transfer?.accountName
     || readMetaString(tx.metadata, 'accountName')
@@ -504,10 +507,10 @@ export default function TransactionDetailScreen({ id }: Props) {
     }
   }
 
-  if (fundingBreakdown && fundedAmountKobo) {
+  if (isWalletFund && resolvedFundedKobo) {
     detailRows.push({
-      label: 'Amount funded',
-      value: tx.formattedFundedAmount || formatCurrencyVisible(fundedAmountKobo, true),
+      label: 'Amount',
+      value: tx.formattedFundedAmount || formatCurrencyVisible(resolvedFundedKobo, true),
     });
     if (hasFee) {
       detailRows.push({
@@ -537,7 +540,7 @@ export default function TransactionDetailScreen({ id }: Props) {
         label: 'Fee',
         value: tx.formattedFee || formatCurrencyVisible(feeKobo, true),
       });
-      if (tx.formattedTotalDebited) {
+      if (!isWalletFund && tx.formattedTotalDebited) {
         detailRows.push({ label: 'Total debited', value: tx.formattedTotalDebited });
       }
     }

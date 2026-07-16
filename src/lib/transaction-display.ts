@@ -188,9 +188,9 @@ export function getWalletFundingFeeKobo(tx: Transaction): string {
 
 export function hasWalletFundingBreakdown(tx: Transaction): boolean {
   if (String(tx.type || '').toUpperCase() !== 'WALLET_FUND') return false;
-  const gross = getWalletFundingGrossAmountKobo(tx);
-  const fee = getWalletFundingFeeKobo(tx);
-  return Boolean(gross && BigInt(fee || '0') > 0n);
+  const fee = BigInt(getWalletFundingFeeKobo(tx) || '0');
+  if (fee > 0n) return true;
+  return getWalletFundingGrossAmountKobo(tx) != null;
 }
 
 /** Mirror backend: hide internal operational-wallet admin credits from user history. */
