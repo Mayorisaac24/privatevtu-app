@@ -15,7 +15,8 @@
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_API_BASE_URL": "https://privatevtu-backend.onrender.com/api/v1",
-        "EXPO_PUBLIC_SSL_PINNING_ENABLED": "true"
+        "EXPO_PUBLIC_SSL_PINNING_ENABLED": "true",
+        "EXPO_PUBLIC_FIREBASE_APP_CHECK_ENABLED": "true"
       },
       "android": {
         "buildType": "apk"

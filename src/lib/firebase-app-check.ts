@@ -12,8 +12,10 @@ async function loadAppCheckModule(): Promise<{
     if (typeof appCheck?.getToken === 'function') {
       return appCheck;
     }
-  } catch {
-    // Not linked yet — dev client without native rebuild.
+  } catch (error) {
+    if (__DEV__) {
+      console.warn('[AppCheck] Native module unavailable — rebuild with expo run:ios/android or EAS.', error);
+    }
   }
   return null;
 }
@@ -40,7 +42,10 @@ export async function getFirebaseAppCheckToken(forceRefresh = false): Promise<st
       expiresAt: Date.now() + 50 * 60 * 1000,
     };
     return token;
-  } catch {
+  } catch (error) {
+    if (__DEV__) {
+      console.warn('[AppCheck] getToken failed:', error);
+    }
     return null;
   }
 }
@@ -70,7 +75,12 @@ export async function initializeFirebaseAppCheck(): Promise<void> {
       provider,
       isTokenAutoRefreshEnabled: true,
     });
-  } catch {
-    // Native Firebase App Check not available until the next EAS build.
+  } catch (error) {
+    if (__DEV__) {
+      console.warn(
+        '[AppCheck] Initialize failed. Register the debug token from device logs in Firebase Console → App Check → Manage debug tokens.',
+        error,
+      );
+    }
   }
 }

@@ -365,6 +365,8 @@ export interface Transaction {
   isCredit?: boolean;
   displayAmount?: string;
   formattedDisplayAmount?: string;
+  fundedAmount?: string;
+  formattedFundedAmount?: string;
   totalDebited?: string;
   formattedTotalDebited?: string;
   fee?: string;

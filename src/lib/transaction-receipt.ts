@@ -6,6 +6,9 @@ import {
   formatTransactionDateTime,
   getStatusMeta,
   getTransactionFeeKobo,
+  getWalletFundingFeeKobo,
+  getWalletFundingGrossAmountKobo,
+  hasWalletFundingBreakdown,
 } from './transaction-display';
 import { formatCurrencyVisible } from './api';
 import { formatAccountNumberDisplay, resolveTransferBankForDisplay } from './transfer-banks';
@@ -75,6 +78,10 @@ export function buildTransactionReceiptData(
   const statusMeta = getStatusMeta(enriched.displayStatus || enriched.status);
   const displayAmount = enriched.displayAmountKobo || enriched.displayAmount || enriched.amount;
   const feeKobo = getTransactionFeeKobo(enriched);
+  const isFunding = txType === 'WALLET_FUND' || txType === 'ADMIN_CREDIT';
+  const fundingBreakdown = isFunding && hasWalletFundingBreakdown(enriched);
+  const fundedAmountKobo = fundingBreakdown ? getWalletFundingGrossAmountKobo(enriched) : null;
+  const fundingFeeKobo = isFunding ? getWalletFundingFeeKobo(enriched) : feeKobo;
   const isTransfer = txType === 'WITHDRAWAL' || txType === 'TRANSFER';
   const transfer = enriched.transferDetails;
   const rows: ReceiptRow[] = [];
@@ -132,19 +139,37 @@ export function buildTransactionReceiptData(
     }
   }
 
-  rows.push({
-    label: isTransfer ? 'Amount sent' : 'Amount',
-    value: enriched.formattedDisplayAmount || formatCurrencyVisible(displayAmount, true),
-    highlight: true,
-  });
-
-  // Transfer fees are disclosed on receipts (regulatory / customer expectation).
-  // VTU program discounts are internal — receipt shows face value only.
-  if (isTransfer && BigInt(feeKobo || '0') > 0n) {
+  if (fundingBreakdown && fundedAmountKobo) {
     rows.push({
-      label: 'Transfer fee',
-      value: enriched.formattedFee || formatCurrencyVisible(feeKobo, true),
+      label: 'Amount funded',
+      value: enriched.formattedFundedAmount || formatCurrencyVisible(fundedAmountKobo, true),
+      highlight: true,
     });
+    if (BigInt(fundingFeeKobo || '0') > 0n) {
+      rows.push({
+        label: 'Fee',
+        value: enriched.formattedFee || formatCurrencyVisible(fundingFeeKobo, true),
+      });
+    }
+    rows.push({
+      label: 'Amount credited',
+      value: enriched.formattedDisplayAmount || formatCurrencyVisible(displayAmount, true),
+    });
+  } else {
+    rows.push({
+      label: isTransfer ? 'Amount sent' : 'Amount',
+      value: enriched.formattedDisplayAmount || formatCurrencyVisible(displayAmount, true),
+      highlight: true,
+    });
+
+    // Transfer fees are disclosed on receipts (regulatory / customer expectation).
+    // VTU program discounts are internal — receipt shows face value only.
+    if (isTransfer && BigInt(feeKobo || '0') > 0n) {
+      rows.push({
+        label: 'Transfer fee',
+        value: enriched.formattedFee || formatCurrencyVisible(feeKobo, true),
+      });
+    }
   }
 
   if (enriched.providerRef) {

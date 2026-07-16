@@ -124,6 +124,9 @@ function resolveFeeKobo(tx: Transaction): string {
   if (tx.fee && BigInt(tx.fee) > 0n) return tx.fee;
 
   const meta = readMetadataRecord(tx.metadata);
+  if (meta?.totalFeeKobo != null && String(meta.totalFeeKobo).length > 0) {
+    return String(meta.totalFeeKobo);
+  }
   if (meta?.fee != null && String(meta.fee).length > 0) {
     return String(meta.fee);
   }
@@ -141,6 +144,53 @@ export function getTransactionDisplayAmountKobo(tx: Transaction): string {
 
 export function getTransactionFeeKobo(tx: Transaction): string {
   return resolveFeeKobo(tx);
+}
+
+function readFundingMetaBigInt(metadata: unknown, key: string): bigint | null {
+  const meta = readMetadataRecord(metadata);
+  if (!meta || meta[key] == null || String(meta[key]).length === 0) return null;
+  try {
+    const value = BigInt(String(meta[key]));
+    return value > 0n ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Gross amount the user paid in (Payvessel order amount). */
+export function getWalletFundingGrossAmountKobo(tx: Transaction): string | null {
+  if (String(tx.type || '').toUpperCase() !== 'WALLET_FUND') return null;
+
+  const fromApi = tx.fundedAmount && BigInt(tx.fundedAmount) > 0n ? tx.fundedAmount : null;
+  if (fromApi) return fromApi;
+
+  const fromMeta = readFundingMetaBigInt(tx.metadata, 'orderAmountKobo');
+  if (fromMeta) return fromMeta.toString();
+
+  const credited = BigInt(tx.displayAmountKobo || tx.displayAmount || tx.amount || '0');
+  const fee = BigInt(getTransactionFeeKobo(tx) || '0');
+  if (fee > 0n && credited > 0n) {
+    return (credited + fee).toString();
+  }
+
+  return null;
+}
+
+export function getWalletFundingFeeKobo(tx: Transaction): string {
+  if (String(tx.type || '').toUpperCase() !== 'WALLET_FUND') return '0';
+
+  const fee = getTransactionFeeKobo(tx);
+  if (BigInt(fee || '0') > 0n) return fee;
+
+  const fromMeta = readFundingMetaBigInt(tx.metadata, 'totalFeeKobo');
+  return fromMeta ? fromMeta.toString() : '0';
+}
+
+export function hasWalletFundingBreakdown(tx: Transaction): boolean {
+  if (String(tx.type || '').toUpperCase() !== 'WALLET_FUND') return false;
+  const gross = getWalletFundingGrossAmountKobo(tx);
+  const fee = getWalletFundingFeeKobo(tx);
+  return Boolean(gross && BigInt(fee || '0') > 0n);
 }
 
 /** Mirror backend: hide internal operational-wallet admin credits from user history. */

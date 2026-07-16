@@ -32,7 +32,10 @@ import {
   getTransactionMeta,
   getTransactionVisual,
   getTransactionWalletDebitKobo,
+  getWalletFundingFeeKobo,
+  getWalletFundingGrossAmountKobo,
   hasTransactionPricingDiscount,
+  hasWalletFundingBreakdown,
 } from '../lib/transaction-display';
 import { showToast } from '../components/ui/Toast';
 import { ThemedScreen } from '../components/ui/ThemedScreen';
@@ -475,8 +478,10 @@ export default function TransactionDetailScreen({ id }: Props) {
   const displayAmount = tx.displayAmountKobo || tx.displayAmount || tx.amount;
   const walletDebitKobo = getTransactionWalletDebitKobo(tx);
   const hasPricingDiscount = hasTransactionPricingDiscount(tx);
-  const feeKobo = getTransactionFeeKobo(tx);
+  const feeKobo = isFunding ? getWalletFundingFeeKobo(tx) : getTransactionFeeKobo(tx);
   const hasFee = BigInt(feeKobo || '0') > 0n;
+  const fundingBreakdown = isFunding && hasWalletFundingBreakdown(tx);
+  const fundedAmountKobo = fundingBreakdown ? getWalletFundingGrossAmountKobo(tx) : null;
   const accountNumber = transfer?.accountNumber || readMetaString(tx.metadata, 'accountNumber');
   const recipientName = transfer?.accountName
     || readMetaString(tx.metadata, 'accountName')
@@ -499,25 +504,42 @@ export default function TransactionDetailScreen({ id }: Props) {
     }
   }
 
-  detailRows.push({
-    label: 'Amount',
-    value: tx.formattedDisplayAmount || formatCurrencyVisible(displayAmount, true),
-  });
-
-  if (hasPricingDiscount) {
+  if (fundingBreakdown && fundedAmountKobo) {
     detailRows.push({
-      label: 'Debited amount',
-      value: tx.formattedTotalDebited || formatCurrencyVisible(walletDebitKobo, true),
+      label: 'Amount funded',
+      value: tx.formattedFundedAmount || formatCurrencyVisible(fundedAmountKobo, true),
     });
-  }
-
-  if (hasFee) {
+    if (hasFee) {
+      detailRows.push({
+        label: 'Fee',
+        value: tx.formattedFee || formatCurrencyVisible(feeKobo, true),
+      });
+    }
     detailRows.push({
-      label: 'Fee',
-      value: tx.formattedFee || formatCurrencyVisible(feeKobo, true),
+      label: 'Amount credited',
+      value: tx.formattedDisplayAmount || formatCurrencyVisible(displayAmount, true),
     });
-    if (tx.formattedTotalDebited) {
-      detailRows.push({ label: 'Total debited', value: tx.formattedTotalDebited });
+  } else {
+    detailRows.push({
+      label: 'Amount',
+      value: tx.formattedDisplayAmount || formatCurrencyVisible(displayAmount, true),
+    });
+
+    if (hasPricingDiscount) {
+      detailRows.push({
+        label: 'Debited amount',
+        value: tx.formattedTotalDebited || formatCurrencyVisible(walletDebitKobo, true),
+      });
+    }
+
+    if (hasFee) {
+      detailRows.push({
+        label: 'Fee',
+        value: tx.formattedFee || formatCurrencyVisible(feeKobo, true),
+      });
+      if (tx.formattedTotalDebited) {
+        detailRows.push({ label: 'Total debited', value: tx.formattedTotalDebited });
+      }
     }
   }
 
