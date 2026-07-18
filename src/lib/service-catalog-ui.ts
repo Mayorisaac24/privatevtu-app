@@ -93,6 +93,13 @@ export const SERVICE_CATALOG_GROUPS: Array<{ title: string; items: ServiceCatalo
         serviceCode: SERVICE_CODES.localTransfer,
       }),
       catalogItem({
+        label: 'Virtual Card',
+        subtitle: 'USD cards for online payments',
+        icon: 'card-outline',
+        route: '/wallet/virtual-cards',
+        serviceCode: SERVICE_CODES.virtualCard,
+      }),
+      catalogItem({
         label: 'Transactions',
         subtitle: 'View purchases & wallet history',
         icon: 'receipt-outline',
@@ -114,7 +121,6 @@ export const SERVICE_CATALOG_GROUPS: Array<{ title: string; items: ServiceCatalo
       { label: 'Gift Cards', icon: 'gift-outline', color: Colors.muted, bg: Colors.surfaceAlt, route: null },
       { label: 'Insurance', icon: 'shield-checkmark-outline', color: Colors.muted, bg: Colors.surfaceAlt, route: null },
       { label: 'Savings', icon: 'trending-up-outline', color: Colors.muted, bg: Colors.surfaceAlt, route: null },
-      { label: 'Virtual Card', icon: 'card-outline', color: Colors.muted, bg: Colors.surfaceAlt, route: null },
     ],
   },
 ];

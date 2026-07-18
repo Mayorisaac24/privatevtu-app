@@ -1,6 +1,7 @@
 import {
   api,
   hasBvnVerified,
+  hasTier2IdentityVerified,
   isResponseSuccess,
   type FundingBank,
   type VirtualAccount,
@@ -130,7 +131,7 @@ async function fetchSnapshotFromApi(): Promise<WalletFundingSnapshot> {
   }
   if (kycRes.status === 'fulfilled' && isResponseSuccess(kycRes.value)) {
     const kyc = kycRes.value.data;
-    snapshot.hasBvn = hasBvnVerified(kyc);
+    snapshot.hasBvn = hasTier2IdentityVerified(kyc);
     snapshot.kycTier = kyc?.currentTier ?? null;
     const tierKey = kyc?.currentTier;
     const limits = tierKey ? kyc?.tierRequirements?.[tierKey]?.limits : undefined;

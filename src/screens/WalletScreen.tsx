@@ -192,6 +192,7 @@ export default function WalletScreen() {
   const { isUsable } = useServiceAvailability();
   const fundUsable = isUsable(SERVICE_CODES.walletFund);
   const transferUsable = isUsable(SERVICE_CODES.localTransfer);
+  const virtualCardUsable = isUsable(SERVICE_CODES.virtualCard);
 
   const insights = useMemo(() => getHomeInsights(), [dashboardVersion]);
   const lastUpdated = useMemo(() => getHomeLastUpdated(), [dashboardVersion]);
@@ -243,6 +244,14 @@ export default function WalletScreen() {
       return;
     }
     router.push('/wallet/transfer');
+  };
+
+  const openVirtualCards = () => {
+    if (!virtualCardUsable) {
+      showToast({ type: 'info', text1: 'Unavailable', text2: 'Virtual cards are currently disabled' });
+      return;
+    }
+    router.push('/wallet/virtual-cards');
   };
 
   return (
@@ -316,6 +325,17 @@ export default function WalletScreen() {
             <Ionicons name="paper-plane-outline" size={16} color={Colors.white} />
             <Text style={styles.heroActionGhostText}>Send</Text>
           </TouchableOpacity>
+
+          {virtualCardUsable ? (
+            <TouchableOpacity
+              style={styles.heroActionGhost}
+              onPress={openVirtualCards}
+              activeOpacity={0.88}
+            >
+              <Ionicons name="card-outline" size={16} color={Colors.white} />
+              <Text style={styles.heroActionGhostText}>Cards</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       </LinearGradient>
 

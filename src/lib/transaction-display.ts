@@ -47,6 +47,7 @@ const TYPE_META: Record<string, Omit<TxDisplayMeta, 'isCredit'>> = {
   ADMIN_CREDIT: { icon: 'wallet-outline', label: 'Wallet Funding', ...BRAND_TX_ICON },
   EDUCATION: { icon: 'school-outline', label: 'Education', ...BRAND_TX_ICON },
   BETTING: { icon: 'trophy-outline', label: 'Betting', ...BRAND_TX_ICON },
+  VIRTUAL_CARD: { icon: 'card-outline', label: 'Virtual Card', ...BRAND_TX_ICON },
 };
 
 const INSTANT_SERVICE_TYPES = ['AIRTIME', 'DATA', 'ELECTRICITY', 'CABLE', 'EDUCATION', 'BETTING'];
@@ -213,6 +214,7 @@ function normalizeCategory(type: string): string {
   const normalized = String(type || '').toUpperCase();
   if (['AIRTIME', 'DATA', 'ELECTRICITY', 'CABLE', 'EDUCATION', 'BETTING'].includes(normalized)) return 'services';
   if (normalized === 'WALLET_FUND' || normalized === 'ADMIN_CREDIT') return 'wallet_funding';
+  if (normalized === 'VIRTUAL_CARD') return 'wallet_funding';
   if (['WITHDRAWAL', 'TRANSFER'].includes(normalized)) return 'transfer';
   return 'other';
 }
@@ -261,6 +263,9 @@ export function enrichTransaction(tx: Transaction): EnrichedTransaction {
       displayTitle = platformName ? `${platformName} funding` : 'Betting funding';
     } else if (txType === 'WALLET_FUND' || txType === 'ADMIN_CREDIT') {
       displayTitle = 'Wallet funding';
+    } else if (txType === 'VIRTUAL_CARD') {
+      const action = readMetaString(metadata, 'action');
+      displayTitle = action === 'fund' ? 'Virtual card funding' : 'Virtual card issuance';
     } else {
       displayTitle = txType.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
     }

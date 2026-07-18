@@ -6,6 +6,7 @@ export default function WalletLayout() {
     <Stack screenOptions={stackScreenOptions}>
       <Stack.Screen name="transfer" />
       <Stack.Screen name="fund" />
+      <Stack.Screen name="virtual-cards" options={{ headerShown: false }} />
     </Stack>
   );
 }

@@ -413,6 +413,68 @@ export interface WalletFundingMethods {
   dynamicVirtualAccount: boolean;
 }
 
+export interface VirtualCardConfig {
+  isEnabled: boolean;
+  maxCardsPerUser: number;
+  minPrefundUsd: string;
+  maxPrefundUsd: string;
+  usdRateMarkupKobo?: string;
+  baseUsdRateKobo?: string;
+  baseUsdRateNaira?: string;
+  effectiveUsdRateKobo?: string;
+  effectiveUsdRateNaira?: string;
+  rateSource?: 'live';
+  providerRateFetchedAt?: string | null;
+  rateAvailable?: boolean;
+  rateError?: string | null;
+  usdRateKobo?: string;
+  usdRateNaira?: string;
+  issueMarkupKobo: string;
+  fundMarkupKobo: string;
+  allowedBrands: Array<'VISA' | 'MASTERCARD'>;
+}
+
+export interface VirtualCardChargeQuote {
+  action: 'issuance' | 'funding';
+  amountUsd: string;
+  providerIssueFeeUsd?: string;
+  providerFundFeeUsd?: string;
+  providerFeesUsd: string;
+  totalProviderUsd: string;
+  operationMarkupKobo: string;
+  conversionKobo: string;
+  totalDebitKobo: string;
+  baseUsdRateKobo: string;
+  effectiveUsdRateKobo: string;
+  effectiveUsdRateNaira: string;
+  rateSource?: 'live';
+}
+
+export interface VirtualCardSummary {
+  id: string;
+  cardName: string | null;
+  brand: string;
+  currency: string;
+  status: string;
+  maskedPan: string | null;
+  balanceUsd: string;
+  expiry: string | null;
+  providerCardId: string;
+  reference: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VirtualCardCredentials {
+  cardNumber: string;
+  cvv: string;
+  expiry: string;
+  cardName: string | null;
+  brand: string;
+  status: string;
+  balanceUsd: string;
+}
+
 export interface PayvesselCheckoutSdkSession {
   mode: 'sdk';
   reference: string;
@@ -442,6 +504,7 @@ export interface KycStatusUser {
   email?: string;
   phone?: string;
   bvnVerifiedAt?: string | null;
+  ninVerifiedAt?: string | null;
   kycStatus?: string;
   dateOfBirth?: string | null;
   isPhoneVerified?: boolean;
@@ -503,8 +566,16 @@ export interface FundingBank {
 
 export function hasBvnVerified(data?: KycStatusData | null): boolean {
   if (!data) return false;
-  const tier = data.currentTier ?? data.user?.kycStatus;
-  return !!data.user?.bvnVerifiedAt || tier === 'TIER_2' || tier === 'TIER_3';
+  return !!data.user?.bvnVerifiedAt;
+}
+
+export function hasNinVerified(data?: KycStatusData | null): boolean {
+  if (!data) return false;
+  return !!data.user?.ninVerifiedAt;
+}
+
+export function hasTier2IdentityVerified(data?: KycStatusData | null): boolean {
+  return hasBvnVerified(data) && hasNinVerified(data);
 }
 
 export interface AirtimeProvider {
@@ -1707,6 +1778,108 @@ class ApiClient {
     return this.request(`/payvessel/verify-checkout?reference=${encodeURIComponent(reference)}`);
   }
 
+  // ============ VIRTUAL CARDS ============
+
+  async getVirtualCardConfig(): Promise<ApiResponse<VirtualCardConfig>> {
+    return this.request('/virtual-cards/config');
+  }
+
+  async listVirtualCards(): Promise<ApiResponse<{ cards: VirtualCardSummary[] }>> {
+    return this.request('/virtual-cards/');
+  }
+
+  async getVirtualCard(cardId: string): Promise<ApiResponse<{ card: VirtualCardSummary }>> {
+    return this.request(`/virtual-cards/${encodeURIComponent(cardId)}`);
+  }
+
+  async createVirtualCard(data: {
+    brand: 'VISA' | 'MASTERCARD';
+    cardName?: string;
+    prefundUsd?: number;
+    pin?: string;
+    biometricToken?: string;
+    deviceId?: string;
+    idempotencyKey?: string;
+  }): Promise<ApiResponse<{
+    card: VirtualCardSummary;
+    transactionReference: string;
+    message: string;
+  }>> {
+    return this.request('/virtual-cards/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      timeoutMs: 90000,
+    });
+  }
+
+  async quoteVirtualCardFees(data: {
+    action: 'issuance' | 'funding';
+    amountUsd?: string;
+  }): Promise<ApiResponse<Record<string, unknown>>> {
+    return this.request('/virtual-cards/fees/quote', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async quoteVirtualCardCharge(data: {
+    action: 'issuance' | 'funding';
+    amountUsd?: string;
+  }): Promise<ApiResponse<VirtualCardChargeQuote>> {
+    return this.request('/virtual-cards/charges/quote', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async fundVirtualCard(
+    cardId: string,
+    data: {
+      amountUsd: number;
+      pin?: string;
+      biometricToken?: string;
+      deviceId?: string;
+      idempotencyKey?: string;
+    },
+  ): Promise<ApiResponse<{ card: VirtualCardSummary; message: string }>> {
+    return this.request(`/virtual-cards/${encodeURIComponent(cardId)}/fund`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+      timeoutMs: 90000,
+    });
+  }
+
+  async revealVirtualCard(cardId: string): Promise<ApiResponse<VirtualCardCredentials>> {
+    return this.request(`/virtual-cards/${encodeURIComponent(cardId)}/reveal`);
+  }
+
+  async syncVirtualCard(cardId: string): Promise<ApiResponse<{ card: VirtualCardSummary }>> {
+    return this.request(`/virtual-cards/${encodeURIComponent(cardId)}/sync`, { method: 'POST' });
+  }
+
+  async freezeVirtualCard(cardId: string): Promise<ApiResponse<{ card: VirtualCardSummary }>> {
+    return this.request(`/virtual-cards/${encodeURIComponent(cardId)}/freeze`, { method: 'POST' });
+  }
+
+  async unfreezeVirtualCard(cardId: string): Promise<ApiResponse<{ card: VirtualCardSummary }>> {
+    return this.request(`/virtual-cards/${encodeURIComponent(cardId)}/unfreeze`, { method: 'POST' });
+  }
+
+  async terminateVirtualCard(
+    cardId: string,
+    data: { pin?: string; biometricToken?: string; deviceId?: string },
+  ): Promise<ApiResponse<{ card: VirtualCardSummary }>> {
+    return this.request(`/virtual-cards/${encodeURIComponent(cardId)}/terminate`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+      timeoutMs: 90000,
+    });
+  }
+
+  async listVirtualCardTransactions(cardId: string): Promise<ApiResponse<{ transactions: unknown[] }>> {
+    return this.request(`/virtual-cards/${encodeURIComponent(cardId)}/transactions`);
+  }
+
   // ============ TRANSACTIONS ============
 
   async getTransactions(page = 1, pageSize = 20, filters?: {
@@ -2150,6 +2323,13 @@ class ApiClient {
     return this.request('/kyc/verify-bvn', {
       method: 'POST',
       body: JSON.stringify({ bvn, dateOfBirth }),
+    });
+  }
+
+  async verifyNin(nin: string, gender: 'MALE' | 'FEMALE'): Promise<ApiResponse> {
+    return this.request('/kyc/verify-nin', {
+      method: 'POST',
+      body: JSON.stringify({ nin, gender }),
     });
   }
 

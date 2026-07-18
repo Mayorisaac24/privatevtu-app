@@ -81,6 +81,8 @@ export const useAuthStore = create<AuthState>()(
         const { resetSupportCache } = await import('../lib/support-cache');
         resetEducationCatalogCache();
         resetSupportCache();
+        const { invalidateVirtualCardsCaches } = await import('../lib/virtual-cards-cache');
+        invalidateVirtualCardsCaches();
         resetCatalogRevisionSync();
         useBeneficiaryStore.getState().clearAll();
         set({ accessToken: null, user: null, isAuthenticated: false, error: null });

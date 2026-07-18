@@ -14,6 +14,7 @@ export const SERVICE_CODES = {
   localTransfer: 'local_transfer',
   education: 'education',
   walletFund: 'wallet_fund',
+  virtualCard: 'virtual_card',
 } as const;
 
 export type ServiceCode = typeof SERVICE_CODES[keyof typeof SERVICE_CODES];

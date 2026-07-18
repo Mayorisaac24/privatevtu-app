@@ -13,6 +13,8 @@ import {
   api,
   getKycTierLabel,
   hasBvnVerified,
+  hasNinVerified,
+  hasTier2IdentityVerified,
   isResponseSuccess,
   type KycStatusData,
   type KycTierRequirement,
@@ -68,7 +70,7 @@ import {
   KYC_ID_TYPE_VALUES,
 } from '../../src/lib/kyc-status-utils';
 
-type Step = 'status' | 'tier2' | 'phone-verify' | 'phone-otp' | 'tier3' | 'tier3-docs';
+type Step = 'status' | 'tier2' | 'tier2-nin' | 'phone-verify' | 'phone-otp' | 'tier3' | 'tier3-docs';
 
 const MAX_KYC_IMAGE_BYTES = 5 * 1024 * 1024;
 
@@ -112,7 +114,7 @@ function tierIndex(tier: string): number {
 /** Requirements introduced at this tier only — excludes carry-over from earlier steps. */
 const TIER_STEP_REQ_IDS: Record<string, string[]> = {
   TIER_1: ['email', 'phone'],
-  TIER_2: ['dob', 'bvn'],
+  TIER_2: ['dob', 'bvn', 'nin'],
   TIER_3: ['address', 'proof_of_address', 'id', 'selfie'],
 };
 
@@ -400,6 +402,7 @@ const MemoTierStep = memo(TierStep);
 const STEP_HEADER: Record<Step, string> = {
   status: 'Verify your identity to unlock limits',
   tier2: 'BVN verification',
+  'tier2-nin': 'NIN verification',
   'phone-verify': 'Phone verification',
   'phone-otp': 'Enter verification code',
   tier3: 'Residential address',
@@ -708,6 +711,8 @@ export default function KycScreen() {
   const [step, setStep] = useState<Step>('status');
 
   const [bvn, setBvn] = useState('');
+  const [nin, setNin] = useState('');
+  const [ninGender, setNinGender] = useState<'MALE' | 'FEMALE'>('MALE');
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [phoneOtp, setPhoneOtp] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
@@ -754,6 +759,10 @@ export default function KycScreen() {
     }
     if (step === 'tier3-docs') {
       setStep(hasSavedKycAddress(kycData) ? 'status' : 'tier3');
+      return;
+    }
+    if (step === 'tier2-nin') {
+      setStep('tier2');
       return;
     }
     setStep('status');
@@ -983,13 +992,35 @@ export default function KycScreen() {
       if (isResponseSuccess(res)) {
         showToast({ type: 'success', text1: 'BVN verified successfully' });
         updateUser({ kycStatus: 'VERIFIED' });
-        setStep('status');
         await fetchStatus({ silent: true, force: true });
+        setStep('tier2-nin');
       } else {
         showToast({ type: 'error', text1: res.message || 'BVN verification failed' });
       }
     } catch (err: any) {
       showToast({ type: 'error', text1: err?.message || 'BVN verification failed' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleVerifyNin = async () => {
+    if (nin.length !== 11) {
+      showToast({ type: 'error', text1: 'Enter a valid 11-digit NIN' });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await api.verifyNin(nin, ninGender);
+      if (isResponseSuccess(res)) {
+        showToast({ type: 'success', text1: 'NIN verified successfully' });
+        setStep('status');
+        await fetchStatus({ silent: true, force: true });
+      } else {
+        showToast({ type: 'error', text1: res.message || 'NIN verification failed' });
+      }
+    } catch (err: any) {
+      showToast({ type: 'error', text1: err?.message || 'NIN verification failed' });
     } finally {
       setSubmitting(false);
     }
@@ -1297,6 +1328,54 @@ export default function KycScreen() {
       );
     }
 
+    if (step === 'tier2-nin') {
+      return (
+        <FormShell
+          icon="id-card-outline"
+          title="NIN verification"
+          subtitle="Verify your National Identification Number."
+          stepBadge="Tier 2 · NIN"
+          perks={['Required for full Tier 2', 'Unlocks permanent VA']}
+        >
+          <FormField label="NIN" icon="card-outline" counter={`${nin.length}/11`}>
+            <TextInput
+              style={styles.inputField}
+              placeholder="Enter 11-digit NIN"
+              placeholderTextColor={Colors.mutedLight}
+              value={nin}
+              onChangeText={(v) => setNin(v.replace(/\D/g, '').slice(0, 11))}
+              keyboardType="number-pad"
+              maxLength={11}
+            />
+          </FormField>
+          <Text style={styles.fieldLabel}>Gender on NIN record</Text>
+          <View style={styles.genderRow}>
+            {(['MALE', 'FEMALE'] as const).map((value) => (
+              <TouchableOpacity
+                key={value}
+                style={[styles.genderChip, ninGender === value && styles.genderChipActive]}
+                onPress={() => setNinGender(value)}
+                activeOpacity={0.85}
+              >
+                <Text style={[styles.genderChipText, ninGender === value && styles.genderChipTextActive]}>
+                  {value === 'MALE' ? 'Male' : 'Female'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <View style={styles.secureNote}>
+            <View style={styles.secureNoteIcon}>
+              <Ionicons name="shield-checkmark" size={16} color={Colors.primary} />
+            </View>
+            <Text style={styles.secureNoteText}>
+              Your NIN is encrypted end-to-end and matched against official records.
+            </Text>
+          </View>
+          {renderPrimaryBtn('Verify NIN', handleVerifyNin, nin.length !== 11)}
+        </FormShell>
+      );
+    }
+
     if (step === 'phone-verify' && kycData) {
       return (
         <FormShell
@@ -1594,10 +1673,12 @@ export default function KycScreen() {
     }
 
     const bvnDone = hasBvnVerified(kycData);
+    const ninDone = hasNinVerified(kycData);
+    const tier2Complete = hasTier2IdentityVerified(kycData);
 
     return (
       <View style={styles.overview}>
-        {bvnDone && (
+        {tier2Complete && (
           <GlassCard borderRadius={Radius.lg} padding={14} variant="solid" contentStyle={styles.perkBanner}>
             <View style={styles.perkIcon}>
               <Ionicons name="wallet" size={18} color={Colors.primary} />
@@ -1626,17 +1707,29 @@ export default function KycScreen() {
           tierKey="TIER_2"
           tier={tiers.TIER_2}
           currentTier={currentTier}
-          onAction={currentTier === 'TIER_1' ? () => setStep('tier2') : undefined}
-          actionLabel={currentTier === 'TIER_1' ? 'Verify BVN' : undefined}
-          showVerified={['TIER_2', 'TIER_3'].includes(currentTier)}
+          onAction={
+            currentTier === 'TIER_1'
+              ? () => setStep('tier2')
+              : currentTier === 'TIER_2' && bvnDone && !ninDone
+                ? () => setStep('tier2-nin')
+                : undefined
+          }
+          actionLabel={
+            currentTier === 'TIER_1'
+              ? 'Verify BVN'
+              : currentTier === 'TIER_2' && bvnDone && !ninDone
+                ? 'Verify NIN'
+                : undefined
+          }
+          showVerified={['TIER_2', 'TIER_3'].includes(currentTier) && tier2Complete}
         />
 
         <MemoTierStep
           tierKey="TIER_3"
           tier={tiers.TIER_3}
           currentTier={currentTier}
-          onAction={currentTier === 'TIER_2' ? startTier3 : undefined}
-          actionLabel={currentTier === 'TIER_2' ? getTier3ActionLabel(kycData) : undefined}
+          onAction={currentTier === 'TIER_2' && tier2Complete ? startTier3 : undefined}
+          actionLabel={currentTier === 'TIER_2' && tier2Complete ? getTier3ActionLabel(kycData) : undefined}
           showVerified={currentTier === 'TIER_3'}
           isLast
         />
@@ -2466,6 +2559,38 @@ const createStyles = (colors: import('../../src/theme/types').ThemeColors) => St
   otpDigit: { fontSize: 22, fontWeight: '800', color: colors.heroDark },
   otpHiddenInput: hiddenNumericInputStyle,
   otpHint: { fontSize: 12, color: colors.mutedLight, fontWeight: '500' },
+  fieldLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.dark,
+    marginBottom: 8,
+  },
+  genderRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 8,
+  },
+  genderChip: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Overlays.borderPrimary18,
+    backgroundColor: colors.formBgAlt,
+    alignItems: 'center',
+  },
+  genderChipActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryMuted,
+  },
+  genderChipText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.muted,
+  },
+  genderChipTextActive: {
+    color: colors.primary,
+  },
   secureNote: {
     flexDirection: 'row',
     alignItems: 'flex-start',
