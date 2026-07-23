@@ -21,7 +21,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.devnex.datamartng",
       "googleServicesFile": "./GoogleService-Info.plist",
-      "buildNumber": "11",
+      "buildNumber": "13",
       "infoPlist": {
         "CFBundleDisplayName": "Datamart",
         "NSCameraUsageDescription": "Allow camera for KYC live face scan and document capture",

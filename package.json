@@ -15,6 +15,7 @@
     "build:android": "eas build --platform android",
     "build:apk": "eas build --platform android --profile preview",
     "build:ios": "eas build --platform ios",
+    "eas:setup-firebase-env": "bash scripts/setup-eas-firebase-env.sh",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

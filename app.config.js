@@ -5,6 +5,16 @@ const ROOT = __dirname;
 const IOS_FILE = 'GoogleService-Info.plist';
 const ANDROID_FILE = 'google-services.json';
 
+const IOS_ENV_KEYS = [
+  'GOOGLE_SERVICES_INFO_PLIST',
+  'GOOGLE_SERVICES_INFOPLIST',
+  'GOOGLE_SERVICES_PLIST',
+];
+
+const ANDROID_ENV_KEYS = [
+  'GOOGLE_SERVICES_JSON',
+];
+
 function copyIfMissing(targetPath, sourcePath) {
   if (fs.existsSync(targetPath) || !sourcePath || !fs.existsSync(sourcePath)) {
     return false;
@@ -21,41 +31,55 @@ function writeBase64IfMissing(targetPath, base64Value) {
   return true;
 }
 
+function materializeFromEnvKeys(targetPath, envKeys, base64Key) {
+  for (const key of envKeys) {
+    if (copyIfMissing(targetPath, process.env[key])) {
+      return true;
+    }
+  }
+  return writeBase64IfMissing(targetPath, process.env[base64Key]);
+}
+
 /**
- * EAS Build only uploads git-tracked files. Firebase iOS config is gitignored locally,
- * so materialize it from EAS file env vars (or base64 secrets) before prebuild runs.
+ * EAS Build only uploads git-tracked files. Materialize Firebase config from
+ * EAS file env vars when the repo copy is unavailable.
  */
 function materializeFirebaseConfigFiles() {
   const iosTarget = path.join(ROOT, IOS_FILE);
   const androidTarget = path.join(ROOT, ANDROID_FILE);
 
-  copyIfMissing(iosTarget, process.env.GOOGLE_SERVICES_INFO_PLIST);
-  writeBase64IfMissing(iosTarget, process.env.GOOGLE_SERVICES_INFO_PLIST_BASE64);
-
-  copyIfMissing(androidTarget, process.env.GOOGLE_SERVICES_JSON);
-  writeBase64IfMissing(androidTarget, process.env.GOOGLE_SERVICES_JSON_BASE64);
+  materializeFromEnvKeys(iosTarget, IOS_ENV_KEYS, 'GOOGLE_SERVICES_INFO_PLIST_BASE64');
+  materializeFromEnvKeys(androidTarget, ANDROID_ENV_KEYS, 'GOOGLE_SERVICES_JSON_BASE64');
 }
 
 function assertFirebaseConfigForEasBuild() {
-  const onEas = process.env.EAS_BUILD === 'true';
-  if (!onEas) return;
+  if (process.env.EAS_BUILD !== 'true') return;
 
   const iosTarget = path.join(ROOT, IOS_FILE);
   if (fs.existsSync(iosTarget)) return;
 
+  const profile = process.env.EAS_BUILD_PROFILE || 'unknown';
+  const environment = process.env.EAS_BUILD_ENVIRONMENT || 'not set';
+
   throw new Error(
     [
       '[Firebase] GoogleService-Info.plist is missing on EAS Build.',
-      'The file is gitignored locally, so upload it as an EAS environment file variable:',
+      `Profile: ${profile} | Environment: ${environment}`,
       '',
+      'Fix option A (recommended — same as google-services.json on Android):',
+      '  git add GoogleService-Info.plist',
+      '  git commit -m "Track Firebase iOS config for EAS builds"',
+      '  git push',
+      '',
+      'Fix option B (keep plist out of git): upload as an EAS file env var, then rebuild:',
       '  eas env:create --scope project \\',
       '    --name GOOGLE_SERVICES_INFO_PLIST \\',
       '    --type file \\',
       '    --value ./GoogleService-Info.plist \\',
       '    --environment production',
       '',
-      'Repeat for preview (and development if needed). Link the variable to each build profile environment in the Expo dashboard.',
-      'Alternative: set GOOGLE_SERVICES_INFO_PLIST_BASE64 to the base64-encoded plist contents.',
+      'Ensure eas.json build profiles set "environment": "production" (or preview/development).',
+      'Run: npm run eas:setup-firebase-env',
     ].join('\n'),
   );
 }
