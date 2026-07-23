@@ -10,6 +10,7 @@ const SCREEN_ROUTES: Record<string, string> = {
   security: '/profile/change-password',
   data: '/services/data',
   dispute: '/profile/disputes',
+  virtual_card: '/wallet/virtual-cards',
 };
 
 export function navigateFromNotificationData(data?: Record<string, unknown> | null): void {
@@ -30,7 +31,24 @@ export function navigateFromNotificationData(data?: Record<string, unknown> | nu
   const type = typeof data.type === 'string' ? data.type : '';
 
   if (screen && SCREEN_ROUTES[screen]) {
+    if (screen === 'virtual_card') {
+      const virtualCardId = typeof data.virtualCardId === 'string' ? data.virtualCardId : '';
+      if (virtualCardId) {
+        router.push(`/wallet/virtual-cards/${virtualCardId}` as any);
+        return;
+      }
+    }
     router.push(SCREEN_ROUTES[screen] as any);
+    return;
+  }
+
+  if (type.startsWith('virtual_card_')) {
+    const virtualCardId = typeof data.virtualCardId === 'string' ? data.virtualCardId : '';
+    if (virtualCardId) {
+      router.push(`/wallet/virtual-cards/${virtualCardId}` as any);
+      return;
+    }
+    router.push('/wallet/virtual-cards');
     return;
   }
 

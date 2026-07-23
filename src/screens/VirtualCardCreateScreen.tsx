@@ -6,70 +6,92 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Switch,
 } from 'react-native';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { ProfileSubScreen } from '../components/profile/ProfileSubScreen';
 import { GlassCard } from '../components/ui/GlassCard';
 import { GradientButton } from '../components/ui/GradientButton';
 import { TransactionLockSheet } from '../components/security/TransactionLockSheet';
+import { VirtualCardDesignPicker } from '../components/virtual-cards/VirtualCardDesignPicker';
+import { VirtualCardVisual } from '../components/virtual-cards/VirtualCardVisual';
 import type { TransactionAuthPayload } from '../hooks/useTransactionLockAuth';
 import {
   api,
   formatCurrency,
-  hasTier2IdentityVerified,
   isResponseSuccess,
   type VirtualCardConfig,
 } from '../lib/api';
 import { getKycStatusData } from '../lib/kyc-status-cache';
+import { isVirtualCardCreationEligible } from '../lib/kyc-status-utils';
+import {
+  DEFAULT_VIRTUAL_CARD_DESIGN,
+  type VirtualCardDesignId,
+} from '../lib/virtual-card-designs';
 import {
   getVirtualCardConfig,
   peekVirtualCardConfig,
   setVirtualCardDetailCache,
 } from '../lib/virtual-cards-cache';
+import { useAuthStore } from '../stores';
 import { Colors, Radius, Spacing, useThemedStyles } from '../theme';
-import {
-  formatUsd,
-  parseUsdInput,
-  sanitizeUsdInput,
-} from '../lib/virtual-card-utils';
+import { useColors } from '../theme/hooks';
+import { formatUsd, parseUsdInput, sanitizeUsdInput, virtualCardIssuanceNotice } from '../lib/virtual-card-utils';
 import { useWalletAffordability } from '../hooks/useWalletAffordability';
 import { showToast } from '../components/ui/Toast';
-import {
-  virtualCardUserMessage,
-  VIRTUAL_CARD_RATE_UNAVAILABLE,
-  VIRTUAL_CARD_RATE_REQUIRED,
-} from '../lib/virtual-card-user-message';
 import { refreshDashboardData } from '../lib/dashboard-data';
+import { newVirtualCardIdempotencyKey } from '../lib/virtual-card-idempotency';
 
 const BRAND_LABELS: Record<'VISA' | 'MASTERCARD', string> = {
   VISA: 'Visa',
   MASTERCARD: 'Mastercard',
 };
 
+function readCreatePrefundBounds(config: VirtualCardConfig | null) {
+  const minRaw = config?.minCreatePrefundUsd ?? config?.initialPrefundUsd ?? '1.00';
+  const maxRaw = config?.maxCreatePrefundUsd ?? config?.maxPrefundUsd ?? '1000.00';
+  const min = Number(minRaw);
+  const max = Number(maxRaw);
+  return {
+    min: Number.isFinite(min) && min > 0 ? min : 1,
+    max: Number.isFinite(max) && max > 0 ? max : 1000,
+  };
+}
+
 export default function VirtualCardCreateScreen() {
   const styles = useStyles();
+  const colors = useColors();
+  const user = useAuthStore((s) => s.user);
   const initialConfig = peekVirtualCardConfig();
   const [config, setConfig] = useState<VirtualCardConfig | null>(initialConfig);
   const [brand, setBrand] = useState<'VISA' | 'MASTERCARD'>(initialConfig?.allowedBrands[0] || 'VISA');
+  const [cardDesign, setCardDesign] = useState<VirtualCardDesignId>(DEFAULT_VIRTUAL_CARD_DESIGN);
   const [cardName, setCardName] = useState('');
-  const [prefundUsd, setPrefundUsd] = useState('');
+  const [isContactless, setIsContactless] = useState(false);
+  const [prefundAmount, setPrefundAmount] = useState('1.00');
   const [loading, setLoading] = useState(!initialConfig);
   const [quoting, setQuoting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [showLock, setShowLock] = useState(false);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
   const [chargeQuote, setChargeQuote] = useState<{
-    totalProviderUsd: string;
+    amountUsd: string;
     providerFeesUsd: string;
+    totalChargeUsd: string;
     totalDebitKobo: string;
-    effectiveUsdRateNaira: string;
   } | null>(null);
   const quoteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const createIdempotencyKeyRef = useRef<string | null>(null);
 
-  const prefundAmount = parseUsdInput(prefundUsd);
+  const prefundBounds = useMemo(() => readCreatePrefundBounds(config), [config]);
+  const prefundUsd = parseUsdInput(prefundAmount);
   const totalDebitKobo = Number(chargeQuote?.totalDebitKobo || 0);
+  const holderName = useMemo(
+    () => `${user?.firstName || ''} ${user?.lastName || ''}`.trim(),
+    [user?.firstName, user?.lastName],
+  );
 
   const affordability = useWalletAffordability(Number(totalDebitKobo), true);
 
@@ -82,45 +104,73 @@ export default function VirtualCardCreateScreen() {
           ? current
           : (nextConfig.allowedBrands[0] || 'VISA')
       ));
+      const defaultPrefund = nextConfig.defaultCreatePrefundUsd
+        ?? nextConfig.minCreatePrefundUsd
+        ?? nextConfig.initialPrefundUsd
+        ?? '1.00';
+      setPrefundAmount(defaultPrefund);
     }
   }, []);
 
-  const refreshQuotes = useCallback(async (amount: number) => {
+  const requestQuote = useCallback(async (amount: number) => {
+    if (amount < prefundBounds.min || amount > prefundBounds.max) {
+      setChargeQuote(null);
+      setQuoteError(
+        `Starting balance must be between ${formatUsd(prefundBounds.min)} and ${formatUsd(prefundBounds.max)}`,
+      );
+      return;
+    }
     setQuoting(true);
     try {
       const res = await api.quoteVirtualCardCharge({
         action: 'issuance',
-        amountUsd: amount > 0 ? amount.toFixed(2) : undefined,
+        amountUsd: amount.toFixed(2),
       });
       if (isResponseSuccess(res) && res.data) {
         setChargeQuote({
-          totalProviderUsd: res.data.totalProviderUsd,
+          amountUsd: res.data.amountUsd,
           providerFeesUsd: res.data.providerFeesUsd,
+          totalChargeUsd: res.data.totalChargeUsd,
           totalDebitKobo: res.data.totalDebitKobo,
-          effectiveUsdRateNaira: res.data.effectiveUsdRateNaira,
         });
+        setQuoteError(null);
       } else {
         setChargeQuote(null);
-        showToast({
-          type: 'error',
-          text1: 'Rate unavailable',
-          text2: virtualCardUserMessage(res.message, VIRTUAL_CARD_RATE_UNAVAILABLE),
-        });
+        setQuoteError(res.message || 'Could not calculate card charges');
       }
+    } catch (error) {
+      setChargeQuote(null);
+      setQuoteError(error instanceof Error ? error.message : 'Could not calculate card charges');
     } finally {
       setQuoting(false);
     }
-  }, []);
+  }, [prefundBounds.max, prefundBounds.min]);
+
+  useEffect(() => {
+    if (quoteTimer.current) clearTimeout(quoteTimer.current);
+    if (prefundUsd <= 0) {
+      setChargeQuote(null);
+      setQuoteError(null);
+      return;
+    }
+    quoteTimer.current = setTimeout(() => {
+      void requestQuote(prefundUsd);
+    }, 400);
+    return () => {
+      if (quoteTimer.current) clearTimeout(quoteTimer.current);
+    };
+  }, [prefundUsd, requestQuote]);
 
   useEffect(() => {
     void (async () => {
       if (!initialConfig) setLoading(true);
       try {
         const kyc = await getKycStatusData();
-        if (!hasTier2IdentityVerified(kyc)) {
+        const eligibility = isVirtualCardCreationEligible(kyc);
+        if (!eligibility.ok) {
           Alert.alert(
             'Verification required',
-            'Complete BVN and NIN verification before creating a virtual card.',
+            eligibility.reason || 'Complete verification before creating a virtual card.',
             [
               { text: 'Go to KYC', onPress: () => router.replace('/kyc') },
               { text: 'Cancel', style: 'cancel', onPress: () => router.back() },
@@ -129,12 +179,11 @@ export default function VirtualCardCreateScreen() {
           return;
         }
         await loadConfig();
-        await refreshQuotes(0);
       } finally {
         setLoading(false);
       }
     })();
-  }, [initialConfig, loadConfig, refreshQuotes]);
+  }, [initialConfig, loadConfig]);
 
   useFocusEffect(
     useCallback(() => {
@@ -142,50 +191,44 @@ export default function VirtualCardCreateScreen() {
     }, [loadConfig]),
   );
 
-  useEffect(() => {
-    if (quoteTimer.current) clearTimeout(quoteTimer.current);
-    quoteTimer.current = setTimeout(() => {
-      void refreshQuotes(prefundAmount);
-    }, 400);
-    return () => {
-      if (quoteTimer.current) clearTimeout(quoteTimer.current);
-    };
-  }, [prefundAmount, refreshQuotes]);
-
   const validate = (): string | null => {
     if (!config) return 'Configuration unavailable';
     if (!config.allowedBrands.includes(brand)) return `${brand} cards are not enabled`;
-    const min = parseFloat(config.minPrefundUsd);
-    const max = parseFloat(config.maxPrefundUsd);
-    if (prefundAmount > 0 && prefundAmount < min) {
-      return `Minimum prefund is ${formatUsd(min)}`;
+    if (prefundUsd < prefundBounds.min || prefundUsd > prefundBounds.max) {
+      return `Starting balance must be between ${formatUsd(prefundBounds.min)} and ${formatUsd(prefundBounds.max)}`;
     }
-    if (prefundAmount > max) {
-      return `Maximum prefund is ${formatUsd(max)}`;
-    }
-    if (affordability.insufficientFunds) {
-      return 'Insufficient wallet balance';
-    }
+    if (affordability.insufficientFunds) return 'Insufficient wallet balance';
     return null;
   };
 
   const handleCreate = async (auth: TransactionAuthPayload) => {
     setSubmitting(true);
     try {
+      if (!createIdempotencyKeyRef.current) {
+        createIdempotencyKeyRef.current = await newVirtualCardIdempotencyKey('vc-create');
+      }
       const res = await api.createVirtualCard({
         brand,
+        cardDesign,
         cardName: cardName.trim() || undefined,
-        prefundUsd: prefundAmount > 0 ? prefundAmount : undefined,
+        initialPrefundUsd: prefundUsd.toFixed(2),
+        isContactless,
+        idempotencyKey: createIdempotencyKeyRef.current,
         ...auth,
       });
       if (!isResponseSuccess(res) || !res.data?.card) {
         showToast({ type: 'error', text1: 'Could not create card', text2: res.message });
         return;
       }
-      showToast({ type: 'success', text1: 'Card created', text2: res.data.message || res.message });
+      showToast({
+        type: 'success',
+        text1: 'Card created',
+        text2: res.data.message || `Your card starts with ${formatUsd(prefundUsd)}.`,
+      });
       setVirtualCardDetailCache(res.data.card);
       void refreshDashboardData();
       router.replace(`/wallet/virtual-cards/${res.data.card.id}`);
+      createIdempotencyKeyRef.current = null;
     } catch (error) {
       showToast({
         type: 'error',
@@ -204,11 +247,15 @@ export default function VirtualCardCreateScreen() {
       showToast({ type: 'error', text1: 'Check details', text2: error });
       return;
     }
+    if (quoting) {
+      showToast({ type: 'error', text1: 'Please wait', text2: 'Calculating charges…' });
+      return;
+    }
     if (!chargeQuote || totalDebitKobo <= 0) {
       showToast({
         type: 'error',
-        text1: 'Rate unavailable',
-        text2: VIRTUAL_CARD_RATE_REQUIRED,
+        text1: 'Charges unavailable',
+        text2: quoteError || 'Could not calculate wallet debit. Try again shortly.',
       });
       return;
     }
@@ -217,15 +264,41 @@ export default function VirtualCardCreateScreen() {
 
   if (loading) {
     return (
-      <ProfileSubScreen title="New Virtual Card" subtitle="Create a USD card" headerIcon="add-circle-outline">
-        <ActivityIndicator color={Colors.primary} style={{ marginTop: 24 }} />
+      <ProfileSubScreen title="New Virtual Card" subtitle="Loading…">
+        <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 40 }} />
       </ProfileSubScreen>
     );
   }
 
   return (
     <>
-      <ProfileSubScreen title="New Virtual Card" subtitle="Create a USD card" headerIcon="add-circle-outline">
+      <ProfileSubScreen
+        title="New Virtual Card"
+        subtitle="Choose starting balance and card style"
+      >
+        <View style={styles.previewWrap}>
+          <VirtualCardVisual
+            designId={cardDesign}
+            brand={brand}
+            cardName={cardName}
+            holderName={holderName}
+            balanceUsd={prefundUsd > 0 ? prefundUsd : prefundBounds.min}
+            preview
+            size="hero"
+          />
+        </View>
+
+        <GlassCard contentStyle={styles.section}>
+          <VirtualCardDesignPicker
+            selected={cardDesign}
+            onSelect={setCardDesign}
+            brand={brand}
+            cardName={cardName}
+            holderName={holderName}
+            balanceUsd={prefundUsd > 0 ? prefundUsd : prefundBounds.min}
+          />
+        </GlassCard>
+
         <GlassCard contentStyle={styles.section}>
           <Text style={styles.label}>Card brand</Text>
           <View style={styles.brandRow}>
@@ -245,6 +318,45 @@ export default function VirtualCardCreateScreen() {
         </GlassCard>
 
         <GlassCard contentStyle={styles.section}>
+          <Text style={styles.label}>Starting balance (USD)</Text>
+          <TextInput
+            style={styles.input}
+            value={prefundAmount}
+            onChangeText={(value) => setPrefundAmount(sanitizeUsdInput(value))}
+            placeholder="1.00"
+            placeholderTextColor={Colors.mutedLight}
+            keyboardType="decimal-pad"
+          />
+          <Text style={styles.hint}>
+            {`Min ${formatUsd(prefundBounds.min)} · Max ${formatUsd(prefundBounds.max)}. A minimum starting balance applies at issuance.`}
+          </Text>
+        </GlassCard>
+
+        <GlassCard contentStyle={styles.section}>
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleCopy}>
+              <Text style={styles.label}>Contactless card</Text>
+              <Text style={styles.hint}>
+                Turn on to issue a contactless-enabled virtual card. Leave off for a standard online-only card.
+              </Text>
+            </View>
+            <Switch
+              value={isContactless}
+              onValueChange={setIsContactless}
+              trackColor={{ false: colors.border, true: `${Colors.primary}55` }}
+              thumbColor={isContactless ? Colors.primary : colors.surface}
+            />
+          </View>
+        </GlassCard>
+
+        <GlassCard contentStyle={styles.section}>
+          <Text style={styles.label}>Currency</Text>
+          <View style={styles.staticField}>
+            <Text style={styles.staticFieldText}>USD — United States Dollar</Text>
+          </View>
+        </GlassCard>
+
+        <GlassCard contentStyle={styles.section}>
           <Text style={styles.label}>Card name (optional)</Text>
           <TextInput
             style={styles.input}
@@ -256,51 +368,68 @@ export default function VirtualCardCreateScreen() {
           />
         </GlassCard>
 
-        <GlassCard contentStyle={styles.section}>
-          <Text style={styles.label}>Initial prefund (USD)</Text>
-          <TextInput
-            style={styles.input}
-            value={prefundUsd}
-            onChangeText={(v) => setPrefundUsd(sanitizeUsdInput(v))}
-            placeholder="0.00"
-            placeholderTextColor={Colors.mutedLight}
-            keyboardType="decimal-pad"
-          />
-          {config ? (
-            <Text style={styles.hint}>
-              Optional. Min {formatUsd(config.minPrefundUsd)} · Max {formatUsd(config.maxPrefundUsd)} · Live rate ₦{chargeQuote?.effectiveUsdRateNaira || config.effectiveUsdRateNaira}/$
-            </Text>
-          ) : null}
-        </GlassCard>
+        <GlassCard contentStyle={styles.chargeSection}>
+          <View style={styles.chargeHeader}>
+            <Text style={styles.chargeTitle}>Issuance charge</Text>
+            <Text style={styles.chargeSubtitle}>Prefund and fees — wallet is debited in Naira</Text>
+          </View>
 
-        <GlassCard contentStyle={styles.section}>
-          <Text style={styles.summaryTitle}>Charge summary</Text>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Prefund</Text>
-            <Text style={styles.summaryValue}>{formatUsd(prefundAmount)}</Text>
+          <View style={styles.chargeBody}>
+            <View style={styles.chargeRow}>
+              <Text style={styles.chargeLabel}>Issuer fee</Text>
+              {quoting ? (
+                <ActivityIndicator size="small" color={Colors.primary} />
+              ) : (
+                <Text style={styles.chargeUsdValue}>
+                  {formatUsd(chargeQuote?.providerFeesUsd || 0)}
+                </Text>
+              )}
+            </View>
+            <View style={styles.chargeRow}>
+              <Text style={styles.chargeLabel}>Prefund amount</Text>
+              {quoting ? (
+                <Text style={styles.chargeDebitValueMuted}>…</Text>
+              ) : (
+                <Text style={styles.chargeUsdValue}>
+                  {formatUsd(chargeQuote?.amountUsd || prefundUsd)}
+                </Text>
+              )}
+            </View>
+            <View style={styles.chargeRow}>
+              <Text style={styles.chargeLabel}>Total (USD)</Text>
+              {quoting ? (
+                <Text style={styles.chargeDebitValueMuted}>Calculating…</Text>
+              ) : (
+                <Text style={styles.chargeUsdValue}>
+                  {formatUsd(chargeQuote?.totalChargeUsd || 0)}
+                </Text>
+              )}
+            </View>
+
+            <View style={styles.chargeDivider} />
+
+            <View style={styles.chargeRow}>
+              <Text style={styles.chargeDebitLabel}>Total amount</Text>
+              {quoting ? (
+                <Text style={styles.chargeDebitValueMuted}>Calculating…</Text>
+              ) : (
+                <Text style={styles.chargeDebitValue}>
+                  {formatCurrency(String(totalDebitKobo))}
+                </Text>
+              )}
+            </View>
           </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Card fees (USD)</Text>
-            <Text style={styles.summaryValue}>
-              {quoting ? '…' : formatUsd(chargeQuote?.providerFeesUsd || 0)}
-            </Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Total (USD equiv.)</Text>
-            <Text style={styles.summaryValue}>
-              {quoting ? '…' : formatUsd(chargeQuote?.totalProviderUsd || prefundAmount)}
-            </Text>
-          </View>
-          <View style={[styles.summaryRow, styles.summaryTotal]}>
-            <Text style={styles.summaryTotalLabel}>Wallet debit</Text>
-            <Text style={styles.summaryTotalValue}>{formatCurrency(String(totalDebitKobo))}</Text>
-          </View>
+
           {!affordability.insufficientFunds ? null : (
-            <Text style={styles.warn}>Insufficient wallet balance</Text>
+            <Text style={styles.chargeWarn}>Insufficient wallet balance</Text>
           )}
+          {quoteError ? <Text style={styles.chargeWarn}>{quoteError}</Text> : null}
         </GlassCard>
 
         <GradientButton title="Create card" onPress={onContinue} disabled={submitting || quoting} />
+        <Text style={styles.issuanceNotice}>
+          {config?.cardIssuanceNotice || virtualCardIssuanceNotice()}
+        </Text>
       </ProfileSubScreen>
 
       <TransactionLockSheet
@@ -318,6 +447,9 @@ export default function VirtualCardCreateScreen() {
 }
 
 const createStyles = (colors: import('../theme/types').ThemeColors) => StyleSheet.create({
+  previewWrap: {
+    marginBottom: 14,
+  },
   section: { gap: Spacing.sm, marginBottom: 12 },
   label: { fontSize: 13, fontWeight: '600', color: colors.muted },
   brandRow: { flexDirection: 'row', gap: 8 },
@@ -342,23 +474,66 @@ const createStyles = (colors: import('../theme/types').ThemeColors) => StyleShee
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
+    fontWeight: '600',
     color: colors.dark,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.card,
   },
+  staticField: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: Radius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: `${colors.border}28`,
+  },
+  staticFieldText: { fontSize: 14, fontWeight: '600', color: colors.dark },
   hint: { fontSize: 12, color: colors.muted, lineHeight: 18 },
-  summaryTitle: { fontSize: 15, fontWeight: '700', color: colors.dark },
-  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  summaryLabel: { fontSize: 13, color: colors.muted },
-  summaryValue: { fontSize: 13, fontWeight: '600', color: colors.dark },
-  summaryTotal: {
-    marginTop: 8,
-    paddingTop: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
-  summaryTotalLabel: { fontSize: 14, fontWeight: '700', color: colors.dark },
-  summaryTotalValue: { fontSize: 16, fontWeight: '800', color: colors.dark },
-  warn: { fontSize: 12, color: Colors.error, marginTop: 6 },
+  toggleCopy: { flex: 1, gap: 4 },
+  issuanceNotice: {
+    fontSize: 11,
+    color: colors.muted,
+    lineHeight: 16,
+    textAlign: 'center',
+    marginTop: 12,
+    paddingHorizontal: 8,
+  },
+  chargeSection: { gap: 0, marginBottom: 16, padding: 0, overflow: 'hidden' },
+  chargeHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+    gap: 4,
+  },
+  chargeTitle: { fontSize: 15, fontWeight: '700', color: colors.dark },
+  chargeSubtitle: { fontSize: 12, color: colors.muted },
+  chargeBody: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: `${colors.border}28`,
+    gap: 12,
+  },
+  chargeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+  },
+  chargeLabel: { fontSize: 13, color: colors.muted },
+  chargeUsdValue: { fontSize: 15, fontWeight: '700', color: colors.dark },
+  chargeDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.border,
+  },
+  chargeDebitLabel: { fontSize: 14, fontWeight: '700', color: colors.dark },
+  chargeDebitValue: { fontSize: 18, fontWeight: '800', color: colors.dark },
+  chargeDebitValueMuted: { fontSize: 14, fontWeight: '600', color: colors.muted },
+  chargeWarn: { fontSize: 12, color: Colors.error, lineHeight: 18, paddingHorizontal: 16, paddingBottom: 12 },
 });
 
 function useStyles() {

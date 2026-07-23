@@ -20,7 +20,8 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.devnex.datamartng",
-      "buildNumber": "10",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "buildNumber": "11",
       "infoPlist": {
         "CFBundleDisplayName": "Datamart",
         "NSCameraUsageDescription": "Allow camera for KYC live face scan and document capture",
@@ -136,11 +137,24 @@
             "minSdkVersion": 26
           },
           "ios": {
-            "deploymentTarget": "15.5"
+            "deploymentTarget": "15.5",
+            "useFrameworks": "static",
+            "extraPods": [
+              {
+                "name": "GoogleUtilities",
+                "modular_headers": true
+              },
+              {
+                "name": "RecaptchaInterop",
+                "modular_headers": true
+              }
+            ]
           }
         }
       ],
-      "@react-native-firebase/app"
+      "@react-native-firebase/app",
+      "@react-native-firebase/app-check",
+      "./plugins/with-firebase-ios-modular-headers.js"
     ],
     "experiments": {
       "typedRoutes": true

@@ -5,13 +5,21 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
+  ScrollView,
+  Dimensions,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+  Platform,
 } from 'react-native';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { ProfileSubScreen } from '../components/profile/ProfileSubScreen';
 import { GlassCard } from '../components/ui/GlassCard';
+import { VirtualCardVisual } from '../components/virtual-cards/VirtualCardVisual';
+import { VirtualCardStatusPill } from '../components/virtual-cards/VirtualCardStatusPill';
+import { VirtualCardWalletThumb } from '../components/virtual-cards/VirtualCardWalletThumb';
 import { type VirtualCardConfig, type VirtualCardSummary } from '../lib/api';
 import {
   getVirtualCardsList,
@@ -22,30 +30,79 @@ import {
   type VirtualCardsListSnapshot,
 } from '../lib/virtual-cards-cache';
 import { Colors, Radius, useThemedStyles } from '../theme';
-import { formatUsd, virtualCardStatusMeta } from '../lib/virtual-card-utils';
+import { formatUsd, parseMaskedPan, virtualCardIssuerFootnote } from '../lib/virtual-card-utils';
 
-function CardRow({ card }: { card: VirtualCardSummary }) {
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const CARD_WIDTH = SCREEN_WIDTH - 48;
+const CARD_GAP = 14;
+
+function CardCarousel({
+  cards,
+  activeIndex,
+  onActiveIndexChange,
+  onPressCard,
+}: {
+  cards: VirtualCardSummary[];
+  activeIndex: number;
+  onActiveIndexChange: (index: number) => void;
+  onPressCard: (card: VirtualCardSummary) => void;
+}) {
   const styles = useStyles();
-  const status = virtualCardStatusMeta(card.status);
+
+  const onScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offsetX = event.nativeEvent.contentOffset.x;
+    const nextIndex = Math.round(offsetX / (CARD_WIDTH + CARD_GAP));
+    onActiveIndexChange(Math.max(0, Math.min(nextIndex, cards.length - 1)));
+  };
 
   return (
-    <GlassCard variant="light" borderRadius={Radius.lg} padding={14} contentStyle={styles.row}>
-      <View style={styles.rowTop}>
-        <View style={styles.brandBadge}>
-          <Ionicons name="card-outline" size={18} color={Colors.primary} />
-          <Text style={styles.brandText}>{card.brand}</Text>
+    <View style={styles.carouselWrap}>
+      <ScrollView
+        horizontal
+        decelerationRate="fast"
+        snapToInterval={CARD_WIDTH + CARD_GAP}
+        snapToAlignment="start"
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.carouselContent}
+        onMomentumScrollEnd={onScrollEnd}
+      >
+        {cards.map((card, index) => (
+          <TouchableOpacity
+            key={card.id}
+            activeOpacity={0.92}
+            onPress={() => onPressCard(card)}
+            style={[
+              styles.carouselItem,
+              { width: CARD_WIDTH },
+              index !== activeIndex && styles.carouselItemInactive,
+            ]}
+          >
+            <VirtualCardVisual
+              designId={card.cardDesign}
+              brand={card.brand}
+              cardName={card.cardName}
+              maskedPan={card.maskedPan}
+              balanceUsd={card.balanceUsd}
+              expiry={card.expiry}
+              status={card.status}
+              size="list"
+              showBalance={false}
+            />
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {cards.length > 1 ? (
+        <View style={styles.dots}>
+          {cards.map((card, index) => (
+            <View
+              key={card.id}
+              style={[styles.dot, index === activeIndex && styles.dotActive]}
+            />
+          ))}
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: `${status.color}18` }]}>
-          <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
-        </View>
-      </View>
-      <Text style={styles.cardName}>{card.cardName || 'Virtual card'}</Text>
-      <Text style={styles.pan}>{card.maskedPan || '•••• •••• •••• ••••'}</Text>
-      <View style={styles.rowBottom}>
-        <Text style={styles.balance}>{formatUsd(card.balanceUsd)}</Text>
-        {card.expiry ? <Text style={styles.expiry}>Exp {card.expiry}</Text> : null}
-      </View>
-    </GlassCard>
+      ) : null}
+    </View>
   );
 }
 
@@ -56,10 +113,12 @@ export default function VirtualCardsListScreen() {
   const [config, setConfig] = useState<VirtualCardConfig | null>(initial?.config ?? null);
   const [loading, setLoading] = useState(!hasVirtualCardsListCache());
   const [refreshing, setRefreshing] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
 
   const applySnapshot = useCallback((snapshot: VirtualCardsListSnapshot) => {
     setCards(snapshot.cards);
     setConfig(snapshot.config);
+    setActiveIndex((current) => Math.min(current, Math.max(snapshot.cards.length - 1, 0)));
   }, []);
 
   useEffect(() => {
@@ -89,11 +148,15 @@ export default function VirtualCardsListScreen() {
   }, [applySnapshot]);
 
   const canCreate = !config || cards.length < config.maxCardsPerUser;
+  const activeCount = useMemo(
+    () => cards.filter((c) => String(c.status).toUpperCase() === 'ACTIVE').length,
+    [cards],
+  );
 
   return (
     <ProfileSubScreen
-      title="Virtual Cards"
-      subtitle="USD cards for online payments"
+      title="Your cards"
+      subtitle="For subscriptions & online payments worldwide"
       headerIcon="card-outline"
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
       footer={canCreate ? (
@@ -114,25 +177,55 @@ export default function VirtualCardsListScreen() {
           <Ionicons name="card-outline" size={32} color={Colors.mutedLight} />
           <Text style={styles.emptyTitle}>No virtual cards yet</Text>
           <Text style={styles.emptySub}>
-            Create a USD virtual card for international online payments. You can hold multiple cards.
+            Create a USD virtual card for international subscriptions and online checkout.
           </Text>
         </GlassCard>
       ) : (
         <View style={styles.list}>
-          {config ? (
-            <Text style={styles.limitHint}>
-              {cards.length} of {config.maxCardsPerUser} active cards
+          <GlassCard variant="light" padding={12} contentStyle={styles.limitsStrip}>
+            <Text style={styles.limitsLeft}>
+              {activeCount} of {config?.maxCardsPerUser ?? cards.length} active cards
             </Text>
-          ) : null}
-          {cards.map((card) => (
-            <TouchableOpacity
-              key={card.id}
-              activeOpacity={0.85}
-              onPress={() => router.push(`/wallet/virtual-cards/${card.id}`)}
-            >
-              <CardRow card={card} />
-            </TouchableOpacity>
-          ))}
+          </GlassCard>
+
+          <CardCarousel
+            cards={cards}
+            activeIndex={activeIndex}
+            onActiveIndexChange={setActiveIndex}
+            onPressCard={(card) => router.push(`/wallet/virtual-cards/${card.id}`)}
+          />
+
+          <Text style={styles.walletHeading}>YOUR WALLET</Text>
+          <View style={styles.walletList}>
+            {cards.map((card) => {
+              const pan = parseMaskedPan(card.maskedPan);
+              const compactPan = pan.bin && pan.last4
+                ? `${pan.bin} •••• ${pan.last4}`
+                : pan.display;
+              return (
+                <TouchableOpacity
+                  key={card.id}
+                  activeOpacity={0.85}
+                  onPress={() => router.push(`/wallet/virtual-cards/${card.id}`)}
+                  style={styles.walletRow}
+                >
+                  <VirtualCardWalletThumb designId={card.cardDesign} />
+                  <View style={styles.walletMeta}>
+                    <Text style={styles.walletName} numberOfLines={1}>
+                      {card.cardName || `${card.brand} card`}
+                    </Text>
+                    <Text style={styles.walletPan}>{compactPan}</Text>
+                  </View>
+                  <View style={styles.walletRight}>
+                    <Text style={styles.walletBalance}>{formatUsd(card.balanceUsd)}</Text>
+                    <VirtualCardStatusPill status={card.status} />
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <Text style={styles.compliance}>{virtualCardIssuerFootnote()}</Text>
         </View>
       )}
     </ProfileSubScreen>
@@ -140,22 +233,69 @@ export default function VirtualCardsListScreen() {
 }
 
 const createStyles = (colors: import('../theme/types').ThemeColors) => StyleSheet.create({
-  list: { gap: 10 },
-  limitHint: { fontSize: 12, color: colors.muted, marginBottom: 4 },
-  row: { gap: 8 },
-  rowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  brandBadge: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  brandText: { fontSize: 13, fontWeight: '700', color: colors.dark },
-  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
-  statusText: { fontSize: 11, fontWeight: '700' },
-  cardName: { fontSize: 16, fontWeight: '700', color: colors.dark },
-  pan: { fontSize: 14, color: colors.muted, letterSpacing: 1 },
-  rowBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  balance: { fontSize: 18, fontWeight: '800', color: colors.dark },
-  expiry: { fontSize: 12, color: colors.muted },
+  list: { gap: 14 },
+  limitsStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  limitsLeft: { fontSize: 12.5, fontWeight: '600', color: colors.muted },
+  carouselWrap: { gap: 10 },
+  carouselContent: {
+    paddingHorizontal: 2,
+    gap: CARD_GAP,
+  },
+  carouselItem: {
+    transform: [{ scale: 1 }],
+  },
+  carouselItemInactive: {
+    opacity: 0.88,
+    transform: [{ scale: 0.98 }],
+  },
+  dots: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.border,
+  },
+  dotActive: {
+    width: 16,
+    backgroundColor: Colors.primary,
+  },
+  walletHeading: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: colors.muted,
+    letterSpacing: 0.3,
+  },
+  walletList: { gap: 10 },
+  walletRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderRadius: Radius.lg,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  walletMeta: { flex: 1, gap: 2 },
+  walletName: { fontSize: 14, fontWeight: '700', color: colors.dark },
+  walletPan: {
+    fontSize: 12,
+    color: colors.muted,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  walletRight: { alignItems: 'flex-end', gap: 4 },
+  walletBalance: { fontSize: 14, fontWeight: '700', color: colors.dark },
   empty: { alignItems: 'center', gap: 8, paddingVertical: 28 },
   emptyTitle: { fontSize: 16, fontWeight: '700', color: colors.dark },
   emptySub: { fontSize: 13, color: colors.muted, textAlign: 'center', lineHeight: 20 },
+  compliance: { fontSize: 11, color: colors.muted, lineHeight: 16, marginTop: 4 },
   createBtn: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -418,20 +418,30 @@ export interface VirtualCardConfig {
   maxCardsPerUser: number;
   minPrefundUsd: string;
   maxPrefundUsd: string;
-  usdRateMarkupKobo?: string;
+  minFundUsd?: string;
+  maxFundUsd?: string;
   baseUsdRateKobo?: string;
   baseUsdRateNaira?: string;
   effectiveUsdRateKobo?: string;
   effectiveUsdRateNaira?: string;
-  rateSource?: 'live';
+  rateSource?: 'live' | 'configured';
   providerRateFetchedAt?: string | null;
   rateAvailable?: boolean;
   rateError?: string | null;
   usdRateKobo?: string;
   usdRateNaira?: string;
+  platformFeesUsd?: Record<string, string>;
   issueMarkupKobo: string;
   fundMarkupKobo: string;
   allowedBrands: Array<'VISA' | 'MASTERCARD'>;
+  allowedCardDesigns?: string[];
+  cardIssuanceNotice?: string;
+  currency?: 'USD';
+  /** USD loaded onto the card at creation (PayVessel minimum $1). */
+  initialPrefundUsd?: string;
+  minCreatePrefundUsd?: string;
+  maxCreatePrefundUsd?: string;
+  defaultCreatePrefundUsd?: string;
 }
 
 export interface VirtualCardChargeQuote {
@@ -440,19 +450,33 @@ export interface VirtualCardChargeQuote {
   providerIssueFeeUsd?: string;
   providerFundFeeUsd?: string;
   providerFeesUsd: string;
-  totalProviderUsd: string;
-  operationMarkupKobo: string;
+  platformFeesUsd: string;
+  platformFeeBreakdown?: Record<string, string>;
+  totalChargeUsd: string;
   conversionKobo: string;
   totalDebitKobo: string;
   baseUsdRateKobo: string;
   effectiveUsdRateKobo: string;
   effectiveUsdRateNaira: string;
-  rateSource?: 'live';
+  rateSource?: 'live' | 'configured';
+}
+
+export interface VirtualCardTransaction {
+  id: string;
+  type: string;
+  description: string;
+  amountUsd: string;
+  currency: string;
+  status?: string;
+  merchant?: string | null;
+  declineReason?: string | null;
+  createdAt?: string | null;
 }
 
 export interface VirtualCardSummary {
   id: string;
   cardName: string | null;
+  cardDesign?: string | null;
   brand: string;
   currency: string;
   status: string;
@@ -1795,7 +1819,9 @@ class ApiClient {
   async createVirtualCard(data: {
     brand: 'VISA' | 'MASTERCARD';
     cardName?: string;
-    prefundUsd?: number;
+    cardDesign?: string;
+    initialPrefundUsd?: string;
+    isContactless?: boolean;
     pin?: string;
     biometricToken?: string;
     deviceId?: string;
@@ -1813,7 +1839,7 @@ class ApiClient {
   }
 
   async quoteVirtualCardFees(data: {
-    action: 'issuance' | 'funding';
+    feeType: 'issuance' | 'funding' | 'withdrawal' | 'spend' | 'maintenance' | 'cross_border' | 'chargeback' | 'decline';
     amountUsd?: string;
   }): Promise<ApiResponse<Record<string, unknown>>> {
     return this.request('/virtual-cards/fees/quote', {
@@ -1849,8 +1875,14 @@ class ApiClient {
     });
   }
 
-  async revealVirtualCard(cardId: string): Promise<ApiResponse<VirtualCardCredentials>> {
-    return this.request(`/virtual-cards/${encodeURIComponent(cardId)}/reveal`);
+  async revealVirtualCard(
+    cardId: string,
+    data: { pin?: string; biometricToken?: string; deviceId?: string },
+  ): Promise<ApiResponse<VirtualCardCredentials>> {
+    return this.request(`/virtual-cards/${encodeURIComponent(cardId)}/reveal`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   }
 
   async syncVirtualCard(cardId: string): Promise<ApiResponse<{ card: VirtualCardSummary }>> {

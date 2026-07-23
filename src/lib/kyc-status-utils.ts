@@ -1,4 +1,5 @@
 import type { KycStatusData } from './api';
+import { hasTier2IdentityVerified } from './api';
 
 export const KYC_ID_TYPES = [
   { value: 'NIN_SLIP', label: 'NIN Slip' },
@@ -14,6 +15,44 @@ export const KYC_ID_TYPE_LABELS = Object.fromEntries(
 
 export function hasSavedKycAddress(data?: KycStatusData | null): boolean {
   return !!(data?.user.address && data?.user.city && data?.user.state);
+}
+
+export function isVirtualCardCreationEligible(data?: KycStatusData | null): {
+  ok: boolean;
+  reason?: string;
+} {
+  if (!hasTier2IdentityVerified(data)) {
+    return {
+      ok: false,
+      reason: 'Complete BVN and NIN verification before creating a virtual card.',
+    };
+  }
+  if (!hasSavedKycAddress(data)) {
+    return {
+      ok: false,
+      reason: 'Complete your residential address in KYC before creating a virtual card.',
+    };
+  }
+
+  const docs = data?.documents ?? [];
+  const approvedIdentityDoc = docs.find(
+    (doc) => doc.status === 'APPROVED'
+      && (
+        doc.type === 'SELFIE'
+        || doc.type === 'NIN_SLIP'
+        || doc.type === 'DRIVERS_LICENSE'
+        || doc.type === 'PASSPORT'
+        || doc.type === 'VOTERS_CARD'
+      ),
+  );
+  if (!approvedIdentityDoc) {
+    return {
+      ok: false,
+      reason: 'An approved government ID or live face scan is required before creating a card.',
+    };
+  }
+
+  return { ok: true };
 }
 
 function isSubmittedDoc(status?: string): boolean {

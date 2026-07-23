@@ -6,6 +6,7 @@
   "scripts": {
     "start": "expo start",
     "start:dev": "expo start --dev-client --lan",
+    "start:tunnel": "expo start --dev-client --tunnel",
     "android": "expo run:android",
     "android:install": "expo run:android --no-bundler",
     "ios": "expo run:ios",
@@ -46,6 +47,7 @@
     "expo-notifications": "^0.29.14",
     "expo-print": "~14.0.3",
     "expo-router": "~4.0.22",
+    "expo-screen-capture": "~7.0.1",
     "expo-secure-store": "~14.0.1",
     "expo-sharing": "~13.0.1",
     "expo-splash-screen": "~0.29.24",
