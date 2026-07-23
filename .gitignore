@@ -14,6 +14,8 @@ web-build/
 .env.local
 .env.*
 !.env.example
+# Firebase client config — use EAS file env GOOGLE_SERVICES_INFO_PLIST (do not commit)
+GoogleService-Info.plist
 # Firebase admin SDK keys (never commit)
 mayor-966a1-*.json
 *-firebase-adminsdk*.json
