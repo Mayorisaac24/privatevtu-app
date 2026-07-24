@@ -67,8 +67,8 @@ import { refreshDashboardData } from '../lib/dashboard-data';
 import * as Clipboard from 'expo-clipboard';
 import { useStatusBarStyle } from '../hooks/useStatusBarStyle';
 
-type LockAction = 'fund' | 'terminate' | 'reveal';
-type DetailSheet = 'menu' | 'fund' | 'reveal' | 'terminate';
+type LockAction = 'fund' | 'withdraw' | 'terminate' | 'reveal';
+type DetailSheet = 'menu' | 'fund' | 'withdraw' | 'reveal' | 'terminate';
 type RevealPhase = 'auth' | 'shown';
 
 function resolveInitialCard(cardId: string): VirtualCardSummary | null {
@@ -116,12 +116,40 @@ export default function VirtualCardDetailScreen() {
   const [revealPhase, setRevealPhase] = useState<RevealPhase>('auth');
   const [ephemeralCredentials, setEphemeralCredentials] = useState<VirtualCardCredentials | null>(null);
   const [terminateConfirm, setTerminateConfirm] = useState('');
+  const [terminateQuote, setTerminateQuote] = useState<{
+    grossBalanceUsd: string;
+    providerFeeUsd: string;
+    platformFeeUsd: string;
+    totalFeesUsd: string;
+    netRefundUsd: string;
+    refundNaira: string;
+    baseUsdRateNaira: string;
+    terminationNotice: string;
+  } | null>(null);
+  const [terminateQuoteLoading, setTerminateQuoteLoading] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawQuote, setWithdrawQuote] = useState<{
+    amountUsd: string;
+    cardBalanceUsd: string;
+    providerFeeUsd: string;
+    platformFeeUsd: string;
+    totalFeesUsd: string;
+    netRefundUsd: string;
+    refundNaira: string;
+    baseUsdRateNaira: string;
+    withdrawalNotice: string;
+  } | null>(null);
+  const [withdrawQuoteError, setWithdrawQuoteError] = useState<string | null>(null);
+  const [quotingWithdraw, setQuotingWithdraw] = useState(false);
 
   const quoteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const withdrawQuoteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingAutoSyncRef = useRef(false);
   const fundIdempotencyKeyRef = useRef<string | null>(null);
+  const withdrawIdempotencyKeyRef = useRef<string | null>(null);
 
   const fundUsd = parseUsdInput(fundAmount);
+  const withdrawUsd = parseUsdInput(withdrawAmount);
   const fundAffordability = useWalletAffordability(fundDebitKobo, activeSheet === 'fund');
 
   const applyDetail = useCallback((detail: VirtualCardDetailSnapshot) => {
@@ -133,6 +161,10 @@ export default function VirtualCardDetailScreen() {
     setActiveSheet(null);
     setRevealPhase('auth');
     setTerminateConfirm('');
+    setTerminateQuote(null);
+    setWithdrawAmount('');
+    setWithdrawQuote(null);
+    setWithdrawQuoteError(null);
     clearEphemeralCredentials(setEphemeralCredentials);
   }, []);
 
@@ -249,6 +281,63 @@ export default function VirtualCardDetailScreen() {
     };
   }, [fundUsd, activeSheet]);
 
+  useEffect(() => {
+    if (activeSheet !== 'withdraw' || withdrawUsd <= 0) {
+      setWithdrawQuote(null);
+      setWithdrawQuoteError(null);
+      return;
+    }
+    if (withdrawQuoteTimer.current) clearTimeout(withdrawQuoteTimer.current);
+    withdrawQuoteTimer.current = setTimeout(async () => {
+      if (!id) return;
+      setQuotingWithdraw(true);
+      try {
+        const res = await api.quoteVirtualCardWithdrawal(id, withdrawUsd);
+        if (isResponseSuccess(res) && res.data?.quote) {
+          setWithdrawQuote({
+            ...res.data.quote,
+            baseUsdRateNaira: res.data.quote.baseUsdRateNaira || '',
+            withdrawalNotice: res.data.withdrawalNotice || '',
+          });
+          setWithdrawQuoteError(null);
+        } else {
+          setWithdrawQuote(null);
+          setWithdrawQuoteError(virtualCardUserMessage(res.message, 'Could not calculate withdrawal quote.'));
+        }
+      } finally {
+        setQuotingWithdraw(false);
+      }
+    }, 400);
+    return () => {
+      if (withdrawQuoteTimer.current) clearTimeout(withdrawQuoteTimer.current);
+    };
+  }, [withdrawUsd, activeSheet, id]);
+
+  useEffect(() => {
+    if (activeSheet !== 'terminate' || !id) return;
+    let cancelled = false;
+    setTerminateQuoteLoading(true);
+    void api.quoteVirtualCardTermination(id)
+      .then((res) => {
+        if (cancelled) return;
+        if (isResponseSuccess(res) && res.data?.quote) {
+          setTerminateQuote({
+            ...res.data.quote,
+            baseUsdRateNaira: res.data.quote.baseUsdRateNaira || '',
+            terminationNotice: res.data.terminationNotice || '',
+          });
+        } else {
+          setTerminateQuote(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setTerminateQuoteLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSheet, id]);
+
   const openLock = (action: LockAction) => {
     setLockAction(action);
     setShowLock(true);
@@ -308,6 +397,38 @@ export default function VirtualCardDetailScreen() {
     }
   };
 
+  const handleWithdraw = async (auth: TransactionAuthPayload) => {
+    if (!id || !card) return;
+    setActionLoading(true);
+    try {
+      if (!withdrawIdempotencyKeyRef.current) {
+        withdrawIdempotencyKeyRef.current = await newVirtualCardIdempotencyKey('vc-withdraw');
+      }
+      const res = await api.withdrawFromVirtualCard(id, {
+        amountUsd: withdrawUsd,
+        idempotencyKey: withdrawIdempotencyKeyRef.current,
+        ...auth,
+      });
+      if (!isResponseSuccess(res) || !res.data?.card) {
+        showToast({ type: 'error', text1: 'Withdrawal failed', text2: res.message });
+        return;
+      }
+      setCard(res.data.card);
+      setVirtualCardDetailCache(res.data.card);
+      closeSheets();
+      setWithdrawAmount('');
+      withdrawIdempotencyKeyRef.current = null;
+      showToast({ type: 'success', text1: 'Withdrawal complete', text2: res.data.message || res.message });
+      void refreshDashboardData();
+      void pullToRefreshVirtualCardDetail(id).then((detail) => {
+        if (detail) applyDetail(detail);
+      });
+    } finally {
+      setActionLoading(false);
+      setShowLock(false);
+    }
+  };
+
   const handleTerminate = async (auth: TransactionAuthPayload) => {
     if (!id) return;
     setActionLoading(true);
@@ -318,7 +439,12 @@ export default function VirtualCardDetailScreen() {
         return;
       }
       closeSheets();
-      showToast({ type: 'success', text1: 'Card terminated', text2: res.message });
+      void refreshDashboardData();
+      showToast({
+        type: 'success',
+        text1: 'Card terminated',
+        text2: res.data.message || res.message,
+      });
       removeVirtualCardFromCaches(id);
       router.replace('/wallet/virtual-cards');
     } finally {
@@ -355,6 +481,7 @@ export default function VirtualCardDetailScreen() {
 
   const onLockAuthorized = async (auth: TransactionAuthPayload) => {
     if (lockAction === 'fund') return handleFund(auth);
+    if (lockAction === 'withdraw') return handleWithdraw(auth);
     if (lockAction === 'terminate') return handleTerminate(auth);
     return fetchRevealCredentials(auth);
   };
@@ -376,7 +503,13 @@ export default function VirtualCardDetailScreen() {
   const isActive = card.status === 'ACTIVE' || card.status === 'FROZEN';
   const isFrozen = card.status === 'FROZEN';
   const canFundOrReveal = card.status === 'ACTIVE';
-  const lockAmount = lockAction === 'fund' ? formatCurrency(String(fundDebitKobo)) : undefined;
+  const minWithdrawUsd = Number(config?.minWithdrawUsd || '3');
+  const canWithdraw = isActive && Number(card.balanceUsd) >= minWithdrawUsd;
+  const lockAmount = lockAction === 'fund'
+    ? formatCurrency(String(fundDebitKobo))
+    : lockAction === 'withdraw' && withdrawQuote
+      ? `₦${withdrawQuote.refundNaira}`
+      : undefined;
   const holderLine = card.cardName || 'Virtual card';
   const terminateOk = terminateConfirm.trim().toUpperCase() === 'TERMINATE';
   const issuerFees = fundQuote ? Number(fundQuote.providerFeesUsd) : 0;
@@ -444,6 +577,18 @@ export default function VirtualCardDetailScreen() {
                   setActiveSheet('fund');
                 }}
               />
+            <DetailAction
+              icon="arrow-down-circle-outline"
+              label="Withdraw"
+              disabled={!canWithdraw}
+              onPress={() => {
+                if (!canWithdraw) return;
+                void newVirtualCardIdempotencyKey('vc-withdraw').then((key) => {
+                  withdrawIdempotencyKeyRef.current = key;
+                });
+                setActiveSheet('withdraw');
+              }}
+            />
             <DetailAction
               icon={isFrozen ? 'snow-outline' : 'snow-outline'}
               label={isFrozen ? 'Unfreeze' : 'Freeze'}
@@ -525,12 +670,26 @@ export default function VirtualCardDetailScreen() {
         />
         <View style={styles.sheetDivider} />
         <SheetRow
+          icon="arrow-down-circle-outline"
+          label="Withdraw to wallet"
+          sub="Move USD from card back to your NGN balance"
+          onPress={() => {
+            if (!canWithdraw) return;
+            void newVirtualCardIdempotencyKey('vc-withdraw').then((key) => {
+              withdrawIdempotencyKeyRef.current = key;
+            });
+            setActiveSheet('withdraw');
+          }}
+        />
+        <View style={styles.sheetDivider} />
+        <SheetRow
           icon="trash-outline"
           label="Terminate card"
           sub="Irreversible — balance refunds to wallet"
           danger
           onPress={() => {
             setTerminateConfirm('');
+            setTerminateQuote(null);
             setActiveSheet('terminate');
           }}
         />
@@ -607,6 +766,57 @@ export default function VirtualCardDetailScreen() {
       </VirtualCardBottomSheet>
 
       <VirtualCardBottomSheet
+        visible={activeSheet === 'withdraw' && canWithdraw}
+        onClose={closeSheets}
+        keyboardAvoiding
+      >
+        <Text style={styles.sheetTitle}>Withdraw to wallet</Text>
+        <Text style={styles.fieldLabel}>Amount (USD)</Text>
+        <TextInput
+          style={styles.fundInput}
+          value={withdrawAmount}
+          onChangeText={(v) => setWithdrawAmount(sanitizeUsdInput(v))}
+          placeholder="0.00"
+          placeholderTextColor={Colors.mutedLight}
+          keyboardType="decimal-pad"
+        />
+        <Text style={styles.fundBounds}>
+          Min {formatUsd(config?.minWithdrawUsd || '3.00')}
+          {' · '}
+          Balance {formatUsd(card.balanceUsd)}
+        </Text>
+        {quotingWithdraw ? (
+          <Text style={styles.fundQuoteLine}>Calculating quote…</Text>
+        ) : withdrawQuoteError ? (
+          <Text style={[styles.fundQuoteLine, styles.fundQuoteError]}>{withdrawQuoteError}</Text>
+        ) : withdrawQuote ? (
+          <>
+            <Text style={styles.fundQuoteLine}>
+              ${withdrawQuote.amountUsd} − fees ${withdrawQuote.totalFeesUsd}
+              {' '}(issuer ${withdrawQuote.providerFeeUsd} + platform ${withdrawQuote.platformFeeUsd})
+              {' '}= ${withdrawQuote.netRefundUsd} → ₦{withdrawQuote.refundNaira} at base rate ₦{withdrawQuote.baseUsdRateNaira}/USD.
+            </Text>
+            <Text style={[styles.fundQuoteLine, { marginTop: 6 }]}>
+              {withdrawQuote.withdrawalNotice}
+            </Text>
+          </>
+        ) : withdrawUsd > 0 ? (
+          <Text style={styles.fundQuoteLine}>Enter an amount to see your wallet credit.</Text>
+        ) : null}
+        <GradientButton
+          title="Continue"
+          onPress={() => openLock('withdraw')}
+          disabled={
+            withdrawUsd < minWithdrawUsd
+            || withdrawUsd > Number(card.balanceUsd)
+            || !withdrawQuote
+            || quotingWithdraw
+            || actionLoading
+          }
+        />
+      </VirtualCardBottomSheet>
+
+      <VirtualCardBottomSheet
         visible={activeSheet === 'reveal' && revealPhase === 'auth' && canFundOrReveal}
         onClose={closeSheets}
         scroll={false}
@@ -632,10 +842,26 @@ export default function VirtualCardDetailScreen() {
           <Ionicons name="warning-outline" size={28} color={Colors.error} />
         </View>
         <Text style={[styles.sheetTitle, styles.centerText]}>Terminate this card?</Text>
-        <Text style={[styles.revealSub, styles.centerText]}>
-          This can&apos;t be undone. The card stops working immediately, and your remaining balance of{' '}
-          <Text style={styles.bold}>{formatUsd(card.balanceUsd)}</Text> is refunded to your NGN wallet when the issuer completes closure.
-        </Text>
+        {terminateQuoteLoading ? (
+          <Text style={[styles.revealSub, styles.centerText]}>Calculating refund…</Text>
+        ) : terminateQuote ? (
+          <>
+            <Text style={[styles.revealSub, styles.centerText]}>
+              Balance <Text style={styles.bold}>${terminateQuote.grossBalanceUsd}</Text>
+              {' '}− fees <Text style={styles.bold}>${terminateQuote.totalFeesUsd}</Text>
+              {' '}(issuer ${terminateQuote.providerFeeUsd} + platform ${terminateQuote.platformFeeUsd})
+              {' '}= <Text style={styles.bold}>${terminateQuote.netRefundUsd}</Text>
+              {' '}→ <Text style={styles.bold}>₦{terminateQuote.refundNaira}</Text> at base rate ₦{terminateQuote.baseUsdRateNaira}/USD.
+            </Text>
+            <Text style={[styles.revealSub, styles.centerText, { marginTop: 8 }]}>
+              {terminateQuote.terminationNotice}
+            </Text>
+          </>
+        ) : (
+          <Text style={[styles.revealSub, styles.centerText]}>
+            This cannot be undone. Your remaining balance will be refunded to your NGN wallet after USD fees, using the base exchange rate.
+          </Text>
+        )}
         <Text style={styles.fieldLabel}>Type TERMINATE to confirm</Text>
         <TextInput
           style={styles.fundInput}
@@ -663,6 +889,8 @@ export default function VirtualCardDetailScreen() {
         title={
           lockAction === 'fund'
             ? 'Authorize funding'
+            : lockAction === 'withdraw'
+              ? 'Authorize withdrawal'
             : lockAction === 'terminate'
               ? 'Authorize termination'
               : 'Verify to reveal card'
@@ -670,6 +898,8 @@ export default function VirtualCardDetailScreen() {
         subtitle={
           lockAction === 'fund'
             ? `Funding ${formatUsd(fundUsd)}`
+            : lockAction === 'withdraw'
+              ? `Withdrawing ${formatUsd(withdrawUsd)} to your wallet`
             : lockAction === 'terminate'
               ? 'This permanently closes the card'
               : 'Full card details are fetched from the issuer and not stored locally'
@@ -679,6 +909,8 @@ export default function VirtualCardDetailScreen() {
         processingMessage={
           lockAction === 'fund'
             ? 'Funding your card…'
+            : lockAction === 'withdraw'
+              ? 'Processing withdrawal…'
             : lockAction === 'terminate'
               ? 'Terminating card…'
               : 'Fetching card details…'
@@ -688,13 +920,17 @@ export default function VirtualCardDetailScreen() {
             ? 'Securely loading your card from the issuer'
             : lockAction === 'fund'
               ? 'Debiting your wallet and crediting the card'
-              : 'Closing the card with the issuer'
+              : lockAction === 'withdraw'
+                ? 'Moving USD from your card and crediting your wallet'
+              : 'Closing the card and crediting your wallet refund'
         }
         processingIcon={
           lockAction === 'reveal'
             ? 'card-outline'
             : lockAction === 'fund'
               ? 'wallet-outline'
+              : lockAction === 'withdraw'
+                ? 'arrow-down-circle-outline'
               : 'close-circle-outline'
         }
       />
@@ -834,7 +1070,7 @@ const createStyles = (colors: import('../theme/types').ThemeColors) => StyleShee
     color: colors.dark,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
-  actionRow: { flexDirection: 'row', gap: 10, marginTop: 6 },
+  actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 6 },
   detailAction: {
     flex: 1,
     alignItems: 'center',
@@ -931,6 +1167,8 @@ const createStyles = (colors: import('../theme/types').ThemeColors) => StyleShee
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
   fundBounds: { fontSize: 11, color: colors.muted },
+  fundQuoteLine: { fontSize: 12, color: colors.muted, lineHeight: 18, marginTop: 10 },
+  fundQuoteError: { color: Colors.error },
   quoteBox: {
     backgroundColor: colors.surfaceAlt,
     borderRadius: Radius.md,

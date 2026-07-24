@@ -442,6 +442,9 @@ export interface VirtualCardConfig {
   minCreatePrefundUsd?: string;
   maxCreatePrefundUsd?: string;
   defaultCreatePrefundUsd?: string;
+  minWithdrawUsd?: string;
+  cardWithdrawalNotice?: string;
+  cardTerminationNotice?: string;
 }
 
 export interface VirtualCardChargeQuote {
@@ -1867,7 +1870,7 @@ class ApiClient {
       deviceId?: string;
       idempotencyKey?: string;
     },
-  ): Promise<ApiResponse<{ card: VirtualCardSummary; message: string }>> {
+  ): Promise<ApiResponse<{ card: VirtualCardSummary; transactionReference?: string; message?: string }>> {
     return this.request(`/virtual-cards/${encodeURIComponent(cardId)}/fund`, {
       method: 'POST',
       body: JSON.stringify(data),
@@ -1897,10 +1900,88 @@ class ApiClient {
     return this.request(`/virtual-cards/${encodeURIComponent(cardId)}/unfreeze`, { method: 'POST' });
   }
 
+  async quoteVirtualCardWithdrawal(
+    cardId: string,
+    amountUsd: number,
+  ): Promise<ApiResponse<{
+    quote: {
+      amountUsd: string;
+      cardBalanceUsd: string;
+      grossBalanceUsd: string;
+      providerFeeUsd: string;
+      platformFeeUsd: string;
+      totalFeesUsd: string;
+      netRefundUsd: string;
+      refundNaira: string;
+      baseUsdRateNaira: string;
+    };
+    withdrawalNotice: string;
+  }>> {
+    return this.request(`/virtual-cards/${encodeURIComponent(cardId)}/withdraw/quote`, {
+      method: 'POST',
+      body: JSON.stringify({ amountUsd }),
+    });
+  }
+
+  async withdrawFromVirtualCard(
+    cardId: string,
+    data: {
+      amountUsd: number;
+      pin?: string;
+      biometricToken?: string;
+      deviceId?: string;
+      idempotencyKey?: string;
+    },
+  ): Promise<ApiResponse<{
+    card: VirtualCardSummary;
+    settlement?: {
+      grossBalanceUsd: string;
+      providerFeeUsd: string;
+      platformFeeUsd: string;
+      totalFeesUsd: string;
+      netRefundUsd: string;
+      refundNaira: string;
+    };
+    transactionReference?: string;
+    message?: string;
+  }>> {
+    return this.request(`/virtual-cards/${encodeURIComponent(cardId)}/withdraw`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+      timeoutMs: 90000,
+    });
+  }
+
+  async quoteVirtualCardTermination(cardId: string): Promise<ApiResponse<{
+    quote: {
+      grossBalanceUsd: string;
+      providerFeeUsd: string;
+      platformFeeUsd: string;
+      totalFeesUsd: string;
+      netRefundUsd: string;
+      refundNaira: string;
+      baseUsdRateNaira: string;
+    };
+    terminationNotice: string;
+  }>> {
+    return this.request(`/virtual-cards/${encodeURIComponent(cardId)}/terminate/quote`);
+  }
+
   async terminateVirtualCard(
     cardId: string,
     data: { pin?: string; biometricToken?: string; deviceId?: string },
-  ): Promise<ApiResponse<{ card: VirtualCardSummary }>> {
+  ): Promise<ApiResponse<{
+    card: VirtualCardSummary;
+    settlement?: {
+      grossBalanceUsd: string;
+      providerFeeUsd: string;
+      platformFeeUsd: string;
+      totalFeesUsd: string;
+      netRefundUsd: string;
+      refundNaira: string;
+    };
+    message?: string;
+  }>> {
     return this.request(`/virtual-cards/${encodeURIComponent(cardId)}/terminate`, {
       method: 'POST',
       body: JSON.stringify(data),
